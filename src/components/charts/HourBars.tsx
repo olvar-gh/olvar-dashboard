@@ -87,7 +87,7 @@ export function HourBars({
   const timeDomain = [toMs(domain[0]), toMs(domain[1])] as const;
   const nowMs = now === undefined ? timeDomain[1] : toMs(now);
   const buckets = toBuckets(data, timeDomain, bucketMs, nowMs);
-  const values = buckets.flatMap((b) => (b.v == null ? [] : [b.v]));
+  const values = buckets.flatMap((b) => (b.v == null || b.future ? [] : [b.v]));
   const mini = variant === 'mini';
 
   return (
@@ -102,7 +102,7 @@ export function HourBars({
             <G>
               {buckets.map((b, i) => {
                 const cx = slot * i + slot / 2;
-                const stub = b.v == null || b.v <= 0 || y(b.v) > plot - MINI.stubHeight;
+                const stub = b.future || b.v == null || b.v <= 0 || y(b.v) > plot - MINI.stubHeight;
                 const bw = stub ? Math.min(MINI.stubWidth, slot) : slot * MINI.barRatio;
                 const top = stub ? plot - MINI.stubHeight : y(b.v as number);
                 const fill = b.future ? colors.border.subtle : color;

@@ -9,6 +9,7 @@ import type { Threshold } from './LineArea';
 import { DashedLine, EndMarker, Label, YGrid } from './parts';
 import {
   definedValues,
+  formatTick,
   latestDefined,
   linear,
   normalizeSeries,
@@ -91,7 +92,7 @@ export function WeekChart({
 
         return (
           <G>
-            <YGrid ticks={soilAxis.ticks} y={ySoil} left={left} right={right} format={(v) => `${v}%`} />
+            <YGrid ticks={soilAxis.ticks} y={ySoil} left={left} right={right} format={(v) => `${formatTick(v)}%`} />
             {days.slice(1).map((d) => (
               <Line
                 key={d.date}

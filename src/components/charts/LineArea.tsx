@@ -7,11 +7,10 @@ import { ChartFrame } from './ChartFrame';
 import { DashedLine, EndMarker, Label, TargetBand, XLabels, YGrid } from './parts';
 import {
   definedValues,
-  downsample,
+  drawableSegments,
   latestDefined,
   linear,
   normalizeSeries,
-  splitSegments,
   timeTicks,
   toMs,
   valueDomain,
@@ -105,7 +104,7 @@ export function LineArea({
 
         const x = linear(timeDomain, [left, right]);
         const y = linear(yDomain, [lineBottom, top]);
-        const segments = splitSegments(downsample(points, Math.ceil((right - left) / 2)), maxGapMs);
+        const segments = drawableSegments(points, Math.ceil((right - left) / 2), maxGapMs);
         const factory = curves[curve];
         const toLine = line<DefinedPoint>()
           .x((p) => x(p.t))

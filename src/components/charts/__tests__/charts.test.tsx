@@ -1,6 +1,7 @@
 import { render } from '@testing-library/react-native';
 import type { ReactElement } from 'react';
 
+import Gallery from '@/app/(dev)/gallery';
 import { colors } from '@/theme';
 
 import { ChartsGallery } from '../ChartsGallery';
@@ -99,6 +100,13 @@ describe('LineArea', () => {
     expect(r.labels).toEqual(['35% water line']);
   });
 
+  it('keeps a continuous minute series as one line at narrow widths with maxGapMs', async () => {
+    const data = Array.from({ length: 1440 }, (_, i) => ({ t: SAMPLE_DAY[0] + i * MIN, v: 40 + (i % 5) }));
+    const r = await draw(<LineArea {...base} width={350} maxGapMs={3 * MIN} data={data} />);
+    expect(r.getAllByTestId('series-line')).toHaveLength(1);
+    expect(r.queryByTestId('series-dot')).toBeNull();
+  });
+
   it('omits the Now label for past windows', async () => {
     const r = await draw(<LineArea {...base} now={false} data={sampleSoil24h()} />);
     expect(r.labels).not.toContain('Now');
@@ -166,6 +174,38 @@ describe('HourBars', () => {
     );
     expect(r.getAllByTestId('bar-future')).toHaveLength(4);
     expect(r.labels).toEqual(['06:00', '18:00', '14:00']);
+  });
+
+  it('mini variant draws future buckets as stubs even when they hold values', async () => {
+    const domain = [Date.parse('2026-11-06T05:00:00Z'), Date.parse('2026-11-06T18:00:00Z')] as const;
+    const data = sampleLightHourly(domain[0], domain[1]).map((p) => ({ ...p, v: 1000 }));
+    const r = await draw(
+      <HourBars
+        variant="mini"
+        data={data}
+        domain={domain}
+        timeZone={SAMPLE_TZ}
+        now={SAMPLE_NOW}
+        width={504}
+        height={78}
+      />,
+    );
+    for (const bar of r.getAllByTestId('bar-future')) {
+      expect(Number((bar.props.d as string).match(/^M[\d.]+,([\d.]+)/)![1])).toBeGreaterThanOrEqual(58 - 1e-6);
+    }
+  });
+
+  it('ignores future values when scaling observed bars', async () => {
+    const domain = [Date.parse('2026-11-06T10:00:00Z'), Date.parse('2026-11-06T14:00:00Z')] as const;
+    const now = Date.parse('2026-11-06T11:30:00Z');
+    const data = [
+      { t: domain[0], v: 100 },
+      { t: domain[0] + HOUR, v: 100 },
+      { t: domain[0] + 3 * HOUR, v: 100000 },
+    ];
+    const r = await draw(<HourBars data={data} domain={domain} timeZone="UTC" now={now} width={724} />);
+    expect(r.labels).not.toContain('100k');
+    expect(r.labels).toContain('100');
   });
 
   it('renders an empty series without bars', async () => {
@@ -246,10 +286,31 @@ describe('WeekChart', () => {
   });
 });
 
+describe('WeekChart axis', () => {
+  it('never labels soil above 100 %', async () => {
+    const soil = [
+      { t: Date.parse('2026-11-02T12:00:00Z'), v: 20 },
+      { t: Date.parse('2026-11-03T12:00:00Z'), v: 99 },
+    ];
+    const r = await draw(<WeekChart weekStart="2026-11-01" timeZone="UTC" soil={soil} temperature={[]} width={800} />);
+    const pct = r.labels.filter((l) => l.endsWith('%')).map((l) => parseFloat(l));
+    expect(Math.max(...pct)).toBe(100);
+  });
+});
+
 describe('ChartsGallery', () => {
   it('renders every chart', async () => {
     const r = await render(<ChartsGallery />);
     expect(r.getByTestId('charts-gallery')).toBeTruthy();
     expect(r.getByText('Charts')).toBeTruthy();
+  });
+});
+
+describe('gallery route', () => {
+  it('puts the charts in a top-aligned scroll view', async () => {
+    const r = await render(<Gallery />);
+    const scroll = r.getByTestId('gallery-scroll');
+    expect(scroll.type).toBe('RCTScrollView');
+    expect(JSON.stringify(scroll.props.contentContainerStyle ?? {})).not.toContain('justifyContent');
   });
 });

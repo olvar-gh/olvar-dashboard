@@ -1,6 +1,7 @@
 import {
   dayTicks,
   downsample,
+  drawableSegments,
   definedValues,
   formatTick,
   hourTicks,
@@ -260,5 +261,41 @@ describe('downsample', () => {
       300,
     );
     expect(definedValues(out)).toEqual([]);
+  });
+});
+
+describe('valueDomain ceiling', () => {
+  it('keeps the rounded ticks at or below ceil', () => {
+    const d = valueDomain([95, 100], { floor: 0, ceil: 100 });
+    expect(d.domain[1]).toBe(100);
+    expect(d.domain[0]).toBeLessThanOrEqual(95);
+  });
+
+  it('divides floor–ceil evenly when round steps cannot fit', () => {
+    const d = valueDomain([20, 99], { ticks: 4, floor: 0, ceil: 100 });
+    expect(d.domain).toEqual([0, 100]);
+    expect(d.ticks).toHaveLength(4);
+  });
+});
+
+describe('drawableSegments', () => {
+  const minuteSeries = (from: number, n: number) =>
+    Array.from({ length: n }, (_, i) => ({ t: from + i * MIN, v: i % 7 }));
+
+  it('does not turn downsampling into gaps', () => {
+    const segs = drawableSegments(minuteSeries(t0, 1440), 175, 3 * MIN);
+    expect(segs).toHaveLength(1);
+    expect(segs[0].length).toBeLessThanOrEqual(175);
+  });
+
+  it('keeps real gaps regardless of width', () => {
+    const points = [...minuteSeries(t0, 600), ...minuteSeries(t0 + 640 * MIN, 800)];
+    for (const width of [40, 175, 2000]) {
+      expect(drawableSegments(points, width, 3 * MIN)).toHaveLength(2);
+    }
+  });
+
+  it('returns nothing for an empty series', () => {
+    expect(drawableSegments([], 100)).toEqual([]);
   });
 });

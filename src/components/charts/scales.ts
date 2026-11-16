@@ -88,7 +88,7 @@ export type ValueDomainOptions = {
 
 export type ValueDomain = { domain: [number, number]; ticks: number[] };
 
-/** A domain split into `ticks − 1` equal, round steps that covers every value. */
+/** A domain split into `ticks − 1` equal, round steps that covers every value and stays within floor/ceil. */
 export function valueDomain(values: readonly number[], opts: ValueDomainOptions = {}): ValueDomain {
   const count = Math.max(2, opts.ticks ?? 5);
   const all = [...values, ...(opts.include ?? [])].filter(
@@ -110,6 +110,13 @@ export function valueDomain(values: readonly number[], opts: ValueDomainOptions 
     step = niceStepAtLeast(step * 1.0001);
     start = Math.floor(lo / step + 1e-9) * step;
     if (opts.floor !== undefined && start < opts.floor) start = opts.floor;
+  }
+  if (opts.ceil !== undefined && start + step * (count - 1) > opts.ceil) {
+    start = opts.ceil - step * (count - 1);
+    if (opts.floor !== undefined && start < opts.floor) {
+      start = opts.floor;
+      step = (opts.ceil - opts.floor) / (count - 1);
+    }
   }
   const ticks = Array.from({ length: count }, (_, i) => round(start + step * i));
   return { domain: [ticks[0], ticks[count - 1]], ticks };
@@ -250,4 +257,20 @@ export function downsample(points: readonly Point[], maxPoints: number): Point[]
   out.sort((a, b) => a.t - b.t);
   out.push(last);
   return out;
+}
+
+/**
+ * Splits on real gaps first, then thins each run to its share of `maxPoints`
+ * by time span, so resizing never invents or hides an outage.
+ */
+export function drawableSegments(points: readonly Point[], maxPoints: number, maxGapMs?: number): DefinedPoint[][] {
+  const segments = splitSegments(points, maxGapMs);
+  const first = segments[0]?.[0]?.t;
+  const lastSeg = segments[segments.length - 1];
+  const total = first === undefined ? 0 : lastSeg[lastSeg.length - 1].t - first;
+  return segments.map((seg) => {
+    const span = seg[seg.length - 1].t - seg[0].t;
+    const budget = total > 0 ? Math.max(2, Math.ceil((maxPoints * span) / total)) : maxPoints;
+    return downsample(seg, budget) as DefinedPoint[];
+  });
 }
