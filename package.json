@@ -57,7 +57,7 @@
     "typecheck": "tsc --noEmit",
     "test": "jest",
     "export": "expo export -p web",
-    "doctor": "expo-doctor"
+    "doctor": "npx expo-doctor"
   },
   "private": true
 }
