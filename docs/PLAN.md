@@ -1,6 +1,6 @@
 # olvar-dashboard — Project plan
 
-Status: planning only. Updated Nov 16, 2026 for the **final contract** (decisions A–H), the user's follow-up decisions, the new Figma frames at 1920 and 1512, and the interface documented in the olvar-gateway plan.
+Status: planning only. Updated Nov 16, 2026 for the **final contract** (decisions A–H), the user's follow-up decisions, the new Figma frames at 1920 and 1512, and the interface in the **current** olvar-gateway plan (commit `cf453d8`, "fix review findings and add Timeline offline periods").
 
 Scope of this repo: the Expo app that serves **desktop web** and **native iOS** from one codebase. It reads the Supabase data and calls the Edge Function owned by `olvar-gateway`.
 
@@ -18,7 +18,9 @@ Scope of this repo: the Expo app that serves **desktop web** and **native iOS** 
   - The Chat screen calls the gateway's Edge Function `chat`.
   - Replies come from `deepseek-flash` with thinking off, in first person as the plant and in the user's language.
   - Messages are stored in `chat_messages`.
-- **Status pill:** the status pill and per-metric status labels are **display-only**, read from the gateway view `plant_status_v`. The dashboard contains no threshold logic.
+- **Status pill:** the pill text (`overall_label`), the per-metric labels (`<metric>_label`) and the one-line `summary` are **display-only**, read from the gateway view `plant_status_v`.
+  - The dashboard contains no threshold logic.
+  - Its only time rule is the gateway's **180 s** offline rule, used to age its cached status row between refetches.
 - **v1 scope** (decision B): sign in (single owner), Home, Sensors, Timeline, Chat, Soil calibration, Settings/Account.
   - One plant and one device, both created by the gateway's seed.
 - **Layout rule:** web pages **scroll vertically without limit**. Content is never squeezed to fit the viewport height.
@@ -28,6 +30,9 @@ Scope of this repo: the Expo app that serves **desktop web** and **native iOS** 
   - `@supabase/supabase-js` with the publishable key and the owner session.
   - TanStack Query v5 for fetching and caching.
   - Realtime: a `readings` INSERT is treated as a signal to re-read `readings_v`; `devices` UPDATE and `chat_messages` INSERT are applied directly.
+  - The plant status is also refetched on a timer and at the reading-expiry deadline, so a silent gateway still turns the app offline.
+  - Every list query is bounded or paginated past the 1,000-row API limit.
+  - Timeline offline periods come from the gateway function `device_offline_periods()`.
   - Database types are a pinned copy of `olvar-gateway/supabase/types/database.types.ts`.
 - **Shipping:** web on **EAS Hosting**; iOS via **EAS Build → TestFlight**, which needs the Apple Developer Program ($99/yr).
 
@@ -97,15 +102,15 @@ Even the new frames still contain deferred features. Each one is handled consist
 | "every 10 s", "Raspberry Pi 4", "USB serial to gateway" | "every minute", "Raspberry Pi 3B", "Wi-Fi · MQTT" |
 | Sidebar plant switcher, ⌘K search, bell, the iPhone "+" button | Not rendered. The sidebar top shows the plant nickname without the switcher chevron. |
 | Home "Recent insights" card | **Kept as a placeholder card**, titled "Recent insights", with an empty-state body: "Insights are coming soon — Sparks will point out trends here." It uses `EmptyState` inside `Card` at the frame size. |
-| Home health score "86/100" | Replaced by the status pill plus a list of `issues` (for example "Soil is low"), mapped from `plant_status_v`. |
+| Home health score "86/100" | Replaced by the status pill (`overall_label`) plus the server's `summary` line (for example "Soil is getting dry — water soon"), both from `plant_status_v`. |
 | Home "Sparks says" bubble | Shows the **latest stored `plant` chat message** with its time. With no chat yet, it shows "Ask Sparks how it's doing →", linking to Chat. No LLM call is made for Home. |
 | "Water in ~2 days", "6.2 h of good light today" | Dropped, because prediction and threshold maths belong to deferred features or the server. Each card instead shows a plain fact such as "Peak 1,560 lux today". |
 | Timeline Day/Week/Month toggle and filter chips | **Week view only, with no filters.** Week navigation ‹ › and "Jump to date" stay. |
 | Timeline "Log care" button and "Upcoming care" card | The button is not rendered. The side column keeps the card slot as an "Upcoming care — coming soon" placeholder, the same pattern as Home. |
 | Timeline "Waterings" and "Alerts" summary rows, plus alert and care events | Not shown (deferred care log and alerts). Week summary shows averages and their change against the previous week. |
-| Chat "Past conversations" (1920 left column; 1512 side column) | **Kept as day groups.** The single conversation is grouped by local date. Each entry shows the first user message of that day, and clicking it scrolls to that day. The "New chat" button, mic icon and "Based on readings from …" footer are not rendered, because the schema has no threads and no reading reference. |
-| Settings Plant profile: Species, Location, Added, photo | Nickname is editable; time zone is edited in Account. Species comes from the plant profile (read-only) and Added is `created_at` (read-only). Location and photo are not rendered (no column). |
-| Settings Care targets: "Use preset" toggle, sliders, per-row alert switches | Shown **read-only**: the effective ranges with a lock icon. No toggles, because the gateway grants no update on thresholds and notifications are deferred. |
+| Chat "Past conversations" (1920 left column; 1512 side column) | **Kept as day groups.** The single conversation is grouped by local date. Each entry shows the first user message of that day, and clicking it scrolls to that day. The "New chat" button and mic icon are not rendered, because there are no threads. The **"Based on readings from HH:mm"** footer is kept, using `chat_messages.based_on_reading_at`. |
+| Settings Plant profile: Species, Location, Added, photo | Nickname and **Location** (free text, ≤ 60 characters) are editable. Time zone is edited in Account. Species comes from the plant profile (read-only) and Added is `created_at` (read-only). Photo is not rendered (no column). |
+| Settings Care targets: "Use preset" toggle, sliders, per-row alert switches | **Editable** through `plants.threshold_overrides`. "Use preset" **on** sets overrides `{}` (profile values, locked). **Off** enables per-metric range editing of `ok_low`/`ok_high`. The per-row alert switches are not rendered (notifications deferred). |
 | Settings Devices: "Add device" button | Not rendered. The rows (gateway, ESP32, soil probe, SHT31 + GY-302) show live status, and the soil probe row keeps its **Recalibrate** button. |
 | Settings nav items Chat, Notifications | Not rendered. The nav keeps Plant profile, Care targets, Devices & calibration and Account. |
 | Account: photo, username, delete account | Not rendered. The pane keeps name, email (read-only), time zone, a password change, and an added **Sign out** button. |
@@ -152,6 +157,10 @@ Even the new frames still contain deferred features. Each one is handled consist
 - **Generated types:** `supabase gen types typescript --remote=<ref>`. — https://supabase.com/docs/reference/cli/supabase-gen
 - **Edge Function auth:** `supabase.functions.invoke` sends the user JWT, which the function verifies. — https://supabase.com/docs/guides/functions/auth
 - **TanStack Query:** React v5 (5.107.x). — https://github.com/TanStack/query/releases
+- **Row limit:** by default a Supabase project returns **at most 1,000 rows per request**. The limit applies silently (no error), and `range(from, to)` paginates, in query order.
+  - https://supabase.com/docs/reference/javascript/select
+  - https://supabase.com/docs/reference/javascript/range
+  - A full day of raw readings (about 1,440 rows) is over this limit, so it must be paginated.
 
 ### 2.5 DeepSeek (used only by the gateway's `chat` function)
 
@@ -170,7 +179,12 @@ Even the new frames still contain deferred features. Each one is handled consist
 - **Testing:** `jest-expo` with React Native Testing Library for unit tests; Maestro on the iOS Simulator for end-to-end tests, locally or in EAS Workflows.
   - https://docs.expo.dev/develop/unit-testing
   - https://docs.expo.dev/eas/workflows/examples/e2e-tests
-- **Playwright** `toHaveScreenshot` supports `mask` for regions to ignore. — https://playwright.dev/docs/test-snapshots
+- **Playwright screenshots:**
+  - `toHaveScreenshot` supports `mask` for regions to ignore. — https://playwright.dev/docs/test-snapshots
+  - `page.screenshot()` defaults to `scale: "device"`, which gives 2× pixels on a DPR 2 project.
+  - `scale: "css"` gives one pixel per CSS pixel. `expect(page).toHaveScreenshot()` defaults to `"css"`.
+  - https://playwright.dev/docs/api/class-page
+  - https://playwright.dev/docs/api/class-pageassertions
 
 ---
 
@@ -185,10 +199,11 @@ Even the new frames still contain deferred features. Each one is handled consist
 | Styling | **`StyleSheet` + tokens + `useBreakpoint()` with layout tokens per tier (§5.4)** | NativeWind v5 (RC), NativeWind 4 (Tailwind 3), Uniwind (extra engine, paid Pro), Unistyles 3 (no Expo Go), Tamagui (heavy). |
 | Liquid Glass | NativeTabs, plus `GlassView` behind an availability check with a fallback; `backdrop-filter` on narrow web | A hand-drawn glass look drifts from the system one. |
 | Charts | **Custom SVG components** (target band, step line, hourly bars, gauge, range bar, week chart) | Skia / Victory XL (+2.9 MB web WASM), gifted-charts, Recharts. |
-| Data sources | Latest values and ≤ 48 h from `readings_v`. 7 d and 30 d charts and the Timeline week chart from `readings_hourly_v`. Timeline per-day events from a **raw per-day `readings_v` query** (§5.5). | Aggregating raw rows on the client for long ranges. |
-| Realtime | Subscribe to `readings` INSERT (filter `device_id=eq.<id>`) as a **signal**, then re-read the latest `readings_v` row and `plant_status_v`. Subscribe to `devices` UPDATE and `chat_messages` INSERT. Invalidate on reconnect. Poll `gateways.last_seen_at` every 60 s, because it has no Realtime. | Reading `soil_pct` from the Realtime payload is impossible: it exists only in views. |
-| Status | **Display only**, from `plant_status_v`: `overall` maps to pill text and per-metric statuses map to labels. Charts draw target bands from the effective threshold numbers but do not judge values. | Client-side rules would let clients disagree. |
-| Chat | `functions.invoke('chat', {body:{plant_id, message}})`, then render `reply`. Optimistic user bubble. 429 `retry_after` shows a countdown. A reply row with `error` set is shown as a fallback message with Retry. | Calling DeepSeek from the client is forbidden (the key would leak). |
+| Data sources | Latest values: `readings_v` with `limit 1`. 24 h charts: `readings_v`, **paginated**. 7 d and 30 d charts, the Timeline week chart and the Timeline daily min/max: `readings_hourly_v`. Timeline offline periods: the gateway RPC `device_offline_periods()`. | Aggregating raw rows on the client for long ranges; client-side gap detection (it would duplicate the server's 180 s rule). |
+| Pagination | One helper, `fetchAll()`. It pages with `.range()` in steps of 1,000, ordered by `recorded_at, id`, with a fixed upper time bound captured at request start. It stops when a page has fewer than 1,000 rows (a page of exactly 1,000 triggers one more request) and de-duplicates by `id`. Chat history is keyset-paged (50 at a time, older on scroll-up). No raw-reading query runs without either `fetchAll()` or an explicit `limit`. | Raising the project's max-rows limit: a day only gets longer, and it hides the bug. |
+| Realtime and freshness | Subscribe to `readings` INSERT (filter `device_id=eq.<id>`) as a **signal**: re-read the latest `readings_v` row and `plant_status_v`. Subscribe to `devices` UPDATE, which invalidates the device and `plant_status_v` queries. Subscribe to `chat_messages` INSERT. Invalidate everything on reconnect. Status freshness rules are in §5.5. Poll `gateways.last_seen_at` every 60 s, because it has no Realtime. | Event-driven only: if the Pi loses power there is no INSERT or UPDATE, and the status would stay "healthy" forever. |
+| Status | **Display only**, from `plant_status_v`: `overall_label`, `<metric>_label`, `summary`. The status keys pick only colours and icons. Charts draw target bands from the effective threshold numbers but do not judge values. | Client-side rules or client-written labels would let clients disagree. |
+| Chat | `functions.invoke('chat', {body:{plant_id, message}})`, then render `reply`, with "Based on readings from HH:mm" from `based_on_reading_at`. Optimistic user bubble. A 429 with `retry_after` shows a countdown. A reply row with `error` set is shown as a fallback message with Retry. | Calling DeepSeek from the client is forbidden (the key would leak). |
 | Type sharing | Pinned copy of `olvar-gateway/supabase/types/database.types.ts`, synced by `scripts/sync-types.sh <ref>`. CI checks the copy matches. | Submodule, private npm package, remote type generation. |
 | Fonts / icons | Inter, plus Fraunces as a variable TTF (WONK/SOFT axes). Figma SVG icons converted with `@svgr/cli --native`. | System fonts; `@expo/vector-icons`. |
 | Auth | Email and password sign-in only. Display name stored in Supabase Auth user metadata (`auth.updateUser({data})`). Password change re-authenticates with the current password, then calls `updateUser({password})`. | Create account and forgot password are deferred, and signups are disabled on the server. |
@@ -207,25 +222,26 @@ Even the new frames still contain deferred features. Each one is handled consist
 - `claim_device`
 - `readings_bucketed`
 
-**Interface the dashboard consumes**, as documented in the olvar-gateway plan (`docs/PLAN.md` §5.5–5.7 on its `docs/plan` branch):
+**Interface the dashboard consumes**, as documented in the current olvar-gateway plan (`docs/PLAN.md` §5.5–5.7, commit `cf453d8`):
 
 | Need | olvar-gateway interface |
 |---|---|
 | Sign in | Supabase Auth email + password, signups disabled, single owner, owner-only RLS, nothing granted to `anon`. |
-| Plant | `plants` (`id`, `nickname`, `timezone`, `profile_id`, `threshold_overrides`, `created_at`). The owner may update **`nickname` and `timezone` only**. `plant_profiles` supplies `common_name`, `scientific_name` and `thresholds`. |
-| Effective thresholds (target bands, read-only care targets) | The gateway's `effective_thresholds(plant_id)`, if execute is granted to `authenticated`. Otherwise a client-side deep merge of `plant_profiles.thresholds` with `plants.threshold_overrides`: a pure, unit-tested function that merges numbers only and never evaluates status. See note 1. |
-| Device | `devices` (`id`, `fw`, `status` online/offline/unknown, `status_changed_at`, `last_seen_at`, `soil_dry_raw`, `soil_wet_raw`, `soil_calibrated_at`). Realtime UPDATE. |
+| Plant | `plants`: `id`, `nickname`, `location`, `timezone`, `profile_id`, `threshold_overrides`, `created_at`. The owner may update **`nickname`, `location`, `timezone` and `threshold_overrides`**. A server check constraint validates overrides: known metrics and keys, numbers, ascending order. `plant_profiles` supplies `common_name`, `scientific_name` and `thresholds` (`critical_low, low, ok_low, ok_high, high, critical_high` per metric). |
+| Effective thresholds (target bands, care targets) | `effective_thresholds(plant_id)` if execute is granted to `authenticated`. Otherwise a client-side deep merge of `plant_profiles.thresholds` with `plants.threshold_overrides`: a pure, unit-tested function that only merges numbers and never evaluates status. See note 1. |
+| Device | `devices`: `id`, `fw`, `status` (online/offline/unknown), `status_changed_at`, `last_seen_at`, `soil_dry_raw`, `soil_wet_raw`, `soil_calibrated_at`. Realtime UPDATE. |
 | Gateway | `gateways.last_seen_at`, `version`. Polled. |
-| Readings | `readings_v`: raw columns plus `soil_pct`; any sensor value may be null; `soil_pct` is null when uncalibrated. Realtime INSERT on `readings` is a signal only. Retention is 90 days. |
+| Readings | `readings_v`: the raw columns plus `soil_pct`. Any sensor value may be null. `soil_pct` is null when uncalibrated. Realtime INSERT on `readings` is a signal only. Retention is 90 days. The API returns at most 1,000 rows per request. |
 | Summaries | `readings_hourly_v` / `readings_daily_v`, with `<metric>_avg/_min/_max`, `soil_pct_*` and `n`. |
-| Status | `plant_status_v`: `overall` (great/okay/needs_attention/in_trouble/offline/no_data), the four `<metric>_status` columns (critical_low…critical_high/unknown), `issues`, `soil_calibrated`, `latest_reading_at`, `device_status`. |
-| Calibration | Owner `update` of `devices.soil_dry_raw`, `soil_wet_raw` and `soil_calibrated_at`. The server checks `dry > wet + 100`. The new calibration applies retroactively to every view. |
-| Chat | `POST /functions/v1/chat` with `{plant_id, message (1–1000 chars)}` returns `{reply: chat_messages row}`. Over the rate limit (10 per 5 min, 200 per day) it returns 429 with `retry_after`. `chat_messages` has `role` user/plant and `error`, and has Realtime INSERT. |
+| Status | `plant_status_v` provides:<ul><li>`overall` (great/okay/needs_attention/in_trouble/offline/no_data) and `overall_label` ("Feeling great" … "No data yet")</li><li>`<metric>_status` and `<metric>_label` (for example "Too dry")</li><li>`summary`</li><li>`issues`, `soil_calibrated`, `latest_reading_at`, `device_status`, `computed_at`</li></ul>**Offline = no reading for more than 180 s, or a retained `offline` status.** |
+| Offline periods | `device_offline_periods(p_device_id, p_from, p_to)` returns `(started_at, ended_at, duration_s, cause 'device_restart'\|'no_data', ongoing)`. It finds gaps over 180 s between raw readings and clips them at the window edges. The window is capped at **7 days** (larger windows raise an error), and the function returns nothing beyond the 90-day retention. |
+| Calibration | The owner may `update` `devices.soil_dry_raw`, `soil_wet_raw` and `soil_calibrated_at`. The server checks `dry > wet + 100`. The new calibration applies retroactively to every view. |
+| Chat | `POST /functions/v1/chat` with `{plant_id, message (1–1000 chars)}` returns `{reply: chat_messages row}`. The reply carries `based_on_reading_at`. Over the rate limit (10 per 5 min, 200 per rolling 24 h, enforced atomically) the function returns 429 with `retry_after`. `chat_messages` holds a single conversation per plant, with `role` user/plant and `error`, and publishes Realtime INSERTs. |
 | Types | `supabase/types/database.types.ts`, committed and tagged. |
 
 Notes (not contract changes):
-1. A grant of execute on `effective_thresholds` to `authenticated` would avoid the client-side merge. It is a gateway implementation detail; the dashboard works either way.
-2. Timeline offline periods: the gateway documents **no connectivity-event history**, only `devices.status_changed_at` for the latest change. The dashboard therefore derives offline periods from raw readings per selected day (§5.5).
+1. A grant of execute on `effective_thresholds` to `authenticated` would avoid the client-side merge. This is a gateway implementation detail; the dashboard works either way.
+2. My earlier client-side offline-gap detection is **withdrawn**. The Timeline uses `device_offline_periods()`, so the 180 s rule lives only on the server.
 
 ---
 
@@ -284,11 +300,12 @@ olvar-dashboard/
 │  │  ├─ supabase.ts · database.types.ts (synced, do not edit)
 │  │  ├─ source/  index.ts (DataSource interface), supabase.ts, fixtures.ts
 │  │  ├─ fixtures/ generate.ts       # seeded 90-day series (see T4 acceptance)
-│  │  ├─ queries/ plant.ts, thresholds.ts, status.ts, latest.ts, readings-day.ts, hourly.ts, device.ts, gateway.ts,
-│  │  │           chat.ts, calibration.ts, account.ts
+│  │  ├─ fetch-all.ts                # paginated reads past the 1,000-row limit (§3)
+│  │  ├─ queries/ plant.ts, thresholds.ts, status.ts, latest.ts, readings-24h.ts, hourly.ts, offline-periods.ts (RPC),
+│  │  │           device.ts, gateway.ts, chat.ts, calibration.ts, account.ts
 │  │  └─ realtime.ts
-│  ├─ domain/     format.ts, labels.ts (status key → text), time.ts (plant timezone), timeline-events.ts,
-│  │              offline-periods.ts, calibration.ts, chat-days.ts
+│  ├─ domain/     format.ts, status-style.ts (status key → colour/icon only), time.ts (plant timezone),
+│  │              timeline-events.ts, calibration.ts, chat-days.ts, status-freshness.ts
 │  └─ theme/      tokens.ts, layout.ts (tiers, §5.4), typography.ts, fonts.ts, useBreakpoint.ts
 ├─ e2e/web/       *.spec.ts, playwright.config.ts, figma-diff.ts, figma-masks.json
 ├─ .maestro/      sign-in.yaml, home.yaml, chat.yaml, calibrate.yaml
@@ -340,8 +357,21 @@ States are built from existing components and tokens:
 
 - **Loading:** card-shaped `Skeleton` blocks.
 - **Error:** `ErrorState`, which is a Card with a warn `Notice` and a Retry button. Chat errors appear inline with Retry.
-- **Device offline:** `plant_status_v.overall = 'offline'` or `devices.status = 'offline'`, using the gateway's rule (no reading for > 5 min, or the LWT fired). The Figma sensor-offline frames (`145:1322`, `148:2056`) apply. `OfflineBanner` shows "olvar-node offline since <status_changed_at>".
-- **Gateway offline:** `gateways.last_seen_at` is older than 5 min; shown in the sidebar footer.
+- **Device offline:** the gateway's rule is **no reading for more than 180 s, or a retained `offline` status (LWT)**. The app shows the offline state when any of these hold:
+  - `plant_status_v.overall = 'offline'`
+  - `devices.status = 'offline'`
+  - the locally aged status has expired (see "Status freshness" below)
+
+  The Figma sensor-offline frames (`145:1322`, `148:2056`) apply. `OfflineBanner` shows "olvar-node offline since HH:mm", using `latest_reading_at` (or `status_changed_at` when the LWT fired). The cached `summary` is replaced by "Offline" until a fresh status row arrives.
+- **Gateway offline:** `gateways.last_seen_at` is older than 180 s (polled every 60 s); shown in the sidebar footer.
+- **Status freshness.** This is how a silent Pi or gateway still shows offline. `plant_status_v` is refetched:
+  1. on every `readings` INSERT signal;
+  2. on every `devices` UPDATE;
+  3. **at the reading-expiry deadline**: a timer set to `latest_reading_at + 180 s + 5 s` and re-armed after each fetch;
+  4. **on a 60 s interval** while the screen is visible or the app is in the foreground, as a fallback in case the deadline timer is throttled in a background tab;
+  5. on window focus, app foreground and Realtime reconnect.
+
+  Between fetches, `domain/status-freshness.ts` ages the cached row. If `now − latest_reading_at > 180 s`, the UI shows Offline immediately and triggers a refetch. This uses the gateway's own 180 s rule and only ages the cached row (gateway plan §5.5); it never computes a health status. The same freshness check drives the "Updated N s ago" text in the Chat context card.
 - **Calibration state vs failed read.** These are two **independent** checks, fixing the review finding.
   - *Calibrated?* is decided **only** from the device configuration: `soil_dry_raw` and `soil_wet_raw` are both non-null, cross-checked with `plant_status_v.soil_calibrated`.
   - *Soil read failed?* means `soil_raw` is null on the latest `readings_v` row.
@@ -366,26 +396,25 @@ States are built from existing components and tokens:
   4. Validation matches the server: `0 ≤ raw ≤ 4095`, and `dry > wet + 100`.
   5. Save writes `soil_dry_raw`, `soil_wet_raw` and `soil_calibrated_at = now()`, then invalidates the readings, hourly and status queries. History re-expresses retroactively on the server.
   6. The modal tells the user "values update every minute".
-- **Timeline (week view).** History is limited to the **last 90 days**, the raw retention. Weeks and dates older than 90 days in the plant time zone are disabled in ‹ › and "Jump to date".
+- **Raw-reading completeness.** A full day is about 1,440 rows, over the 1,000-row API limit. Every multi-row raw read goes through `fetchAll()` (§3):
+  - The Sensors 24 h charts read the window `[now − 24 h, now]`, with `now` captured once per fetch.
+  - Pages are ordered by `recorded_at, id`, de-duplicated by `id`, and requested until a page is short.
+  - Backfilled rows that land mid-pagination are picked up by the next signal-driven refetch.
+  - Single-row reads use `limit 1` (latest reading) or `limit 3` (calibration stability).
+- **Timeline (week view).**
+  - History covers the **last 90 days**, the raw retention. Weeks and dates older than that (in the plant time zone) are disabled in ‹ › and "Jump to date".
   - **"This week" chart:** soil % and temperature from `readings_hourly_v` for the 7 local days.
   - **Week summary:** average soil %, temperature, humidity and daytime light from `readings_hourly_v`, compared with the previous week. There is no threshold logic.
-  - **Activity:** one group per local day. Each day uses the **per-day raw query**:
-
-    ```
-    readings_v
-      select recorded_at, temperature_c, humidity_pct, lux, soil_pct
-      where device_id = $d and recorded_at between $dayStart and $dayEnd
-      order by recorded_at
-    ```
-
-    - That is about 1,440 rows per day. `$dayStart`/`$dayEnd` are the local-midnight bounds in the plant time zone.
-    - Each day is fetched lazily when its group scrolls into view and cached per `(device, date)`.
-    - Today's group is refetched on the `readings` signal.
-  - **Events per day:** these are pure functions in `domain/timeline-events.ts` and `domain/offline-periods.ts`. They use no thresholds.
-    - Daily max and min of temperature, light, humidity and soil.
-    - **Offline periods:** consecutive `recorded_at` gaps over 5 min, matching the gateway's offline rule. Each period gets a start, end and duration. The day's start and end bounds also count, but only up to "now" for today.
+  - **Activity:** one group per local day, fetched lazily when it scrolls into view and cached per `(device, local date)`. Today's group is refetched on the `readings` signal. Its events come from:
+    - **Offline periods.** Source: `device_offline_periods(device, dayStart, dayEnd)`.
+      - It is called **once per local day**, which keeps every call far under the 7-day cap, including DST days of 23–25 h.
+      - `dayStart`/`dayEnd` are the local-midnight bounds in the plant time zone. For today, `dayEnd = now`.
+      - Each row becomes an event: "Offline 03:10–03:52 (42 min)", "Device restarted, offline 2 min" (`cause = 'device_restart'`), or "Offline since 14:02" (`ongoing`).
+      - A gap crossing midnight appears in both days, clipped by the server.
+      - **No gap detection runs on the client.**
+    - **Daily max and min** of temperature, light, humidity and soil, from that day's `readings_hourly_v` rows (≤ 25 rows). These are exact values; the time is shown at hour precision, for example "Temperature peaked at 24.6 °C · 14:00–15:00". There is no threshold logic, and the helpers are pure functions in `domain/timeline-events.ts`.
     - "Soil sensor calibrated", if `soil_calibrated_at` falls on that day. Only the latest calibration is known.
-    - Chat: "You asked Sparks: …", from the first user message of that day.
+    - Chat: "You asked Sparks: …", from the first user message of that day (one bounded query per day).
 
 ---
 
@@ -469,25 +498,43 @@ States are built from existing components and tokens:
 
 **Work:**
 - A `DataSource` interface with Supabase and fixtures implementations, plus the hooks listed in §5.3.
-- The per-day raw query, keyed by `(device, local date)`.
-- The Realtime signal handling from §3.
+- `fetchAll()` pagination (§3).
+- The `device_offline_periods` RPC per `(device, local date)`.
+- The Realtime signal handling and the status-freshness refetch (§5.5).
 - The threshold merge fallback (§4 note 1).
 - Provisional types until the gateway tags its types file.
 
+**Fixture rules.** The fixtures source **returns offline periods as data**, written by the generator next to the outages it injects. It does not detect gaps.
+
 **Accept:**
-- Fixtures are deterministic per seed and cover:
+- **Fixture coverage.** Fixtures are deterministic per seed and cover:
   - 90 days of data
   - null reads for every metric, including a **calibrated device with a null `soil_raw`**
   - an uncalibrated stretch
-  - offline gaps (a short 3-min gap that is *not* offline, a 40-min outage, and an outage crossing midnight)
+  - a 2-min gap with no period, then a **4-min outage** (the 3–5 min case)
+  - a 40-min outage
+  - an outage crossing midnight
+  - a `device_restart` gap
+  - an `ongoing` outage
   - a calibration event
-  - multi-day chat
-- Realtime tests: a duplicate signal, a reconnect, and a re-read after the signal.
-- The per-day query uses local-midnight bounds.
+  - multi-day chat with more than 50 messages
+- **`fetchAll()` unit tests** against a mock that caps pages at 1,000:
+  - 0 rows, 999 rows, exactly 1,000 rows, 1,440 rows and 2,500 rows return every row exactly once
+  - the last returned row is the newest
+  - a duplicate across a page boundary is removed
+  - an error mid-way is surfaced, never silently truncated
+- **Status freshness** (fake timers):
+  - after `latest_reading_at + 185 s` with no events, a status refetch has happened and the UI reads Offline
+  - a `devices` UPDATE triggers a refetch
+  - the 60 s interval keeps running with no Realtime events
+- **Realtime:** a duplicate signal, a reconnect, and a re-read after the signal.
 - **(live)**
   - After sign-in, a fake-ESP32 reading reaches `useLatest()` within 2 s.
   - Signed-out reads fail.
-  - Over the 90-day limit, the day query returns no rows and the UI disables the date.
+  - **With 26 h of seeded 60 s readings (> 1,000 rows), the 24 h query returns all of the last 24 hours' rows (≈ 1,440), and the newest row equals `latest_reading_at`.**
+  - Stopping the fake ESP32 and the gateway turns the UI Offline within 180 s + 65 s, with no Realtime event.
+  - `device_offline_periods` for a seeded day matches the injected outage.
+  - Over the 90-day limit, the RPC returns no rows and the UI disables the date.
 
 **Verify:** Jest; `e2e/web/live.spec.ts` (runs only with `SUPABASE_LOCAL=1`).
 
@@ -496,18 +543,19 @@ States are built from existing components and tokens:
 **Owns:** `src/domain/**`.
 
 **Work:**
-- `labels.ts` (status key → text).
-- Formatting, plant-time-zone helpers.
-- `offline-periods.ts`, `timeline-events.ts`, `calibration.ts`, `chat-days.ts`.
-- No threshold evaluation anywhere.
+- `status-style.ts` (status key → colour and icon; **text always comes from the server labels**).
+- `status-freshness.ts` (expiry deadline from `latest_reading_at + 180 s`; whether the cached row has aged out).
+- Formatting and plant-time-zone helpers (local-midnight bounds, DST days).
+- `timeline-events.ts` (offline-period rows and hourly min/max → event list), `calibration.ts`, `chat-days.ts`.
+- No threshold evaluation and no gap detection anywhere.
 
 **Accept:**
 - 100 % branch coverage.
-- Offline-period tests:
-  - a gap of exactly 5 min is not offline; just over 5 min is
-  - midnight crossing
-  - today stops at "now"
-  - an empty day is one full-day period, or "No data" when the device didn't exist yet
+- `status-freshness`: 180 s exactly is still fresh, 181 s has expired, and the deadline is re-armed after each fetch.
+- Local-day bounds for 23 h and 25 h DST days.
+- Event mapping:
+  - `no_data` / `device_restart` / `ongoing` rows map to the right text
+  - a midnight-crossing period shows on both days
 - The calibration state matrix (§5.5) is table-tested.
 
 **Verify:** Jest.
@@ -537,8 +585,12 @@ States are built from existing components and tokens:
 **Owns:** `src/app/(app)/index.tsx`, `src/features/home/**`.
 
 **Work:**
-- Plant card: nickname, species, status pill, issues, the "Sparks says" bubble showing the latest plant message, and the Chat link.
-- 4 sensor cards with mini charts and status labels.
+- Plant card:
+  - nickname, species and location
+  - status pill (`overall_label`) and the `summary` line
+  - the "Sparks says" bubble showing the latest plant message
+  - the Chat link
+- 4 sensor cards with mini charts and the server's `<metric>_label`.
 - "Today's timeline" card: today's events from T5.
 - **"Recent insights" placeholder card ("coming soon")**.
 - iPhone stack layout.
@@ -555,7 +607,7 @@ States are built from existing components and tokens:
 **Owns:** `src/app/(app)/sensors.tsx`, `src/features/sensors/**`.
 
 **Work:**
-- 24 h / 7 d / 30 d segmented control: 24 h reads `readings_v`; 7 d and 30 d read `readings_hourly_v`.
+- 24 h / 7 d / 30 d segmented control: 24 h reads `readings_v` through `fetchAll()` (about 1,440 rows); 7 d and 30 d read `readings_hourly_v` (≤ 720 rows).
 - 4 detail cards with min / avg / max.
 - Hardware footers, for example "Capacitive · GPIO34 · raw 1,980 · calibrated Nov 5" or "SHT31 · I²C 0x44 · Read OK / Read failed".
 - The offline state.
@@ -563,6 +615,7 @@ States are built from existing components and tokens:
 
 **Accept:**
 - The range switch uses the right source.
+- The 24 h chart's last point is the latest reading, even when the window holds more than 1,000 rows.
 - Snapshots for the normal, offline, null-read and uncalibrated states.
 - Figma diff of `227:7830` / `227:8145`.
 
@@ -575,11 +628,17 @@ States are built from existing components and tokens:
 **Work:**
 - Week navigation (limited to 90 days) and "Jump to date".
 - The "This week" chart and the Week summary.
-- Activity, built from the per-day raw queries, including **offline periods**.
+- Activity per local day, built from `device_offline_periods()` (one call per day), hourly min/max, calibration and chat events (§5.5).
 - The "Upcoming care — coming soon" placeholder.
 
 **Accept:**
-- A golden test checks the event list for each fixture day, including the 40-min outage, the midnight-crossing outage, and *no* event for the 3-min gap.
+- A golden test checks the event list for each fixture day. It must include:
+  - the 4-min outage
+  - the 40-min outage
+  - the midnight-crossing outage on both days
+  - a "Device restarted" event
+  - an "Offline since …" (ongoing) event
+- No event appears for the 2-min gap.
 - Dates older than 90 days are disabled.
 - Figma diff of `227:8461` / `227:9006`.
 
@@ -590,9 +649,11 @@ States are built from existing components and tokens:
 **Owns:** `src/app/(app)/chat.tsx`, `src/features/chat/**`.
 
 **Work:**
-- At `xl`, the three-column layout: day-grouped conversations, chat, and "What Sparks sees" (latest `readings_v` and statuses). At `lg`, two columns with conversations below the context card.
+- At `xl`, the three-column layout: day-grouped conversations, chat, and "What Sparks sees" (latest `readings_v`, `<metric>_label`, "Updated N s ago"). At `lg`, two columns with conversations below the context card.
+- History keyset-paged 50 at a time.
 - The sticky composer.
 - Optimistic send.
+- The "Based on readings from HH:mm" footer from `based_on_reading_at`.
 - Handling for 429 (`retry_after`), the error row (`error` set), and upstream failure.
 - Suggestion chips.
 
@@ -622,15 +683,21 @@ States are built from existing components and tokens:
 **Owns:** `src/app/(app)/settings/**`, `src/features/settings/**`.
 
 **Work:**
-- **Plant profile:** nickname is editable; species and added date are read-only.
-- **Care targets:** effective ranges, read-only.
+- **Plant profile:** nickname and location are editable; species and added date are read-only.
+- **Care targets:** "Use preset" on writes `threshold_overrides = {}`. Off enables editing `ok_low`/`ok_high` per metric. The client mirrors the server's ascending-order check for messages only; the server constraint is authoritative.
 - **Devices & calibration:** live rows plus Recalibrate.
 - **Account:** name in user metadata, email read-only, `plants.timezone` picker, password change with re-authentication, Sign out.
 - The pane is capped at 1040 at `xl`.
 
 **Accept:**
-- Validation: nickname is 1–40 characters; the new password is at least 8 characters.
-- **(live)** A nickname change shows up in the sidebar and in the next chat reply. A time-zone change moves the Timeline day bounds.
+- Validation:
+  - nickname is 1–40 characters and location ≤ 60
+  - the new password is at least 8 characters
+  - a range out of order shows the server's error
+- **(live)**
+  - A nickname change shows up in the sidebar and in the next chat reply.
+  - Saving an override changes `plant_status_v` labels and the chart target bands.
+  - A time-zone change moves the Timeline day bounds.
 - Figma diff of `227:10136` / `227:10593` and `227:12148` / `227:12271`.
 
 **Verify:** Jest, Playwright, Maestro.
@@ -645,8 +712,12 @@ States are built from existing components and tokens:
   - `layout-1280`, `layout-1728`, `layout-2560`: layout-invariant checks only.
   - `web-narrow` (402×874).
 - **Server and fixtures:** serve the web export with `npx expo serve` in fixtures mode. The fixture content matches the frames' sample data where possible: "Sparks", 42 %, 1,240 lux, 23.4 °C, 58 %. Freeze the clock to the frames' dates with `page.clock.install`, and turn animations off.
-- **Figma diff:** `figma-diff.ts` compares the **first screenful** (the viewport clip) at 1920 and 1512 against `design/figma/<Screen>-1920.png` / `-1512.png` for the 8 v1 screens. It uses `figma-masks.json` per screen to mask the regions §2.1.1 changes or removes (switcher, search, bell, health score, Log care, filter chips, New chat, mic, Use-preset toggle, Add device, photo / username / delete account). The diff is advisory; start at 8 % after masking.
-- **Snapshot baselines:** `toHaveScreenshot` **full-page** baselines at 1920 and 1512 (pages scroll; nothing is clipped to the viewport).
+- **Figma diff:** `figma-diff.ts` compares the **first screenful** at 1920 and 1512 against `design/figma/<Screen>-1920.png` / `-1512.png` for the 8 v1 screens.
+  - **Scale:** captures use `page.screenshot({ clip: {x: 0, y: 0, width: vw, height: vh}, scale: 'css', animations: 'disabled' })`. A DPR 2 project (`mbp-1512`) therefore yields **1512×982**, the same size as the 1× Figma export, not 3024×1964.
+  - **Size guard:** the script asserts that capture and reference dimensions are equal before diffing, and fails loudly if they are not.
+  - **Masks:** `figma-masks.json` holds the regions §2.1.1 changes or removes (switcher, search, bell, health score, Log care, filter chips, New chat, mic, alert switches, Add device, photo / username / delete account). Masks are stored in **CSS pixels**, the same coordinate space as the capture and the export.
+  - **Threshold:** the diff is advisory; start at 8 % after masking.
+- **Snapshot baselines:** `toHaveScreenshot` **full-page** baselines at 1920 and 1512, with `scale: 'css'` set explicitly (pages scroll; nothing is clipped to the viewport).
 - **Layout invariants**, checked at every width:
   - no horizontal scroll
   - sidebar width per tier
@@ -696,7 +767,9 @@ States are built from existing components and tokens:
 ## 8. Risks
 
 - **The frames still contain deferred features.** Building to them means removing those elements consistently (§2.1.1), so the Figma diffs depend on correct masks. If the designer later updates the frames for v1, the masks can be removed.
-- **Timeline per-day raw queries:** a week view needs up to 7 queries of about 1,440 rows each. Lazy loading per day and caching keep this light, but a slow connection will show day-level skeletons.
+- **Raw-reading volume:** the Sensors 24 h view needs 2 paginated requests (about 1,440 rows). Forgetting `fetchAll()` on a new query would silently drop the newest rows, which is why T4 tests the > 1,000-row case live.
+- **Timeline cost:** each day costs one small RPC call plus about 24 hourly rows, loaded lazily per day.
+- **Status freshness depends on client timers.** Background tabs throttle them, so the app also refetches on focus and foreground.
 - **Only the latest calibration is known** (`soil_calibrated_at`). Earlier calibrations cannot appear on the Timeline.
 - **Expo Router SDK 58 core rework and native tabs.** Pin patch versions and keep the shell isolated.
 - **Liquid Glass pitfalls:** animating opacity or mounting on demand breaks it, and it needs iOS 26+.
@@ -715,4 +788,5 @@ None are blocking. The follow-up decisions answered the remaining items:
 Choices this plan made that the user may want to glance at:
 - Timeline's "Upcoming care" slot uses the same "coming soon" placeholder.
 - Chat's "Past conversations" column groups the single conversation by day, because the schema has no threads.
-- Care targets are read-only, because the gateway grants no update on thresholds.
+- Care targets are editable through `threshold_overrides` (`ok_low`/`ok_high` only); the per-row alert switches stay hidden.
+- Timeline peak times are shown at hour precision, because they come from the hourly summaries.
