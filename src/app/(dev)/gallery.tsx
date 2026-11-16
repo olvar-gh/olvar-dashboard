@@ -1,5 +1,6 @@
-import { useState, type ReactNode } from 'react';
+import { useContext, useState, type ReactNode } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { SafeAreaInsetsContext } from 'react-native-safe-area-context';
 
 import {
   Button,
@@ -51,16 +52,21 @@ const RANGES = [
 type Range = (typeof RANGES)[number]['value'];
 
 export default function GalleryScreen() {
-  useAppFonts();
+  const [fontsLoaded, fontError] = useAppFonts();
+  const insets = useContext(SafeAreaInsetsContext) ?? { top: 0, bottom: 0 };
   const bp = useBreakpoint();
   const [range, setRange] = useState<Range>('24h');
   const [preset, setPreset] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
   const [name, setName] = useState('Sparks');
   const columns = bp.isDesktop ? styles.columns : styles.stack;
+  const padY = bp.shell.paddingTop || 16;
+
+  // Text measured before the custom fonts load keeps its fallback width on iOS, which truncates labels.
+  if (!fontsLoaded && !fontError) return null;
 
   return (
-    <ScrollView style={styles.page} contentContainerStyle={{ paddingHorizontal: bp.shell.paddingX || 16, paddingVertical: bp.shell.paddingTop || 16 }}>
+    <ScrollView style={styles.page} contentContainerStyle={{ paddingHorizontal: bp.shell.paddingX || 16, paddingTop: insets.top + padY, paddingBottom: insets.bottom + padY }}>
       <View testID="gallery" style={[styles.content, { maxWidth: bp.isDesktop ? bp.contentWidth : undefined }]}>
         <PageHeader
           title="Gallery"

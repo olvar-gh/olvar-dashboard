@@ -51,10 +51,16 @@ export type ModalProps = ModalCardProps & {
 export function Modal({ visible, onDismiss, ...card }: ModalProps) {
   return (
     <RNModal transparent visible={visible} animationType="fade" onRequestClose={onDismiss}>
-      <View accessibilityViewIsModal style={styles.overlay}>
-        <Pressable accessibilityLabel="Close" style={StyleSheet.absoluteFill} onPress={onDismiss} />
-        <ScrollView contentContainerStyle={styles.scroll} style={styles.scrollView}>
-          <ModalCard {...card} style={styles.floating} />
+      <View accessibilityViewIsModal onAccessibilityEscape={onDismiss} style={styles.overlay}>
+        <ScrollView style={styles.scrollView} contentContainerStyle={styles.scroll}>
+          <Pressable
+            accessible={false}
+            testID={card.testID && `${card.testID}-backdrop`}
+            onPress={(e) => e.target === e.currentTarget && onDismiss()}
+            style={styles.backdrop}
+          >
+            <ModalCard {...card} style={[styles.floating, card.style]} />
+          </Pressable>
         </ScrollView>
       </View>
     </RNModal>
@@ -79,6 +85,7 @@ const styles = StyleSheet.create({
   subtitle: { ...typography.cardSubtitle, color: colors.text.tertiary },
   footer: { flexDirection: 'row', justifyContent: 'flex-end', gap: 8 },
   overlay: { flex: 1, backgroundColor: scrim },
-  scrollView: { flexGrow: 0, maxHeight: '100%', marginVertical: 'auto' },
-  scroll: { flexGrow: 1, justifyContent: 'center', padding: 16 },
+  scrollView: { flex: 1 },
+  scroll: { flexGrow: 1 },
+  backdrop: { flexGrow: 1, justifyContent: 'center', padding: 16 },
 });

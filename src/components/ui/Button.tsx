@@ -52,7 +52,7 @@ export function Button({
       ]}
     >
       {loading ? <ActivityIndicator size="small" color={fg} /> : icon}
-      <Text numberOfLines={1} style={[labelStyle(variant, size), { color: fg }]}>
+      <Text style={[labelStyle(variant, size), { color: fg }]}>
         {label}
       </Text>
     </Pressable>

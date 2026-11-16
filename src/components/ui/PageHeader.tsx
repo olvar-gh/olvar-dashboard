@@ -30,14 +30,10 @@ export function PageHeader({ title, subtitle, actions, dateNav, avatar, onAvatar
   return (
     <View style={styles.root}>
       <View style={styles.greeting}>
-        <Text accessibilityRole="header" aria-level={1} numberOfLines={1} style={styles.title}>
+        <Text accessibilityRole="header" aria-level={1} style={styles.title}>
           {title}
         </Text>
-        {subtitle ? (
-          <Text numberOfLines={1} style={styles.subtitle}>
-            {subtitle}
-          </Text>
-        ) : null}
+        {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}
       </View>
       <View style={styles.controls}>
         {actions}
@@ -80,11 +76,11 @@ function RoundButton({ icon, label, onPress, disabled }: { icon: IconName; label
 }
 
 const styles = StyleSheet.create({
-  root: { flexDirection: 'row', alignItems: 'center', minHeight: 60, gap: 16 },
-  greeting: { flex: 1, minWidth: 0, gap: space.pageHeaderTitleGap },
+  root: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', minHeight: 60, gap: 16 },
+  greeting: { flexGrow: 1, flexShrink: 1, flexBasis: 240, minWidth: 0, gap: space.pageHeaderTitleGap },
   title: { ...typography.pageTitle, color: colors.text.primary },
   subtitle: { ...typography.pageSubtitle, color: colors.text.secondary },
-  controls: { flexDirection: 'row', alignItems: 'center', gap: space.pageHeaderControlsGap },
+  controls: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: space.pageHeaderControlsGap },
   date: { ...typography.label, color: colors.text.secondary },
   round: {
     width: 36,

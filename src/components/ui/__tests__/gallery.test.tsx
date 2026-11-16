@@ -1,6 +1,18 @@
 import { fireEvent, render, screen } from '@testing-library/react-native';
 
-import GalleryScreen from '@/app/(dev)/gallery';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
+
+import Gallery from '@/app/(dev)/gallery';
+
+const metrics = { frame: { x: 0, y: 0, width: 402, height: 874 }, insets: { top: 62, left: 0, right: 0, bottom: 34 } };
+
+function GalleryScreen() {
+  return (
+    <SafeAreaProvider initialMetrics={metrics}>
+      <Gallery />
+    </SafeAreaProvider>
+  );
+}
 
 describe('gallery', () => {
   it('renders every primitive', async () => {

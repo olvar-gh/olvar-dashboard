@@ -1,3 +1,4 @@
+import { useRef, type ComponentRef } from 'react';
 import { Pressable, StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
 
 import { colors, typography } from '@/theme';
@@ -13,17 +14,45 @@ export type SegmentedProps<V extends string> = {
   testID?: string;
 };
 
+const STEP: Record<string, number> = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 };
+
 /** Range switch from the Sensors filter bar (24 hours · 7 days · 30 days). */
 export function Segmented<V extends string>({ options, value, onChange, accessibilityLabel, style, testID }: SegmentedProps<V>) {
+  const refs = useRef<(ComponentRef<typeof View> | null)[]>([]);
+  const current = options.findIndex((o) => o.value === value);
+
+  const onKeyDown = (e: { nativeEvent: { key: string }; preventDefault?: () => void }) => {
+    const key = e.nativeEvent.key;
+    let next: number | null = null;
+    if (key in STEP) next = (Math.max(current, 0) + STEP[key] + options.length) % options.length;
+    else if (key === 'Home') next = 0;
+    else if (key === 'End') next = options.length - 1;
+    if (next === null) return;
+    e.preventDefault?.();
+    onChange(options[next].value);
+    refs.current[next]?.focus();
+  };
+
   return (
-    <View accessibilityRole="tablist" accessibilityLabel={accessibilityLabel} testID={testID} style={[styles.track, style]}>
-      {options.map((o) => {
+    <View
+      accessibilityRole="tablist"
+      accessibilityLabel={accessibilityLabel}
+      testID={testID}
+      style={[styles.track, style]}
+      {...({ onKeyDown } as object)}
+    >
+      {options.map((o, i) => {
         const selected = o.value === value;
         return (
           <Pressable
             key={o.value}
+            ref={(el) => {
+              refs.current[i] = el;
+            }}
             accessibilityRole="tab"
             accessibilityState={{ selected }}
+            aria-selected={selected}
+            tabIndex={selected || current < 0 ? 0 : -1}
             onPress={() => !selected && onChange(o.value)}
             style={[styles.segment, selected && styles.selected]}
           >

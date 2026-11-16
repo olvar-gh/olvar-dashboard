@@ -20,15 +20,15 @@ export function GlassButton({ icon, accessibilityLabel, onPress, size = GLASS_SI
       disabled={disabled}
       onPress={onPress}
       testID={testID}
-      style={[shape, disabled && styles.disabled, style]}
+      style={[shape, style]}
     >
-      {/* GlassView renders blank if mounted conditionally or faded, so it is always mounted and never animated. */}
+      {/* GlassView renders blank under opacity < 1 on it or any ancestor, or when mounted on demand, so only the icon is dimmed. */}
       {liquidGlass ? (
         <GlassView testID={testID && `${testID}-glass`} isInteractive glassEffectStyle="regular" style={[StyleSheet.absoluteFill, shape]} />
       ) : (
         <View testID={testID && `${testID}-fallback`} style={[StyleSheet.absoluteFill, shape, styles.fallback]} />
       )}
-      <View style={styles.center}>
+      <View style={[styles.center, disabled && styles.disabled]}>
         <Icon name={icon} size={GLASS_ICON_SIZE} color={colors.text.primary} />
       </View>
     </Pressable>

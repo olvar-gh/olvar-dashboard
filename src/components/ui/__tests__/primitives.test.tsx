@@ -154,14 +154,18 @@ describe('Modal', () => {
     expect(confirm).toHaveBeenCalled();
   });
 
-  it('Modal renders only when visible and dismisses on scrim press', async () => {
+  it('Modal renders only when visible and dismisses on a backdrop press only', async () => {
     const onDismiss = jest.fn();
-    const { rerender } = await render(<Modal visible={false} onDismiss={onDismiss} title="Dialog" />);
+    const { rerender } = await render(<Modal visible={false} onDismiss={onDismiss} title="Dialog" testID="m" />);
     expect(screen.queryByText('Dialog')).toBeNull();
-    await rerender(<Modal visible onDismiss={onDismiss} title="Dialog" />);
+    await rerender(<Modal visible onDismiss={onDismiss} title="Dialog" testID="m" style={{ padding: 40 }} />);
     expect(screen.getByText('Dialog')).toBeTruthy();
-    await fireEvent.press(screen.getByLabelText('Close'));
-    expect(onDismiss).toHaveBeenCalled();
+    expect(flat(screen.getByTestId('m').props.style)).toMatchObject({ padding: 40, boxShadow: expect.any(String) });
+    const backdrop = screen.getByTestId('m-backdrop');
+    await fireEvent.press(backdrop, { target: 'card', currentTarget: 'backdrop' });
+    expect(onDismiss).not.toHaveBeenCalled();
+    await fireEvent.press(backdrop, { target: 'backdrop', currentTarget: 'backdrop' });
+    expect(onDismiss).toHaveBeenCalledTimes(1);
   });
 });
 
@@ -197,6 +201,17 @@ describe('Segmented', () => {
     { value: '24h', label: '24 hours' },
     { value: '7d', label: '7 days' },
   ] as const;
+
+  it('moves selection and focus with arrow keys', async () => {
+    const onChange = jest.fn();
+    await render(<Segmented options={options} value="24h" onChange={onChange} testID="range" />);
+    const tablist = screen.getByTestId('range');
+    await fireEvent(tablist, 'keyDown', { nativeEvent: { key: 'ArrowRight' } });
+    expect(onChange).toHaveBeenLastCalledWith('7d');
+    await fireEvent(tablist, 'keyDown', { nativeEvent: { key: 'ArrowLeft' } });
+    expect(onChange).toHaveBeenLastCalledWith('7d');
+    expect(screen.getByRole('tab', { name: '24 hours' })).toBeSelected();
+  });
 
   it('marks the selected tab and reports changes', async () => {
     const onChange = jest.fn();

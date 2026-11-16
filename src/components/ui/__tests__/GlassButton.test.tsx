@@ -21,6 +21,14 @@ describe('GlassButton', () => {
     expect(onPress).toHaveBeenCalled();
   });
 
+  it('keeps the glass hierarchy opaque when disabled', async () => {
+    available.mockReturnValue(true);
+    await render(<GlassButton icon="chevLeft" accessibilityLabel="Back" disabled testID="g" />);
+    const flat = (style: unknown) => Object.assign({}, ...[style].flat(Infinity).filter(Boolean));
+    expect(flat(screen.getByRole('button').props.style).opacity).toBeUndefined();
+    expect(flat(screen.getByTestId('g-glass').props.style).opacity).toBeUndefined();
+  });
+
   it('falls back to a plain view below iOS 26', async () => {
     available.mockReturnValue(false);
     await render(<GlassButton icon="gear" accessibilityLabel="Settings" testID="g" />);
