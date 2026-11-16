@@ -1,9 +1,10 @@
 import { fireEvent, render, screen } from '@testing-library/react-native';
-import { Text } from 'react-native';
+import { ActionSheetIOS, Alert, Text } from 'react-native';
 
-import { colors } from '@/theme';
+import { colors, iosColors } from '@/theme';
 
 import {
+  BrandHeader,
   Button,
   Card,
   EmptyState,
@@ -14,21 +15,24 @@ import {
   ListSection,
   Modal,
   ModalCard,
-  NavBar,
   Notice,
   OfflineBanner,
-  PageHeader,
+  RangeCard,
+  SearchField,
   Segmented,
   SelectField,
   SkeletonCard,
   StatusPill,
+  appTabs,
+  confirmAlert,
   offlineText,
+  showActionSheet,
 } from '..';
 import { withAlpha } from '../color';
 
 const flat = (style: unknown) => Object.assign({}, ...[style].flat(Infinity).filter(Boolean));
 
-describe('Button', () => {
+describe('Button (iPhone)', () => {
   it('fires onPress and exposes its label', async () => {
     const onPress = jest.fn();
     await render(<Button label="Save" onPress={onPress} />);
@@ -50,23 +54,38 @@ describe('Button', () => {
     expect(screen.getByRole('button', { name: 'B' }).props.accessibilityState).toMatchObject({ busy: true });
   });
 
-  it.each([
-    ['primary', colors.brand.olive],
-    ['destructive', colors.status.alert],
-    ['secondary', colors.surface.card],
-  ] as const)('%s uses the Figma fill', async (variant, fill) => {
-    await render(<Button label="X" variant={variant} />);
-    expect(flat(screen.getByRole('button').props.style).backgroundColor).toBe(fill);
+  it('large primary is the full-width olive capsule; destructive is the white grouped row', async () => {
+    await render(
+      <>
+        <Button size="large" label="Sign In" />
+        <Button size="large" variant="destructive" label="Sign Out" />
+      </>,
+    );
+    expect(flat(screen.getByRole('button', { name: 'Sign In' }).props.style)).toMatchObject({
+      backgroundColor: colors.brand.olive,
+      height: 50,
+      alignSelf: 'stretch',
+    });
+    expect(flat(screen.getByRole('button', { name: 'Sign Out' }).props.style)).toMatchObject({
+      backgroundColor: iosColors.groupedBackgroundSecondary,
+      borderRadius: 26,
+    });
+  });
+
+  it('small secondary is a tinted capsule', async () => {
+    await render(<Button label="Recalibrate" variant="secondary" />);
+    expect(flat(screen.getByRole('button').props.style)).toMatchObject({ backgroundColor: iosColors.fillTertiary, borderRadius: 1000 });
   });
 });
 
-describe('Field', () => {
+describe('Field (iPhone row)', () => {
   it('edits text and labels the input', async () => {
     const onChangeText = jest.fn();
-    await render(<Field label="Nickname" value="Sparks" onChangeText={onChangeText} hint="Up to 60 characters" />);
-    await fireEvent.changeText(screen.getByLabelText('Nickname'), 'Fern');
-    expect(onChangeText).toHaveBeenCalledWith('Fern');
-    expect(screen.getByText('Up to 60 characters')).toBeTruthy();
+    await render(<Field label="Email" placeholder="you@example.com" onChangeText={onChangeText} hint="We never share it" />);
+    await fireEvent.changeText(screen.getByLabelText('Email'), 'a@b.c');
+    expect(onChangeText).toHaveBeenCalledWith('a@b.c');
+    expect(screen.getByText('We never share it')).toBeTruthy();
+    expect(flat(screen.getByLabelText('Email').props.style).textAlign).toBe('right');
   });
 
   it('SelectField shows the placeholder when empty and is pressable', async () => {
@@ -92,8 +111,8 @@ describe('Notice', () => {
   });
 });
 
-describe('Card', () => {
-  it('renders title, subtitle, actions and content', async () => {
+describe('Card (iPhone)', () => {
+  it('renders title, subtitle, actions and content on the inset card surface', async () => {
     await render(
       <Card title="Devices" subtitle="Paired" actions={<Button label="Add" />} minHeight={232} testID="card">
         <Text>Body</Text>
@@ -102,23 +121,22 @@ describe('Card', () => {
     expect(screen.getByRole('header', { name: 'Devices' })).toBeTruthy();
     expect(screen.getByText('Paired')).toBeTruthy();
     expect(screen.getByText('Body')).toBeTruthy();
-    expect(flat(screen.getByTestId('card').props.style)).toMatchObject({ minHeight: 232, borderRadius: 20 });
+    expect(flat(screen.getByTestId('card').props.style)).toMatchObject({ minHeight: 232, borderRadius: 26 });
+    expect(flat(screen.getByTestId('card').props.style).borderWidth).toBeUndefined();
   });
 });
 
-describe('ListRow', () => {
-  it('shows title, subtitle, status and action', async () => {
+describe('ListRow (iPhone)', () => {
+  it('becomes a grouped row with the status as its value', async () => {
+    const onPress = jest.fn();
     await render(
-      <ListRow title="olvar-node" subtitle="ESP32" status={{ label: 'Offline', live: false }} action={<Button label="Recalibrate" />} />,
+      <ListRow divider title="olvar-node" subtitle="ESP32" status={{ label: 'Offline', live: false }} action={<Button label="Recalibrate" />} onPress={onPress} />,
     );
     expect(screen.getByText('olvar-node')).toBeTruthy();
     expect(screen.getByText('Offline')).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Recalibrate' })).toBeTruthy();
-  });
-
-  it('draws the top divider only when asked', async () => {
-    await render(<ListRow title="a" divider testID="row" />);
-    expect(flat(screen.getByTestId('row').props.style).borderTopWidth).toBe(1);
+    await fireEvent.press(screen.getByText('olvar-node'));
+    expect(onPress).toHaveBeenCalled();
   });
 });
 
@@ -141,85 +159,44 @@ describe('IosListRow and ListSection', () => {
   });
 });
 
-describe('Modal', () => {
-  it('ModalCard wires cancel and confirm', async () => {
+describe('Modal (iPhone sheet)', () => {
+  it('ModalCard wires cancel and confirm in the sheet bar', async () => {
     const cancel = jest.fn();
     const confirm = jest.fn();
     await render(
       <ModalCard title="Recalibrate" subtitle="Every minute" cancel={{ label: 'Cancel', onPress: cancel }} confirm={{ label: 'Save', onPress: confirm }} />,
     );
+    expect(screen.getByRole('header', { name: 'Recalibrate' })).toBeTruthy();
     await fireEvent.press(screen.getByRole('button', { name: 'Cancel' }));
     await fireEvent.press(screen.getByRole('button', { name: 'Save' }));
     expect(cancel).toHaveBeenCalled();
     expect(confirm).toHaveBeenCalled();
   });
 
-  it('Modal renders only when visible and dismisses on a backdrop press only', async () => {
+  it('is a native page sheet that dismisses from its default Cancel', async () => {
     const onDismiss = jest.fn();
-    const { rerender } = await render(<Modal visible={false} onDismiss={onDismiss} title="Dialog" testID="m" />);
+    const { rerender } = await render(<Modal visible={false} onDismiss={onDismiss} title="Dialog" />);
     expect(screen.queryByText('Dialog')).toBeNull();
-    await rerender(<Modal visible onDismiss={onDismiss} title="Dialog" testID="m" style={{ padding: 40 }} />);
+    await rerender(<Modal visible onDismiss={onDismiss} title="Dialog" testID="m" />);
     expect(screen.getByText('Dialog')).toBeTruthy();
-    expect(flat(screen.getByTestId('m').props.style)).toMatchObject({ padding: 40, boxShadow: expect.any(String) });
-    const backdrop = screen.getByTestId('m-backdrop');
-    await fireEvent.press(backdrop, { target: 'card', currentTarget: 'backdrop' });
-    expect(onDismiss).not.toHaveBeenCalled();
-    await fireEvent.press(backdrop, { target: 'backdrop', currentTarget: 'backdrop' });
+    await fireEvent.press(screen.getByRole('button', { name: 'Cancel' }));
     expect(onDismiss).toHaveBeenCalledTimes(1);
   });
 });
 
-describe('PageHeader', () => {
-  it('renders title and date navigation with disabled state', async () => {
-    const onPrev = jest.fn();
-    await render(<PageHeader title="Timeline" subtitle="Week" avatar="dongmin" dateNav={{ label: 'Nov 6', onPrev, nextDisabled: true }} />);
-    expect(screen.getByRole('header', { name: 'Timeline' })).toBeTruthy();
-    expect(screen.getByText('D')).toBeTruthy();
-    await fireEvent.press(screen.getByRole('button', { name: 'Previous' }));
-    expect(onPrev).toHaveBeenCalled();
-    expect(screen.getByRole('button', { name: 'Next' })).toBeDisabled();
-  });
-});
-
-describe('NavBar', () => {
-  it('shows the large title and a glass back button', async () => {
-    const onBack = jest.fn();
-    await render(<NavBar title="Settings" onBack={onBack} />);
-    expect(screen.getByRole('header', { name: 'Settings' })).toBeTruthy();
-    await fireEvent.press(screen.getByRole('button', { name: 'Back' }));
-    expect(onBack).toHaveBeenCalled();
-  });
-
-  it('omits the toolbar without back or trailing', async () => {
-    await render(<NavBar title="Home" />);
-    expect(screen.queryByRole('button')).toBeNull();
-  });
-});
-
-describe('Segmented', () => {
+describe('Segmented (iPhone)', () => {
   const options = [
-    { value: '24h', label: '24 hours' },
-    { value: '7d', label: '7 days' },
+    { value: '24h', label: '24H' },
+    { value: '7d', label: '7D' },
   ] as const;
-
-  it('moves selection and focus with arrow keys', async () => {
-    const onChange = jest.fn();
-    await render(<Segmented options={options} value="24h" onChange={onChange} testID="range" />);
-    const tablist = screen.getByTestId('range');
-    await fireEvent(tablist, 'keyDown', { nativeEvent: { key: 'ArrowRight' } });
-    expect(onChange).toHaveBeenLastCalledWith('7d');
-    await fireEvent(tablist, 'keyDown', { nativeEvent: { key: 'ArrowLeft' } });
-    expect(onChange).toHaveBeenLastCalledWith('7d');
-    expect(screen.getByRole('tab', { name: '24 hours' })).toBeSelected();
-  });
 
   it('marks the selected tab and reports changes', async () => {
     const onChange = jest.fn();
     await render(<Segmented options={options} value="24h" onChange={onChange} />);
-    expect(screen.getByRole('tab', { name: '24 hours' })).toBeSelected();
-    await fireEvent.press(screen.getByRole('tab', { name: '24 hours' }));
+    expect(screen.getByRole('tab', { name: '24H' })).toBeSelected();
+    await fireEvent.press(screen.getByRole('tab', { name: '24H' }));
     expect(onChange).not.toHaveBeenCalled();
-    await fireEvent.press(screen.getByRole('tab', { name: '7 days' }));
+    await fireEvent.press(screen.getByRole('tab', { name: '7D' }));
     expect(onChange).toHaveBeenCalledWith('7d');
   });
 });
@@ -243,11 +220,70 @@ describe('StatusPill', () => {
   });
 });
 
+describe('RangeCard', () => {
+  it('places the ideal range and the now marker on the scale', async () => {
+    await render(<RangeCard testID="rc" caption="Soil moisture" value="42" status="%" min={0} max={100} low={35} high={60} current={42} color="#0088ff" />);
+    expect(screen.getByText('Soil moisture')).toBeTruthy();
+    expect(flat(screen.getByTestId('rc-range').props.style)).toMatchObject({ left: '35%', width: '25%', backgroundColor: '#0088ff' });
+    expect(flat(screen.getByTestId('rc-now').props.style).left).toBe('42%');
+  });
+
+  it('clamps out-of-scale values and hides the marker for a failed read', async () => {
+    await render(<RangeCard testID="rc" caption="Light" value="—" min={0} max={100} low={-10} high={150} current={null} color="#ffcc00" />);
+    expect(flat(screen.getByTestId('rc-range').props.style)).toMatchObject({ left: '0%', width: '100%' });
+    expect(screen.queryByTestId('rc-now')).toBeNull();
+  });
+});
+
+describe('SearchField and BrandHeader', () => {
+  it('search field is a labelled search input', async () => {
+    const onChangeText = jest.fn();
+    await render(<SearchField placeholder="Search plants" onChangeText={onChangeText} />);
+    await fireEvent.changeText(screen.getByRole('search', { name: 'Search plants' }), 'fern');
+    expect(onChangeText).toHaveBeenCalledWith('fern');
+  });
+
+  it('brand header shows the title and tagline', async () => {
+    await render(<BrandHeader />);
+    expect(screen.getByRole('header', { name: 'Olvar' })).toBeTruthy();
+    expect(screen.getByText('Your plants, in their own words.')).toBeTruthy();
+  });
+});
+
+describe('native alert and action sheet', () => {
+  afterEach(() => jest.restoreAllMocks());
+
+  it('confirmAlert uses Alert.alert with a destructive action', async () => {
+    const spy = jest.spyOn(Alert, 'alert').mockImplementation((_t, _m, buttons) => buttons?.[1]?.onPress?.());
+    await expect(confirmAlert({ title: 'Remove?', confirmLabel: 'Remove', destructive: true })).resolves.toBe(true);
+    expect(spy.mock.calls[0][2]).toEqual([
+      expect.objectContaining({ text: 'Cancel', style: 'cancel' }),
+      expect.objectContaining({ text: 'Remove', style: 'destructive' }),
+    ]);
+  });
+
+  it('showActionSheet uses ActionSheetIOS and maps Cancel to null', async () => {
+    const spy = jest.spyOn(ActionSheetIOS, 'showActionSheetWithOptions');
+    spy.mockImplementationOnce((_o, cb) => cb(1));
+    await expect(showActionSheet({ options: ['A', 'B'], destructiveIndex: 1 })).resolves.toBe(1);
+    expect(spy.mock.calls[0][0]).toMatchObject({ options: ['A', 'B', 'Cancel'], cancelButtonIndex: 2, destructiveButtonIndex: 1 });
+    spy.mockImplementationOnce((_o, cb) => cb(2));
+    await expect(showActionSheet({ options: ['A', 'B'] })).resolves.toBeNull();
+  });
+});
+
+describe('tab bar items', () => {
+  it('matches the Figma iPhone/Tab bar order with SF Symbols', () => {
+    expect(appTabs.map((t) => t.label)).toEqual(['Home', 'Sensors', 'Timeline', 'Chat']);
+    expect(appTabs.every((t) => t.sf.length > 0)).toBe(true);
+  });
+});
+
 describe('SkeletonCard', () => {
   it('is a busy progressbar with the requested lines', async () => {
     await render(<SkeletonCard minHeight={232} testID="sk" />);
     expect(screen.getByRole('progressbar', { name: 'Loading' })).toBeTruthy();
-    expect(flat(screen.getByTestId('sk').props.style).minHeight).toBe(232);
+    expect(flat(screen.getByTestId('sk').props.style)).toMatchObject({ minHeight: 232, borderRadius: 26 });
   });
 });
 

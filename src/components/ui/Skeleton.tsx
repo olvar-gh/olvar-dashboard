@@ -1,6 +1,8 @@
-import { StyleSheet, View, type DimensionValue, type StyleProp, type ViewStyle } from 'react-native';
+import { Platform, StyleSheet, View, type DimensionValue, type StyleProp, type ViewStyle } from 'react-native';
 
 import { colors, radius, space } from '@/theme';
+
+import { IOS_GROUP_RADIUS } from './color';
 
 export type SkeletonProps = {
   width?: DimensionValue;
@@ -47,12 +49,16 @@ const styles = StyleSheet.create({
   block: { backgroundColor: colors.bg.sidebar },
   card: {
     backgroundColor: colors.surface.card,
-    borderWidth: 1,
-    borderColor: colors.border.subtle,
-    borderRadius: radius.card,
-    paddingHorizontal: space.cardPaddingX,
-    paddingVertical: space.cardPaddingY,
     gap: 12,
+    ...(Platform.OS === 'web'
+      ? {
+          borderWidth: 1,
+          borderColor: colors.border.subtle,
+          borderRadius: radius.card,
+          paddingHorizontal: space.cardPaddingX,
+          paddingVertical: space.cardPaddingY,
+        }
+      : { borderRadius: IOS_GROUP_RADIUS, padding: 16 }),
   },
   header: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 4 },
 });

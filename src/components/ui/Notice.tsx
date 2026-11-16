@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
+import { Platform, StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
 
 import { Icon, type IconName } from '@/components/icons';
 import { colors, typography } from '@/theme';
@@ -42,8 +42,8 @@ const styles = StyleSheet.create({
     gap: 8,
     paddingLeft: 12,
     paddingRight: 14,
-    paddingVertical: 10,
-    borderRadius: 10,
+    paddingVertical: Platform.OS === 'web' ? 10 : 12,
+    borderRadius: Platform.OS === 'web' ? 10 : 16,
   },
   text: { ...typography.label, flex: 1, minWidth: 0 },
 });

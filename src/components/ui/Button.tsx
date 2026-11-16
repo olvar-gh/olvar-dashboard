@@ -1,25 +1,17 @@
 import type { ReactNode } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, Text, View, type StyleProp, type TextStyle, type ViewStyle } from 'react-native';
 
-import { colors, iosColors, radius, space, typography } from '@/theme';
+import { colors, iosColors, typography } from '@/theme';
 
-export type ButtonVariant = 'primary' | 'secondary' | 'destructive' | 'plain';
-/** `small` / `large` are the desktop sizes; `ios` is the full-width iPhone button. */
-export type ButtonSize = 'small' | 'large' | 'ios';
+import type { ButtonProps, ButtonVariant } from './Button.types';
+import { IOS_GROUP_RADIUS } from './color';
 
-export type ButtonProps = {
-  label: string;
-  onPress?: () => void;
-  variant?: ButtonVariant;
-  size?: ButtonSize;
-  icon?: ReactNode;
-  disabled?: boolean;
-  loading?: boolean;
-  style?: StyleProp<ViewStyle>;
-  testID?: string;
-  accessibilityLabel?: string;
-};
+export type { ButtonProps, ButtonSize, ButtonVariant } from './Button.types';
 
+/**
+ * iPhone button (Figma iPhone/Button). `large` is the full-width form button: olive capsule,
+ * red grouped row, or olive text. `small` is the compact capsule used inline.
+ */
 export function Button({
   label,
   onPress,
@@ -33,7 +25,7 @@ export function Button({
   accessibilityLabel,
 }: ButtonProps) {
   const inactive = disabled || loading;
-  const fg = foreground(variant, size);
+  const look = (size === 'large' ? LARGE : SMALL)[variant];
   return (
     <Pressable
       accessibilityRole="button"
@@ -44,79 +36,47 @@ export function Button({
       testID={testID}
       style={({ pressed }) => [
         styles.base,
-        sizeStyles[size],
-        variantStyles(variant, size),
+        size === 'large' ? styles.large : styles.small,
+        look.box,
         pressed && styles.pressed,
         inactive && styles.disabled,
         style,
       ]}
     >
-      {loading ? <ActivityIndicator size="small" color={fg} /> : icon}
-      <Text style={[labelStyle(variant, size), { color: fg }]}>
-        {label}
-      </Text>
+      {loading ? <ActivityIndicator size="small" color={look.label.color as string} /> : icon}
+      <Text style={look.label}>{label}</Text>
     </Pressable>
   );
 }
 
-function foreground(variant: ButtonVariant, size: ButtonSize): string {
-  if (variant === 'primary') return colors.surface.card;
-  if (variant === 'plain') return colors.brand.olive;
-  if (variant === 'destructive') return size === 'ios' ? colors.status.alert : colors.surface.card;
-  return colors.text.primary;
-}
+type Look = { box: ViewStyle; label: TextStyle };
 
-function labelStyle(variant: ButtonVariant, size: ButtonSize) {
-  if (size === 'small') return typography.buttonSmall;
-  if (size === 'large') return typography.buttonLarge;
-  return variant === 'primary' ? styles.iosPrimaryLabel : typography.iosBody;
-}
+const bodySemibold: TextStyle = { ...typography.iosBody, fontFamily: typography.iosSubheadlineEmphasized.fontFamily };
+const subheadSemibold: TextStyle = typography.iosSubheadlineEmphasized;
 
-function variantStyles(variant: ButtonVariant, size: ButtonSize): ViewStyle {
-  if (size === 'ios') {
-    if (variant === 'primary') return { backgroundColor: colors.brand.olive, borderRadius: radius.pill, height: 50 };
-    if (variant === 'destructive') {
-      return { backgroundColor: iosColors.groupedBackgroundSecondary, borderRadius: 26, paddingVertical: 12 };
-    }
-    return { height: 44 };
-  }
-  switch (variant) {
-    case 'primary':
-      return { backgroundColor: colors.brand.olive };
-    case 'destructive':
-      return { backgroundColor: colors.status.alert };
-    case 'secondary':
-      return { backgroundColor: colors.surface.card, borderWidth: 1, borderColor: colors.border.subtle };
-    case 'plain':
-      return {};
-  }
-}
-
-const sizeStyles = StyleSheet.create({
-  small: {
-    paddingHorizontal: space.buttonPaddingX,
-    paddingVertical: space.buttonSmallPaddingY,
-    borderRadius: radius.buttonSmall,
+const LARGE: Record<ButtonVariant, Look> = {
+  primary: { box: { backgroundColor: colors.brand.olive, height: 50 }, label: { ...bodySemibold, letterSpacing: 0, color: colors.surface.card } },
+  secondary: { box: { backgroundColor: iosColors.groupedBackgroundSecondary, height: 50 }, label: { ...typography.iosBody, color: colors.brand.olive } },
+  destructive: {
+    box: { backgroundColor: iosColors.groupedBackgroundSecondary, minHeight: 46, borderRadius: IOS_GROUP_RADIUS },
+    label: { ...typography.iosBody, color: colors.status.alert },
   },
-  large: {
-    paddingHorizontal: space.buttonPaddingX,
-    paddingVertical: space.buttonLargePaddingY,
-    borderRadius: radius.buttonLarge,
-  },
-  ios: { alignSelf: 'stretch', paddingHorizontal: 16 },
-});
+  plain: { box: { height: 44 }, label: { ...typography.iosBody, color: colors.brand.olive } },
+};
+
+const SMALL: Record<ButtonVariant, Look> = {
+  primary: { box: { backgroundColor: colors.brand.olive }, label: { ...subheadSemibold, color: colors.surface.card } },
+  secondary: { box: { backgroundColor: iosColors.fillTertiary }, label: { ...subheadSemibold, color: colors.brand.olive } },
+  destructive: { box: { backgroundColor: iosColors.fillTertiary }, label: { ...subheadSemibold, color: colors.status.alert } },
+  plain: { box: {}, label: { ...typography.iosSubheadline, color: colors.brand.olive } },
+};
 
 const styles = StyleSheet.create({
-  base: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    overflow: 'hidden',
-  },
-  iosPrimaryLabel: { ...typography.iosBody, fontFamily: typography.buttonLarge.fontFamily, letterSpacing: 0 },
-  pressed: { opacity: 0.8 },
-  disabled: { opacity: 0.5 },
+  base: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, borderRadius: 1000 },
+  large: { alignSelf: 'stretch', paddingHorizontal: 16 },
+  small: { minHeight: 34, paddingHorizontal: 14, paddingVertical: 7 },
+  pressed: { opacity: 0.7 },
+  disabled: { opacity: 0.4 },
 });
 
 export function ButtonRow({ children, style }: { children: ReactNode; style?: StyleProp<ViewStyle> }) {

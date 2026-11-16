@@ -20,3 +20,9 @@ export function withAlpha(hex: string, alpha: number): string {
 }
 
 export const scrim = withAlpha(colors.text.primary, 0.4);
+
+/** Page background of the Figma iPhone frames (iOS grouped background). */
+export const iosGroupedBackground = '#f2f2f7';
+
+/** Corner radius of grouped sections, cards and capsule buttons in the iPhone frames. */
+export const IOS_GROUP_RADIUS = 26;

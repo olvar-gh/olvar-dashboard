@@ -1,39 +1,46 @@
-import type { ReactNode } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { Stack } from 'expo-router';
 
 import { iosColors, typography } from '@/theme';
 
-import { GlassButton } from './GlassButton';
+import type { NavBarProps } from './NavBar.types';
 
-export type NavBarProps = {
-  title: string;
-  onBack?: () => void;
-  backLabel?: string;
-  /** Trailing glass buttons. */
-  trailing?: ReactNode;
-};
+export type { NavBarAction, NavBarProps } from './NavBar.types';
 
-/** iPhone toolbar with a glass back button, then the large title (Figma iPhone/Nav bar). */
-export function NavBar({ title, onBack, backLabel = 'Back', trailing }: NavBarProps) {
-  const toolbar = onBack || trailing;
+/**
+ * iPhone nav bar (Figma iPhone/Nav bar) as the native stack header: large title, and
+ * Liquid Glass toolbar buttons with SF Symbols. Renders nothing in the page itself; the
+ * screen's ScrollView needs contentInsetAdjustmentBehavior="automatic".
+ */
+export function NavBar({ title, onBack, backLabel = 'Back', actions }: NavBarProps) {
   return (
-    <View style={styles.root}>
-      {toolbar ? (
-        <View style={styles.toolbar}>
-          {onBack ? <GlassButton icon="chevLeft" accessibilityLabel={backLabel} onPress={onBack} /> : <View />}
-          <View style={styles.trailing}>{trailing}</View>
-        </View>
+    <>
+      <Stack.Screen
+        options={{
+          headerShown: true,
+          title,
+          headerLargeTitle: true,
+          headerTransparent: true,
+          headerShadowVisible: false,
+          headerLargeTitleShadowVisible: false,
+          headerBackButtonDisplayMode: 'minimal',
+          headerLargeTitleStyle: { fontFamily: typography.iosLargeTitle.fontFamily, color: iosColors.labelPrimary },
+          headerTitleStyle: { fontFamily: typography.iosSubheadlineEmphasized.fontFamily, color: iosColors.labelPrimary },
+
+          headerBackVisible: !onBack,
+        }}
+      />
+      {onBack ? (
+        <Stack.Toolbar placement="left">
+          <Stack.Toolbar.Button icon="chevron.left" accessibilityLabel={backLabel} onPress={onBack} />
+        </Stack.Toolbar>
       ) : null}
-      <Text accessibilityRole="header" numberOfLines={1} style={styles.title}>
-        {title}
-      </Text>
-    </View>
+      {actions?.length ? (
+        <Stack.Toolbar placement="right">
+          {actions.map((a) => (
+            <Stack.Toolbar.Button key={a.label} icon={a.sf} accessibilityLabel={a.label} disabled={a.disabled} onPress={a.onPress} />
+          ))}
+        </Stack.Toolbar>
+      ) : null}
+    </>
   );
 }
-
-const styles = StyleSheet.create({
-  root: { gap: 8, alignSelf: 'stretch' },
-  toolbar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingTop: 4 },
-  trailing: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  title: { ...typography.iosLargeTitle, color: iosColors.labelPrimary, paddingBottom: 8 },
-});

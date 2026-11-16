@@ -1,4 +1,4 @@
-import { StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
+import { Platform, StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
 
 import { Icon } from '@/components/icons';
 import { colors, typography } from '@/theme';
@@ -37,10 +37,8 @@ const styles = StyleSheet.create({
     gap: 8,
     paddingHorizontal: 14,
     paddingVertical: 10,
-    borderRadius: 10,
     backgroundColor: colors.bg.sidebar,
-    borderWidth: 1,
-    borderColor: colors.border.subtle,
+    ...(Platform.OS === 'web' ? { borderRadius: 10, borderWidth: 1, borderColor: colors.border.subtle } : { borderRadius: 16 }),
   },
   text: { ...typography.label, color: colors.text.primary },
   detail: { ...typography.meta, color: colors.text.tertiary },
