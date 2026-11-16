@@ -9,6 +9,8 @@ export type RangeCardProps = {
   value: string;
   /** Unit or status text after the value. */
   status?: string;
+  /** Unit appended to the spoken thresholds, e.g. "%" or " lux". */
+  unit?: string;
   /** Scale ends and their labels. */
   min: number;
   max: number;
@@ -29,7 +31,7 @@ const TRACK_H = 4.83;
 const HANDLE = 10.06;
 
 /** Current reading with its ideal-range slider (Figma iPhone/Range card). */
-export function RangeCard({ caption, value, status, min, max, minLabel, maxLabel, low, high, current, color, style, testID }: RangeCardProps) {
+export function RangeCard({ caption, value, status, unit = '', min, max, minLabel, maxLabel, low, high, current, color, style, testID }: RangeCardProps) {
   const at = (v: number) => clamp((v - min) / (max - min || 1)) * 100;
   const pct = (v: number) => `${at(v)}%` as const;
   return (
@@ -41,8 +43,9 @@ export function RangeCard({ caption, value, status, min, max, minLabel, maxLabel
       </View>
       <View
         accessible
-        accessibilityRole="adjustable"
-        accessibilityLabel={`Ideal range ${minLabel ?? low} to ${maxLabel ?? high}`}
+        accessibilityRole="text"
+        accessibilityLabel={rangeLabel({ low, high, current, unit })}
+        testID={testID && `${testID}-slider`}
         style={styles.slider}
       >
         <View style={styles.track} />
@@ -57,6 +60,15 @@ export function RangeCard({ caption, value, status, min, max, minLabel, maxLabel
       </View>
     </View>
   );
+}
+
+const number = new Intl.NumberFormat('en-US', { maximumFractionDigits: 1 });
+
+/** Spoken description of the slider: the ideal thresholds and the current reading, never the axis ends. */
+export function rangeLabel({ low, high, current, unit = '' }: { low: number; high: number; current?: number | null; unit?: string }): string {
+  const fmt = (v: number) => `${number.format(v)}${unit}`;
+  const now = current == null ? 'no current reading' : `now ${fmt(current)}`;
+  return `Ideal range ${fmt(low)} to ${fmt(high)}, ${now}`;
 }
 
 function clamp(t: number) {

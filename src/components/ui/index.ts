@@ -13,7 +13,7 @@ export { NavBar, type NavBarAction, type NavBarProps } from './NavBar';
 export { Notice, type NoticeProps, type NoticeTone } from './Notice';
 export { OfflineBanner, offlineText, type OfflineBannerProps } from './OfflineBanner';
 export { PageHeader, type PageHeaderDateNav, type PageHeaderProps } from './PageHeader';
-export { RangeCard, type RangeCardProps } from './RangeCard';
+export { RangeCard, rangeLabel, type RangeCardProps } from './RangeCard';
 export { SearchField, type SearchFieldProps } from './SearchField';
 export { ListSection, SectionFooter, SectionHeader, type ListSectionProps } from './Section';
 export { Segmented, type SegmentedOption, type SegmentedProps } from './Segmented';

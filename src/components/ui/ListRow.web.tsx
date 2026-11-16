@@ -1,4 +1,4 @@
-import { StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { Icon } from '@/components/icons';
 import { colors, typography } from '@/theme';
@@ -9,9 +9,9 @@ export type { ListRowProps, ListRowStatus } from './ListRow.types';
 export { IosListRow, type IosListAccessory, type IosListRowProps } from './IosListRow';
 
 /** Desktop list row for devices and settings (Figma Desktop/List row). */
-export function ListRow({ title, subtitle, icon = 'leaf', status, action, divider = false, style, testID }: ListRowProps) {
-  return (
-    <View testID={testID} style={[styles.row, divider && styles.divider, style]}>
+export function ListRow({ title, subtitle, icon = 'leaf', status, action, divider = false, onPress, style, testID }: ListRowProps) {
+  const content = (
+    <>
       <View style={styles.iconChip}>
         <Icon name={icon} size={18} color={colors.text.secondary} />
       </View>
@@ -32,6 +32,29 @@ export function ListRow({ title, subtitle, icon = 'leaf', status, action, divide
         </View>
       ) : null}
       {action}
+    </>
+  );
+  if (onPress) {
+    return (
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={status ? `${title}, ${status.label}` : title}
+        onPress={onPress}
+        testID={testID}
+        style={({ pressed, hovered }: { pressed: boolean; hovered?: boolean }) => [
+          styles.row,
+          divider && styles.divider,
+          (pressed || hovered) && styles.active,
+          style,
+        ]}
+      >
+        {content}
+      </Pressable>
+    );
+  }
+  return (
+    <View testID={testID} style={[styles.row, divider && styles.divider, style]}>
+      {content}
     </View>
   );
 }
@@ -39,6 +62,7 @@ export function ListRow({ title, subtitle, icon = 'leaf', status, action, divide
 const styles = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center', gap: 14, paddingVertical: 9 },
   divider: { borderTopWidth: 1, borderTopColor: colors.border.subtle },
+  active: { backgroundColor: colors.bg.canvas },
   iconChip: {
     width: 36,
     height: 36,

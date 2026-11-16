@@ -21,10 +21,10 @@ export function ModalCard({ title, subtitle, children, cancel, confirm, style, t
   );
 }
 
-/** Native iOS page sheet (swipe down to dismiss) with Cancel · title · Confirm. */
+/** Native iOS page sheet with Cancel · title · Confirm; swiping it down calls onDismiss. */
 export function Modal({ visible, onDismiss, title, subtitle, children, cancel, confirm, style, testID }: ModalProps) {
   return (
-    <RNModal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onDismiss}>
+    <RNModal visible={visible} animationType="slide" presentationStyle="pageSheet" allowSwipeDismissal onRequestClose={onDismiss}>
       <View testID={testID} style={[styles.sheet, style]}>
         <SheetBar title={title} cancel={cancel ?? { label: 'Cancel', onPress: onDismiss }} confirm={confirm} />
         <ScrollView contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">

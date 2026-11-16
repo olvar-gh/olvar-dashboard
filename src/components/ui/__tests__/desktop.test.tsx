@@ -44,6 +44,21 @@ describe('desktop Card, Field and ListRow', () => {
     expect(screen.getByText('Asia/Seoul')).toBeTruthy();
   });
 
+  it('list row is a button when onPress is given, and stays plain otherwise', async () => {
+    const onPress = jest.fn();
+    await render(
+      <>
+        <ListRow title="olvar-gateway" status={{ label: 'Live', live: true }} onPress={onPress} testID="pressable" />
+        <ListRow title="olvar-node" testID="plain" />
+      </>,
+    );
+    const row = screen.getByRole('button', { name: 'olvar-gateway, Live' });
+    await fireEvent.press(row);
+    expect(onPress).toHaveBeenCalledTimes(1);
+    expect(screen.getByTestId('pressable')).toBe(row);
+    expect(screen.queryByRole('button', { name: 'olvar-node' })).toBeNull();
+  });
+
   it('list row draws the top divider only when asked', async () => {
     await render(<ListRow title="a" divider testID="row" status={{ label: 'Live', live: true }} />);
     expect(flat(screen.getByTestId('row').props.style).borderTopWidth).toBe(1);

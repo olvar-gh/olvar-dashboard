@@ -3178,8 +3178,8 @@ exports[`gallery (iOS) matches the snapshot 1`] = `
                         </Text>
                       </View>
                       <View
-                        accessibilityLabel="Ideal range 0% to 100%"
-                        accessibilityRole="adjustable"
+                        accessibilityLabel="Ideal range 35% to 60%, now 42%"
+                        accessibilityRole="text"
                         accessible={true}
                         style={
                           {
@@ -3188,6 +3188,7 @@ exports[`gallery (iOS) matches the snapshot 1`] = `
                             "marginTop": 6,
                           }
                         }
+                        testID="range-soil-slider"
                       >
                         <View
                           style={
@@ -3372,8 +3373,8 @@ exports[`gallery (iOS) matches the snapshot 1`] = `
                         </Text>
                       </View>
                       <View
-                        accessibilityLabel="Ideal range 0 to 4,000 lux"
-                        accessibilityRole="adjustable"
+                        accessibilityLabel="Ideal range 500 lux to 1,500 lux, now 1,240 lux"
+                        accessibilityRole="text"
                         accessible={true}
                         style={
                           {
@@ -3564,8 +3565,8 @@ exports[`gallery (iOS) matches the snapshot 1`] = `
                         </Text>
                       </View>
                       <View
-                        accessibilityLabel="Ideal range 10 °C to 35 °C"
-                        accessibilityRole="adjustable"
+                        accessibilityLabel="Ideal range 18 °C to 27 °C, now 23.4 °C"
+                        accessibilityRole="text"
                         accessible={true}
                         style={
                           {
@@ -3756,8 +3757,8 @@ exports[`gallery (iOS) matches the snapshot 1`] = `
                         </Text>
                       </View>
                       <View
-                        accessibilityLabel="Ideal range 0% to 100%"
-                        accessibilityRole="adjustable"
+                        accessibilityLabel="Ideal range 40% to 70%, no current reading"
+                        accessibilityRole="text"
                         accessible={true}
                         style={
                           {

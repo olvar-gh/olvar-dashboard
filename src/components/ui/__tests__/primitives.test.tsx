@@ -26,6 +26,7 @@ import {
   appTabs,
   confirmAlert,
   offlineText,
+  rangeLabel,
   showActionSheet,
 } from '..';
 import { withAlpha } from '../color';
@@ -173,6 +174,16 @@ describe('Modal (iPhone sheet)', () => {
     expect(confirm).toHaveBeenCalled();
   });
 
+  it('enables the swipe-down gesture and routes it to onDismiss', async () => {
+    const onDismiss = jest.fn();
+    await render(<Modal visible onDismiss={onDismiss} title="Dialog" />);
+    const sheet = screen.toJSON() as unknown as { type: string; props: { onRequestClose: () => void } };
+    expect(sheet.type).toBe('Modal');
+    expect(sheet.props).toMatchObject({ presentationStyle: 'pageSheet', allowSwipeDismissal: true });
+    sheet.props.onRequestClose();
+    expect(onDismiss).toHaveBeenCalledTimes(1);
+  });
+
   it('is a native page sheet that dismisses from its default Cancel', async () => {
     const onDismiss = jest.fn();
     const { rerender } = await render(<Modal visible={false} onDismiss={onDismiss} title="Dialog" />);
@@ -226,6 +237,15 @@ describe('RangeCard', () => {
     expect(screen.getByText('Soil moisture')).toBeTruthy();
     expect(flat(screen.getByTestId('rc-range').props.style)).toMatchObject({ left: '35%', width: '25%', backgroundColor: '#0088ff' });
     expect(flat(screen.getByTestId('rc-now').props.style).left).toBe('42%');
+  });
+
+  it('announces the ideal thresholds and the reading, not the axis ends', async () => {
+    await render(
+      <RangeCard testID="rc" caption="Soil moisture" value="42" unit="%" min={0} max={100} minLabel="0%" maxLabel="100%" low={35} high={60} current={42} color="#0088ff" />,
+    );
+    expect(screen.getByTestId('rc-slider').props.accessibilityLabel).toBe('Ideal range 35% to 60%, now 42%');
+    expect(rangeLabel({ low: 500, high: 1500, current: null, unit: ' lux' })).toBe('Ideal range 500 lux to 1,500 lux, no current reading');
+    expect(rangeLabel({ low: 18, high: 27.25, current: 23.44, unit: ' °C' })).toBe('Ideal range 18 °C to 27.3 °C, now 23.4 °C');
   });
 
   it('clamps out-of-scale values and hides the marker for a failed read', async () => {
