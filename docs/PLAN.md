@@ -1,6 +1,6 @@
 # olvar-dashboard — Project plan
 
-Status: planning only. Updated Nov 16, 2026 for the **final contract** (decisions A–H), the user's follow-up decisions, the new Figma frames at 1920 and 1512, and the interface in the **current** olvar-gateway plan (commit `cf453d8`, "fix review findings and add Timeline offline periods").
+Status: planning only. Updated Nov 16, 2026 for the **final contract** (decisions A–H), the user's follow-up decisions, the new Figma frames at 1920 and 1512, and the interface in the **current** olvar-gateway plan (commit `1629277`, "seal retained rollups, exact soil averages, validate timezone").
 
 Scope of this repo: the Expo app that serves **desktop web** and **native iOS** from one codebase. It reads the Supabase data and calls the Edge Function owned by `olvar-gateway`.
 
@@ -199,7 +199,7 @@ Even the new frames still contain deferred features. Each one is handled consist
 | Styling | **`StyleSheet` + tokens + `useBreakpoint()` with layout tokens per tier (§5.4)** | NativeWind v5 (RC), NativeWind 4 (Tailwind 3), Uniwind (extra engine, paid Pro), Unistyles 3 (no Expo Go), Tamagui (heavy). |
 | Liquid Glass | NativeTabs, plus `GlassView` behind an availability check with a fallback; `backdrop-filter` on narrow web | A hand-drawn glass look drifts from the system one. |
 | Charts | **Custom SVG components** (target band, step line, hourly bars, gauge, range bar, week chart) | Skia / Victory XL (+2.9 MB web WASM), gifted-charts, Recharts. |
-| Data sources | Latest values: `readings_v` with `limit 1`. 24 h charts: `readings_v`, **paginated**. 7 d and 30 d charts, the Timeline week chart and the Timeline daily min/max: `readings_hourly_v`. Timeline offline periods: the gateway RPC `device_offline_periods()`. | Aggregating raw rows on the client for long ranges; client-side gap detection (it would duplicate the server's 180 s rule). |
+| Data sources | Latest values: `readings_v` with `limit 1`. 24 h charts: `readings_v`, **paginated**. 7 d and 30 d charts and the Timeline week chart: `readings_hourly_v`. Week summary and completed-day extrema: `readings_daily_v` (local dates), with raw `limit 1` lookups for the extremum times. Today's extrema: raw `limit 1`. Timeline offline periods: the gateway RPC `device_offline_periods()`. | Aggregating raw rows on the client for long ranges; client-side gap detection (it would duplicate the server's 180 s rule). |
 | Pagination | One helper, `fetchAll()`. It pages with `.range()` in steps of 1,000, ordered by `recorded_at, id`, with a fixed upper time bound captured at request start. It stops when a page has fewer than 1,000 rows (a page of exactly 1,000 triggers one more request) and de-duplicates by `id`. Chat history is keyset-paged (50 at a time, older on scroll-up). No raw-reading query runs without either `fetchAll()` or an explicit `limit`. | Raising the project's max-rows limit: a day only gets longer, and it hides the bug. |
 | Realtime and freshness | Subscribe to `readings` INSERT (filter `device_id=eq.<id>`) as a **signal**: re-read the latest `readings_v` row and `plant_status_v`. Subscribe to `devices` UPDATE, which invalidates the device and `plant_status_v` queries. Subscribe to `chat_messages` INSERT. Invalidate everything on reconnect. Status freshness rules are in §5.5. Poll `gateways.last_seen_at` every 60 s, because it has no Realtime. | Event-driven only: if the Pi loses power there is no INSERT or UPDATE, and the status would stay "healthy" forever. |
 | Status | **Display only**, from `plant_status_v`: `overall_label`, `<metric>_label`, `summary`. The status keys pick only colours and icons. Charts draw target bands from the effective threshold numbers but do not judge values. | Client-side rules or client-written labels would let clients disagree. |
@@ -222,7 +222,7 @@ Even the new frames still contain deferred features. Each one is handled consist
 - `claim_device`
 - `readings_bucketed`
 
-**Interface the dashboard consumes**, as documented in the current olvar-gateway plan (`docs/PLAN.md` §5.5–5.7, commit `cf453d8`):
+**Interface the dashboard consumes**, as documented in the current olvar-gateway plan (`docs/PLAN.md` §5.4–5.7, commit `1629277`):
 
 | Need | olvar-gateway interface |
 |---|---|
@@ -230,9 +230,9 @@ Even the new frames still contain deferred features. Each one is handled consist
 | Plant | `plants`: `id`, `nickname`, `location`, `timezone`, `profile_id`, `threshold_overrides`, `created_at`. The owner may update **`nickname`, `location`, `timezone` and `threshold_overrides`**. A server check constraint validates overrides: known metrics and keys, numbers, ascending order. `plant_profiles` supplies `common_name`, `scientific_name` and `thresholds` (`critical_low, low, ok_low, ok_high, high, critical_high` per metric). |
 | Effective thresholds (target bands, care targets) | `effective_thresholds(plant_id)` if execute is granted to `authenticated`. Otherwise a client-side deep merge of `plant_profiles.thresholds` with `plants.threshold_overrides`: a pure, unit-tested function that only merges numbers and never evaluates status. See note 1. |
 | Device | `devices`: `id`, `fw`, `status` (online/offline/unknown), `status_changed_at`, `last_seen_at`, `soil_dry_raw`, `soil_wet_raw`, `soil_calibrated_at`. Realtime UPDATE. |
-| Gateway | `gateways.last_seen_at`, `version`. Polled. |
+| Gateway | `gateways.last_seen_at` (heartbeat every 5 min), `version`. Polled every 60 s; stale after 420 s. |
 | Readings | `readings_v`: the raw columns plus `soil_pct`. Any sensor value may be null. `soil_pct` is null when uncalibrated. Realtime INSERT on `readings` is a signal only. Retention is 90 days. The API returns at most 1,000 rows per request. |
-| Summaries | `readings_hourly_v` / `readings_daily_v`, with `<metric>_avg/_min/_max`, `soil_pct_*` and `n`. |
+| Summaries | `readings_hourly_v` (UTC hours) and `readings_daily_v` (`bucket` = local date in `plants.timezone`, computed from raw, exact for any offset). Both carry per-metric `<metric>_n/_avg/_min/_max` and `soil_pct_*`. Rollups run hourly at :05. |
 | Status | `plant_status_v` provides:<ul><li>`overall` (great/okay/needs_attention/in_trouble/offline/no_data) and `overall_label` ("Feeling great" … "No data yet")</li><li>`<metric>_status` and `<metric>_label` (for example "Too dry")</li><li>`summary`</li><li>`issues`, `soil_calibrated`, `latest_reading_at`, `device_status`, `computed_at`</li></ul>**Offline = no reading for more than 180 s, or a retained `offline` status.** |
 | Offline periods | `device_offline_periods(p_device_id, p_from, p_to)` returns `(started_at, ended_at, duration_s, cause 'device_restart'\|'no_data', ongoing)`. It finds gaps over 180 s between raw readings and clips them at the window edges. The window is capped at **7 days** (larger windows raise an error), and the function returns nothing beyond the 90-day retention. |
 | Calibration | The owner may `update` `devices.soil_dry_raw`, `soil_wet_raw` and `soil_calibrated_at`. The server checks `dry > wet + 100`. The new calibration applies retroactively to every view. |
@@ -363,7 +363,11 @@ States are built from existing components and tokens:
   - the locally aged status has expired (see "Status freshness" below)
 
   The Figma sensor-offline frames (`145:1322`, `148:2056`) apply. `OfflineBanner` shows "olvar-node offline since HH:mm", using `latest_reading_at` (or `status_changed_at` when the LWT fired). The cached `summary` is replaced by "Offline" until a fresh status row arrives.
-- **Gateway offline:** `gateways.last_seen_at` is older than 180 s (polled every 60 s); shown in the sidebar footer.
+- **Gateway offline:** uses its own threshold, separate from the 180 s **device-reading** rule.
+  - The gateway writes its heartbeat (`gateways.last_seen_at`) **every 5 min** (gateway plan §5.4).
+  - The footer shows the gateway offline when `last_seen_at` is older than **`GATEWAY_STALE_S = 420 s`**: the 300 s heartbeat interval plus 120 s for delivery and polling slack.
+  - The app polls `gateways` every 60 s.
+  - A healthy gateway therefore never flickers offline between heartbeats. The footer text ("olvar-gateway · 3 min ago") always shows the real age.
 - **Status freshness.** This is how a silent Pi or gateway still shows offline. `plant_status_v` is refetched:
   1. on every `readings` INSERT signal;
   2. on every `devices` UPDATE;
@@ -372,6 +376,12 @@ States are built from existing components and tokens:
   5. on window focus, app foreground and Realtime reconnect.
 
   Between fetches, `domain/status-freshness.ts` ages the cached row. If `now − latest_reading_at > 180 s`, the UI shows Offline immediately and triggers a refetch. This uses the gateway's own 180 s rule and only ages the cached row (gateway plan §5.5); it never computes a health status. The same freshness check drives the "Updated N s ago" text in the Chat context card.
+
+  **Today's activity uses the same triggers.** Triggers 2–5 (and the moment the cached status ages out) also invalidate **today's** Timeline/Home activity queries:
+  - `device_offline_periods(device, todayStart, now)`, re-issued with an advancing `dayEnd = now`
+  - today's extrema
+
+  An outage that starts while the Timeline is open therefore appears as "Offline since HH:mm" (`ongoing`) within about 60 s of the 180 s expiry, without waiting for recovery, navigation or reconnect. Past days are immutable and are not refetched.
 - **Calibration state vs failed read.** These are two **independent** checks, fixing the review finding.
   - *Calibrated?* is decided **only** from the device configuration: `soil_dry_raw` and `soil_wet_raw` are both non-null, cross-checked with `plant_status_v.soil_calibrated`.
   - *Soil read failed?* means `soil_raw` is null on the latest `readings_v` row.
@@ -403,16 +413,23 @@ States are built from existing components and tokens:
   - Single-row reads use `limit 1` (latest reading) or `limit 3` (calibration stability).
 - **Timeline (week view).**
   - History covers the **last 90 days**, the raw retention. Weeks and dates older than that (in the plant time zone) are disabled in ‹ › and "Jump to date".
-  - **"This week" chart:** soil % and temperature from `readings_hourly_v` for the 7 local days.
-  - **Week summary:** average soil %, temperature, humidity and daytime light from `readings_hourly_v`, compared with the previous week. There is no threshold logic.
-  - **Activity:** one group per local day, fetched lazily when it scrolls into view and cached per `(device, local date)`. Today's group is refetched on the `readings` signal. Its events come from:
+  - **"This week" chart:** soil % and temperature from `readings_hourly_v`. Points are plotted by absolute time and clipped to the local week bounds, so UTC-aligned buckets are fine for a chart.
+  - **Week summary:** per-metric averages for the 7 local days from **`readings_daily_v`** (`bucket` = local date in `plants.timezone`, computed from raw and exact for any offset, including :30/:45). Days are combined with `sum(<m>_avg · <m>_n) / sum(<m>_n)`. The summary compares this week with the previous week. Today's daily row lags until the next hourly rollup run (:05), so the summary carries "updated hourly". There is no threshold logic.
+  - **Activity:** one group per local day, fetched lazily when it scrolls into view and cached per `(device, local date)`. Today's group is refetched on the `readings` signal and on the freshness triggers above. Its events come from:
     - **Offline periods.** Source: `device_offline_periods(device, dayStart, dayEnd)`.
       - It is called **once per local day**, which keeps every call far under the 7-day cap, including DST days of 23–25 h.
       - `dayStart`/`dayEnd` are the local-midnight bounds in the plant time zone. For today, `dayEnd = now`.
       - Each row becomes an event: "Offline 03:10–03:52 (42 min)", "Device restarted, offline 2 min" (`cause = 'device_restart'`), or "Offline since 14:02" (`ongoing`).
       - A gap crossing midnight appears in both days, clipped by the server.
       - **No gap detection runs on the client.**
-    - **Daily max and min** of temperature, light, humidity and soil, from that day's `readings_hourly_v` rows (≤ 25 rows). These are exact values; the time is shown at hour precision, for example "Temperature peaked at 24.6 °C · 14:00–15:00". There is no threshold logic, and the helpers are pure functions in `domain/timeline-events.ts`.
+    - **Daily extrema** ("Temperature peaked at 24.6 °C · 14:20"). Events cover the temperature max, light max, humidity min and the driest soil (`soil_raw` max; higher raw means drier).
+      - **Not taken from hourly rows.** UTC-hour buckets straddle local midnight in :30/:45 time zones (for example Asia/Kolkata), so they cannot give exact local-day values.
+      - **Completed days:**
+        - The value comes from that day's `readings_daily_v` row: `temperature_c_max`, `lux_max`, `humidity_pct_min`, `soil_raw_max`, and `soil_pct_min` for display.
+        - The **display time** comes from one raw lookup per event: `readings_v where device_id = $d and recorded_at >= dayStart and recorded_at < dayEnd and <col> = <value> order by recorded_at limit 1`. That is 4 `limit 1` queries per day, all on the `(device_id, recorded_at)` index.
+        - If no raw match exists, for example in a sealed edge case, the event shows the value without a time.
+      - **Today:** the daily row lags behind the hourly rollup, so value and time both come from raw: `order by <col> desc|asc nulls last, recorded_at limit 1` within `[todayStart, now)`. The result is refetched with the freshness triggers.
+      - Event wording comes from pure functions in `domain/timeline-events.ts`. There is no threshold logic.
     - "Soil sensor calibrated", if `soil_calibrated_at` falls on that day. Only the latest calibration is known.
     - Chat: "You asked Sparks: …", from the first user message of that day (one bounded query per day).
 
@@ -524,9 +541,15 @@ States are built from existing components and tokens:
   - a duplicate across a page boundary is removed
   - an error mid-way is surfaced, never silently truncated
 - **Status freshness** (fake timers):
-  - after `latest_reading_at + 185 s` with no events, a status refetch has happened and the UI reads Offline
-  - a `devices` UPDATE triggers a refetch
-  - the 60 s interval keeps running with no Realtime events
+  - After `latest_reading_at + 185 s` with no events, a status refetch has happened and the UI reads Offline.
+  - The same tick refetched **today's** `device_offline_periods` with an advanced `dayEnd`, and an `ongoing` period is now shown in today's activity.
+  - A `devices` UPDATE triggers a refetch.
+  - The 60 s interval keeps running with no Realtime events.
+  - A gateway heartbeat arriving every 300 s never shows the gateway offline across a simulated 30 min.
+- **Daily extrema:**
+  - A completed day takes its value from the `readings_daily_v` mock and its time from the raw `limit 1` lookup.
+  - Today takes both from raw.
+  - A fixture plant in Asia/Kolkata has its maximum at 23:50 local time (18:20 UTC, inside a UTC hour that straddles local midnight). That maximum is attributed to the correct local day.
 - **Realtime:** a duplicate signal, a reconnect, and a re-read after the signal.
 - **(live)**
   - After sign-in, a fake-ESP32 reading reaches `useLatest()` within 2 s.
@@ -544,15 +567,20 @@ States are built from existing components and tokens:
 
 **Work:**
 - `status-style.ts` (status key → colour and icon; **text always comes from the server labels**).
-- `status-freshness.ts` (expiry deadline from `latest_reading_at + 180 s`; whether the cached row has aged out).
+- `status-freshness.ts`:
+  - reading expiry: `latest_reading_at + 180 s`, and whether the cached row has aged out
+  - gateway staleness: `last_seen_at + 420 s`, as a separate constant
 - Formatting and plant-time-zone helpers (local-midnight bounds, DST days).
-- `timeline-events.ts` (offline-period rows and hourly min/max → event list), `calibration.ts`, `chat-days.ts`.
+- `timeline-events.ts` (offline-period rows and daily extrema with their times → event list), `calibration.ts`, `chat-days.ts`.
 - No threshold evaluation and no gap detection anywhere.
 
 **Accept:**
 - 100 % branch coverage.
-- `status-freshness`: 180 s exactly is still fresh, 181 s has expired, and the deadline is re-armed after each fetch.
-- Local-day bounds for 23 h and 25 h DST days.
+- `status-freshness`:
+  - At 180 s a reading is still fresh; at 181 s it has expired.
+  - The deadline is re-armed after each fetch.
+  - A gateway heartbeat 299 s or 400 s old is **online**; 421 s is stale.
+- Local-day bounds for 23 h and 25 h DST days, and for **Asia/Kolkata (+05:30)** and **Asia/Kathmandu (+05:45)**, where the day runs from 18:30 / 18:15 UTC.
 - Event mapping:
   - `no_data` / `device_restart` / `ongoing` rows map to the right text
   - a midnight-crossing period shows on both days
@@ -628,7 +656,11 @@ States are built from existing components and tokens:
 **Work:**
 - Week navigation (limited to 90 days) and "Jump to date".
 - The "This week" chart and the Week summary.
-- Activity per local day, built from `device_offline_periods()` (one call per day), hourly min/max, calibration and chat events (§5.5).
+- Activity per local day, built from:
+  - `device_offline_periods()`, one call per day; today's call is refreshed with an advancing `dayEnd`
+  - daily extrema, from `readings_daily_v` plus a raw time lookup, or raw only for today
+  - calibration and chat events (§5.5)
+- The Week summary from `readings_daily_v`.
 - The "Upcoming care — coming soon" placeholder.
 
 **Accept:**
@@ -686,7 +718,7 @@ States are built from existing components and tokens:
 - **Plant profile:** nickname and location are editable; species and added date are read-only.
 - **Care targets:** "Use preset" on writes `threshold_overrides = {}`. Off enables editing `ok_low`/`ok_high` per metric. The client mirrors the server's ascending-order check for messages only; the server constraint is authoritative.
 - **Devices & calibration:** live rows plus Recalibrate.
-- **Account:** name in user metadata, email read-only, `plants.timezone` picker, password change with re-authentication, Sign out.
+- **Account:** name in user metadata, email read-only, a `plants.timezone` picker (the server rejects unknown zones with error 22023, shown as "Unknown timezone"), password change with re-authentication, Sign out.
 - The pane is capped at 1040 at `xl`.
 
 **Accept:**
@@ -768,7 +800,11 @@ States are built from existing components and tokens:
 
 - **The frames still contain deferred features.** Building to them means removing those elements consistently (§2.1.1), so the Figma diffs depend on correct masks. If the designer later updates the frames for v1, the masks can be removed.
 - **Raw-reading volume:** the Sensors 24 h view needs 2 paginated requests (about 1,440 rows). Forgetting `fetchAll()` on a new query would silently drop the newest rows, which is why T4 tests the > 1,000-row case live.
-- **Timeline cost:** each day costs one small RPC call plus about 24 hourly rows, loaded lazily per day.
+- **Timeline cost:** each day is loaded lazily and costs:
+  - one small RPC call
+  - one `readings_daily_v` row
+  - 4 indexed `limit 1` raw lookups
+  - Today is refetched at most once a minute.
 - **Status freshness depends on client timers.** Background tabs throttle them, so the app also refetches on focus and foreground.
 - **Only the latest calibration is known** (`soil_calibrated_at`). Earlier calibrations cannot appear on the Timeline.
 - **Expo Router SDK 58 core rework and native tabs.** Pin patch versions and keep the shell isolated.
@@ -789,4 +825,4 @@ Choices this plan made that the user may want to glance at:
 - Timeline's "Upcoming care" slot uses the same "coming soon" placeholder.
 - Chat's "Past conversations" column groups the single conversation by day, because the schema has no threads.
 - Care targets are editable through `threshold_overrides` (`ok_low`/`ok_high` only); the per-row alert switches stay hidden.
-- Timeline peak times are shown at hour precision, because they come from the hourly summaries.
+- The Week summary includes today only up to the last hourly rollup (:05), and says "updated hourly".
