@@ -1,5 +1,7 @@
 import { render } from '@testing-library/react-native';
 import type { ReactElement } from 'react';
+import { StyleSheet } from 'react-native';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import Gallery from '@/app/(dev)/gallery';
 import { colors } from '@/theme';
@@ -306,11 +308,91 @@ describe('ChartsGallery', () => {
   });
 });
 
+const insets = { top: 59, bottom: 34, left: 0, right: 0 };
+const metrics = { frame: { x: 0, y: 0, width: 320, height: 693 }, insets };
+
 describe('gallery route', () => {
-  it('puts the charts in a top-aligned scroll view', async () => {
-    const r = await render(<Gallery />);
+  it('puts the charts in a top-aligned scroll view below the safe-area inset', async () => {
+    const r = await render(
+      <SafeAreaProvider initialMetrics={metrics}>
+        <Gallery />
+      </SafeAreaProvider>,
+    );
     const scroll = r.getByTestId('gallery-scroll');
     expect(scroll.type).toBe('RCTScrollView');
-    expect(JSON.stringify(scroll.props.contentContainerStyle ?? {})).not.toContain('justifyContent');
+    const content = StyleSheet.flatten(scroll.props.contentContainerStyle);
+    expect(content.justifyContent).toBeUndefined();
+    expect(content).toMatchObject({ paddingTop: 59, paddingBottom: 34 });
+  });
+});
+
+describe('gallery at 320 px', () => {
+  it('lets every panel shrink below its basis and wraps the gauge row', async () => {
+    const r = await render(<ChartsGallery />);
+    const panels = r.getAllByTestId('gallery-panel');
+    expect(panels).toHaveLength(10);
+    for (const p of panels) expect(StyleSheet.flatten(p.props.style)).toMatchObject({ flexShrink: 1, minWidth: 0 });
+    expect(StyleSheet.flatten(r.getByTestId('gauge-row').props.style).flexWrap).toBe('wrap');
+  });
+
+  it('keeps fixed-width content inside a 320 px viewport', () => {
+    const gallerySide = 16;
+    const panelSide = 24 + 1;
+    const widestFixed = 124;
+    expect(2 * gallerySide + 2 * panelSide + widestFixed).toBeLessThanOrEqual(320);
+  });
+});
+
+describe('review regressions', () => {
+  const start = Date.parse('2026-11-06T10:00:00Z');
+
+  function barHeight(d: string) {
+    const top = Number(d.match(/Q[^,]+,([\d.-]+) /)![1]);
+    const bottom = Number(d.match(/V([\d.-]+)/)![1]);
+    return bottom - top;
+  }
+
+  it('full HourBars starts at zero so bar heights keep their ratio', async () => {
+    const data = [
+      { t: start, v: 100 },
+      { t: start + HOUR, v: 200 },
+    ];
+    const r = await render(<HourBars width={400} data={data} domain={[start, start + 2 * HOUR]} timeZone="UTC" />);
+    const [a, b] = r.getAllByTestId(/^bar/).map((n) => barHeight(n.props.d as string));
+    expect(a / b).toBeCloseTo(0.5, 1);
+  });
+
+  it('places Now at the current instant, not the future domain edge', async () => {
+    const data = [{ t: start, v: 100 }];
+    const r = await render(
+      <HourBars width={400} data={data} domain={[start, start + 4 * HOUR]} now={start + 1.5 * HOUR} timeZone="UTC" />,
+    );
+    const x = Number([r.getByTestId('now-label').props.x].flat()[0]);
+    const expected = 45 + (1.5 / 4) * (400 - 6 - 45);
+    expect(x).toBeCloseTo(expected, 0);
+  });
+
+  it('omits Now when the window is entirely in the past', async () => {
+    const r = await render(
+      <HourBars width={400} data={[]} domain={[start, start + 4 * HOUR]} now={start + 8 * HOUR} timeZone="UTC" />,
+    );
+    expect(r.queryByTestId('now-label')).toBeNull();
+  });
+
+  it.each([0, 100])('Gauge without labels keeps the marker for %i inside the SVG', async (value) => {
+    const r = await render(<Gauge value={value} showLabels={false} />);
+    const height = StyleSheet.flatten(r.getByTestId('gauge').props.style).height as number;
+    let marker: Record<string, unknown> | undefined;
+    const walk = (n: unknown) => {
+      if (!n || typeof n !== 'object') return;
+      if (Array.isArray(n)) return n.forEach(walk);
+      const node = n as Node;
+      if (node.type === 'RNSVGCircle') marker = node.props;
+      node.children?.forEach(walk);
+    };
+    walk(r.toJSON());
+    const reach = Number(marker!.r) + Number(marker!.strokeWidth) / 2;
+    expect(Number(marker!.cy) + reach).toBeLessThanOrEqual(height);
+    expect(Number(marker!.cy) - reach).toBeGreaterThanOrEqual(0);
   });
 });

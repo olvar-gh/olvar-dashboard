@@ -142,7 +142,7 @@ export function HourBars({
         const left = FULL.left;
         const right = w - FULL.right;
         const bottom = height - FULL.bottom;
-        const { domain: yDomain, ticks } = valueDomain(values, { floor: 0, fallback: [0, 100] });
+        const { domain: yDomain, ticks } = valueDomain(values, { include: [0], floor: 0, fallback: [0, 100] });
         const x = linear(timeDomain, [left, right]);
         const y = linear(yDomain, [bottom, FULL.top]);
         return (
@@ -171,7 +171,7 @@ export function HourBars({
               left={left}
               right={w}
               top={bottom + FULL.labelGap}
-              now
+              nowX={nowMs >= timeDomain[0] && nowMs <= timeDomain[1] ? x(nowMs) : undefined}
             />
           </G>
         );

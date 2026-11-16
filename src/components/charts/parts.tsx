@@ -79,19 +79,20 @@ export type XLabelsProps = {
   left: number;
   right: number;
   top: number;
-  /** Draw a bold "Now" at the right edge and drop ticks it would cover. */
-  now?: boolean;
+  /** Where the current instant falls; draws a bold "Now" there and drops ticks it would cover. */
+  nowX?: number;
 };
 
-export function XLabels({ ticks, x, left, right, top, now }: XLabelsProps) {
+export function XLabels({ ticks, x, left, right, top, nowX }: XLabelsProps) {
   const nowWidth = textWidth('Now');
-  const limit = now ? right - nowWidth - 8 : right;
+  const atEdge = nowX !== undefined && nowX + nowWidth / 2 >= right - 8;
+  const nowCx = nowX === undefined ? 0 : atEdge ? right - nowWidth / 2 : Math.max(nowX, left + nowWidth / 2);
   const shown = ticks
     .map((tick) => {
       const w = textWidth(tick.label);
       return { ...tick, w, cx: clamp(x(tick.t), left + w / 2, right - w / 2) };
     })
-    .filter((tick) => tick.cx + tick.w / 2 <= limit);
+    .filter((tick) => nowX === undefined || Math.abs(tick.cx - nowCx) >= (tick.w + nowWidth) / 2 + 8);
 
   return (
     <G testID="x-labels">
@@ -100,8 +101,15 @@ export function XLabels({ ticks, x, left, right, top, now }: XLabelsProps) {
           {tick.label}
         </Label>
       ))}
-      {now && (
-        <Label x={right} top={top} anchor="end" weight={600} color={colors.text.primary} testID="now-label">
+      {nowX !== undefined && (
+        <Label
+          x={atEdge ? right : nowCx}
+          top={top}
+          anchor={atEdge ? 'end' : 'middle'}
+          weight={600}
+          color={colors.text.primary}
+          testID="now-label"
+        >
           Now
         </Label>
       )}

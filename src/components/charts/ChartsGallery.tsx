@@ -24,7 +24,7 @@ const HOUR = 3_600_000;
 
 function Panel({ title, width, children }: { title: string; width: number; children: ReactNode }) {
   return (
-    <View style={[styles.panel, { maxWidth: width }]}>
+    <View style={[styles.panel, { maxWidth: width }]} testID="gallery-panel">
       <Text style={styles.title}>{title}</Text>
       {children}
     </View>
@@ -99,7 +99,7 @@ export function ChartsGallery() {
           <RangeBar min={10} max={35} band={{ min: 18, max: 27 }} low={19.8} high={24.6} value={23.4} />
         </Panel>
         <Panel title="Gauge · humidity" width={544}>
-          <View style={styles.row}>
+          <View style={styles.row} testID="gauge-row">
             <Gauge value={58} band={{ min: 40, max: 70 }} />
             <Gauge value={null} band={{ min: 40, max: 70 }} />
           </View>
@@ -131,12 +131,14 @@ export function ChartsGallery() {
 }
 
 const styles = StyleSheet.create({
-  root: { alignSelf: 'stretch', gap: 16, padding: 24 },
+  root: { alignSelf: 'stretch', gap: 16, padding: 16 },
   heading: { ...typography.cardTitle, color: colors.text.primary },
-  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 24 },
+  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 16 },
   panel: {
     flexBasis: 360,
     flexGrow: 1,
+    flexShrink: 1,
+    minWidth: 0,
     gap: space.cardHeaderGap,
     paddingHorizontal: space.cardPaddingX,
     paddingVertical: space.cardPaddingY,
@@ -146,5 +148,5 @@ const styles = StyleSheet.create({
     borderRadius: radius.card,
   },
   title: { ...typography.sensorTitle, color: colors.text.primary },
-  row: { flexDirection: 'row', gap: 24 },
+  row: { flexDirection: 'row', flexWrap: 'wrap', gap: 24 },
 });

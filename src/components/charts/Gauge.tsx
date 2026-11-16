@@ -13,7 +13,7 @@ export type GaugeProps = {
   max?: number;
   band?: Band | null;
   color?: string;
-  /** Arc width; the height follows the Figma 124 × 64 proportion. */
+  /** Arc width; the height leaves room for the end markers below the arc. */
   width?: number;
   showLabels?: boolean;
   accessibilityLabel?: string;
@@ -22,6 +22,8 @@ export type GaugeProps = {
 
 const STROKE = 10;
 const LABELS = 18;
+// Room for the 7 px value marker and its 3 px stroke at the arc ends.
+const MARKER_REACH = 8.5;
 
 /** Point on the half circle for a 0–1 fraction, from the left end over the top to the right. */
 export function arcPoint(cx: number, cy: number, r: number, fraction: number): [number, number] {
@@ -47,11 +49,11 @@ export function Gauge({
   accessibilityLabel,
   testID = 'gauge',
 }: GaugeProps) {
-  const arcHeight = (width * 64) / 124;
-  const height = arcHeight + (showLabels ? LABELS : 0);
   const cx = width / 2;
-  const cy = arcHeight - 2;
   const r = width / 2 - STROKE;
+  const cy = r + MARKER_REACH;
+  const arcHeight = cy + MARKER_REACH;
+  const height = arcHeight + (showLabels ? LABELS : 0);
   const frac = (v: number) => (max === min ? 0 : (v - min) / (max - min));
 
   return (

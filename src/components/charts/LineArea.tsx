@@ -170,7 +170,7 @@ export function LineArea({
                 left={left}
                 right={w}
                 top={plotBottom + FULL.labelGap}
-                now={now}
+                nowX={now ? w : undefined}
               />
             )}
           </G>
