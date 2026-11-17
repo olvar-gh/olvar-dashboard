@@ -1,4 +1,5 @@
 import type { Href } from 'expo-router';
+import { Platform } from 'react-native';
 
 import { appTabs, type AppTab } from '@/components/ui';
 
@@ -38,9 +39,32 @@ export function sectionFor(pathname: string): Section {
   return shellTabs.find((t) => t.section === first)?.section ?? 'home';
 }
 
-/** Where sign-in returns to: only in-app paths, never another origin or the auth screens. */
-export function safeNext(next: unknown): Href {
+// Characters browsers drop (tabs, newlines) or read as `/` (backslash) when parsing a URL, which can
+// turn `/\evil.example` into `//evil.example`, a URL on another origin.
+const UNSAFE_CHARS = /[\\\u0000-\u001f\u007f]/;
+// `.` and `..` segments (also percent-encoded) can collapse `/..//evil.example` into `//evil.example`.
+const DOT_SEGMENT = /(^|\/)(\.|%2e){1,2}(?=\/|$)/i;
+
+function webOrigin(): string | undefined {
+  if (Platform.OS !== 'web') return undefined;
+  return (globalThis as { location?: { origin?: string } }).location?.origin;
+}
+
+/**
+ * Where sign-in returns to: an in-app path on the app's own origin, never the auth screens. Anything
+ * else returns Home. `origin` defaults to the page origin on web; native has no origin to leave.
+ */
+export function safeNext(next: unknown, origin: string | undefined = webOrigin()): Href {
   if (typeof next !== 'string' || !next.startsWith('/') || next.startsWith('//')) return hrefs.home;
-  if (next.startsWith(hrefs.signIn)) return hrefs.home;
+  const pathname = next.split(/[?#]/)[0];
+  if (UNSAFE_CHARS.test(next) || DOT_SEGMENT.test(pathname)) return hrefs.home;
+  if (origin) {
+    try {
+      if (new URL(next, origin).origin !== origin) return hrefs.home;
+    } catch {
+      return hrefs.home;
+    }
+  }
+  if (pathname === hrefs.signIn || pathname.startsWith(`${hrefs.signIn}/`)) return hrefs.home;
   return next as Href;
 }

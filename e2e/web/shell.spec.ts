@@ -28,6 +28,20 @@ test.describe('session gate', () => {
     await expect(page.getByRole('heading', { name: 'Timeline', level: 1 })).toBeVisible();
   });
 
+  for (const next of ['/\\evil.example', '/\\/evil.example', '/..//evil.example', '/\t/evil.example']) {
+    test(`a return path ${JSON.stringify(next)} that leaves the origin goes Home`, async ({ page }) => {
+      const errors: string[] = [];
+      page.on('pageerror', (e) => errors.push(e.message));
+      await page.goto(`/sign-in?session=signed-out&next=${encodeURIComponent(next)}`);
+      await page.getByLabel('Email').fill(FIXTURE_EMAIL);
+      await page.getByLabel('Password').fill(FIXTURE_PASSWORD);
+      await page.getByLabel('Password').press('Enter');
+      await expect(page).toHaveURL(/^http:\/\/localhost:\d+\/$/);
+      await expect(page.getByRole('heading', { name: 'Home', level: 1 })).toBeVisible();
+      expect(errors).toEqual([]);
+    });
+  }
+
   test('signed in, sign-in redirects into the app', async ({ page }) => {
     await page.goto('/sign-in');
     await expect(page).toHaveURL(/\/$/);

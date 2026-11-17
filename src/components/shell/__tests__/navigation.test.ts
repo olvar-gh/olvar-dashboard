@@ -27,17 +27,58 @@ describe('shell navigation', () => {
     expect(sectionFor(path)).toBe(section);
   });
 
-  it.each([
-    ['/sensors', '/sensors'],
-    ['/settings/account', '/settings/account'],
-    [undefined, '/'],
-    ['', '/'],
-    ['https://evil.example', '/'],
-    ['//evil.example', '/'],
-    ['/sign-in', '/'],
-    [['/chat'], '/'],
-  ])('sign-in returns to %p as %p', (next, expected) => {
-    expect(safeNext(next)).toBe(expected);
+  describe.each([
+    ['native (no origin)', undefined],
+    ['web', 'https://app.olvar.test'],
+  ])('sign-in return path on %s', (_name, origin) => {
+    it.each([
+      ['/sensors', '/sensors'],
+      ['/settings/account', '/settings/account'],
+      ['/timeline?week=2026-11-16', '/timeline?week=2026-11-16'],
+      ['/settings#account', '/settings#account'],
+      ['/sign-inx', '/sign-inx'],
+    ])('keeps the in-app path %p', (next, expected) => {
+      expect(safeNext(next, origin)).toBe(expected);
+    });
+
+    it.each([
+      [undefined],
+      [''],
+      [['/chat']],
+      ['sensors'],
+      ['https://evil.example'],
+      ['//evil.example'],
+      ['/\\evil.example'],
+      ['/\\/evil.example'],
+      ['/\\\\evil.example'],
+      ['/sensors\\..\\..\\evil.example'],
+      ['/\t/evil.example'],
+      ['/\n/evil.example'],
+      ['/\r/evil.example'],
+      ['/\u0000/evil.example'],
+      ['/..//evil.example'],
+      ['/.//evil.example'],
+      ['/%2e%2e//evil.example'],
+      ['/%2E//evil.example'],
+      ['/sensors/../../evil.example'],
+      ['/sign-in'],
+      ['/sign-in?next=/sensors'],
+      ['/sign-in/again'],
+    ])('sends %p home', (next) => {
+      expect(safeNext(next, origin)).toBe('/');
+    });
+  });
+
+  it('rejects a path that resolves to another origin', () => {
+    const RealURL = URL;
+    const spy = jest
+      .spyOn(globalThis, 'URL')
+      .mockImplementation(
+        (url: string | URL, base?: string | URL) =>
+          ({ ...new RealURL(String(url), base), origin: 'https://evil.example' } as unknown as URL)
+      );
+    expect(safeNext('/sensors', 'https://app.olvar.test')).toBe('/');
+    spy.mockRestore();
   });
 
   it('describes the gateway heartbeat with the 420 s rule applied by the data layer', () => {
