@@ -74,6 +74,20 @@ test.describe('desktop shell', () => {
     await expect(nav.getByRole('link', { name: 'Home' })).not.toHaveAttribute('aria-current', 'page');
   });
 
+  test('the bottom bar keeps every tab on screen down to 320 px', async ({ page }, info) => {
+    test.skip(info.project.name !== 'web-narrow', 'compact web only');
+    for (const width of [402, 360, 320]) {
+      await page.setViewportSize({ width, height: 700 });
+      await page.goto('/');
+      const bar = page.getByTestId('bottom-bar');
+      for (const label of ['Home', 'Sensors', 'Timeline', 'Chat']) {
+        const box = (await bar.getByRole('link', { name: label }).boundingBox())!;
+        expect(box.x, `${label} at ${width}`).toBeGreaterThanOrEqual(0);
+        expect(box.x + box.width, `${label} at ${width}`).toBeLessThanOrEqual(width);
+      }
+    }
+  });
+
   test('pages scroll as a document, never fitted to the viewport', async ({ page }) => {
     await page.goto('/');
     await expect(page.getByTestId('screen-placeholder')).toBeVisible();

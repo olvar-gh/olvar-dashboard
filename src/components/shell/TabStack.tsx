@@ -12,26 +12,31 @@ export type TabStackProps = {
   pushed?: boolean;
 };
 
+const backItems = () => [
+  {
+    type: 'button' as const,
+    label: 'Back',
+    icon: { type: 'sfSymbol' as const, name: 'chevron.left' as const },
+    onPress: () => router.back(),
+  },
+];
+
+type ScreenOptionsArgs = { route: { key?: string }; navigation: { getState: () => { routes: { key: string }[] } } };
+
+/**
+ * Header options for a pushed stack. The back item goes on whichever screen is first in the stack,
+ * since a direct push (the account avatar opening /settings/account) starts the stack at that screen.
+ */
+export function pushedStackOptions({ route, navigation }: ScreenOptionsArgs) {
+  const first = navigation.getState().routes[0]?.key === route.key;
+  return first ? { ...nativeStackOptions, unstable_headerLeftItems: backItems } : nativeStackOptions;
+}
+
 /** The native stack inside a tab (or Settings) folder, so its screens get native large-title headers and push transitions. */
 export function TabStack({ title, pushed = false }: TabStackProps) {
   return (
-    <Stack screenOptions={nativeStackOptions}>
-      <Stack.Screen
-        name="index"
-        options={{
-          title,
-          ...(pushed && {
-            unstable_headerLeftItems: () => [
-              {
-                type: 'button',
-                label: 'Back',
-                icon: { type: 'sfSymbol', name: 'chevron.left' },
-                onPress: () => router.back(),
-              },
-            ],
-          }),
-        }}
-      />
+    <Stack screenOptions={pushed ? pushedStackOptions : nativeStackOptions}>
+      <Stack.Screen name="index" options={{ title }} />
     </Stack>
   );
 }

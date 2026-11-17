@@ -20,10 +20,13 @@ export function BottomBar({ active }: { active: Section }) {
               href={tab.href}
               label={tab.label}
               selected={selected}
+              containerStyle={styles.slot}
               style={[styles.item, selected && styles.itemActive]}
             >
               <Icon name={tab.icon} size={22} color={selected ? colors.brand.olive : colors.text.primary} />
-              <Text style={[styles.label, selected && styles.labelActive]}>{tab.label}</Text>
+              <Text numberOfLines={1} style={[styles.label, selected && styles.labelActive]}>
+                {tab.label}
+              </Text>
             </NavLink>
           );
         })}
@@ -33,9 +36,17 @@ export function BottomBar({ active }: { active: Section }) {
 }
 
 const styles = StyleSheet.create({
-  dock: { position: 'fixed' as ViewStyle['position'], left: 16, right: 16, bottom: 16, zIndex: 2, alignItems: 'center' },
-  bar: { flexDirection: 'row', justifyContent: 'space-between', width: '100%', maxWidth: 402, padding: 4, borderRadius: 999 },
-  item: { width: 86, alignItems: 'center', gap: 2, paddingVertical: 7, borderRadius: 999 },
+  dock: {
+    position: 'fixed' as ViewStyle['position'],
+    left: 16,
+    right: 16,
+    bottom: 16,
+    zIndex: 2,
+    alignItems: 'center',
+  },
+  bar: { flexDirection: 'row', width: '100%', maxWidth: 402, padding: 4, borderRadius: 999 },
+  slot: { flex: 1, minWidth: 0 },
+  item: { alignItems: 'center', gap: 2, paddingVertical: 7, paddingHorizontal: 4, borderRadius: 999 },
   itemActive: { backgroundColor: colors.border.subtle },
   label: { ...typography.iosTabLabel, color: colors.text.primary },
   labelActive: { color: colors.brand.olive },

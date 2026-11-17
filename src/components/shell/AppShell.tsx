@@ -19,7 +19,12 @@ export function AppShell({ noPlant = false }: AppShellProps) {
       <Stack.Screen name="settings" />
       <Stack.Screen
         name="calibrate"
-        options={{ title: 'Soil calibration', presentation: 'formSheet', sheetGrabberVisible: true, sheetAllowedDetents: [0.75, 1] }}
+        options={{
+          title: 'Soil calibration',
+          presentation: 'formSheet',
+          sheetGrabberVisible: true,
+          sheetAllowedDetents: [0.75, 1],
+        }}
       />
     </Stack>
   );

@@ -7,6 +7,8 @@ export type NavLinkProps = {
   label: string;
   selected?: boolean;
   style: StyleProp<ViewStyle>;
+  /** Layout of the link in its parent (flex share, width): the <a> itself cannot be styled. */
+  containerStyle?: StyleProp<ViewStyle>;
   hoverStyle?: StyleProp<ViewStyle>;
   testID?: string;
   children: ReactNode;
@@ -16,9 +18,18 @@ export type NavLinkProps = {
  * A web link (an <a>, so it opens in a new tab and shows the URL) styled as a nav item. Link with
  * asChild drops the child's style on web, so the item is styled on an inner view.
  */
-export function NavLink({ href, label, selected = false, style, hoverStyle, testID, children }: NavLinkProps) {
+export function NavLink({
+  href,
+  label,
+  selected = false,
+  style,
+  containerStyle,
+  hoverStyle,
+  testID,
+  children,
+}: NavLinkProps) {
   const [hovered, setHovered] = useState(false);
-  return (
+  const link = (
     <Link href={href} asChild>
       <Pressable
         accessibilityRole="link"
@@ -32,4 +43,5 @@ export function NavLink({ href, label, selected = false, style, hoverStyle, test
       </Pressable>
     </Link>
   );
+  return containerStyle ? <View style={containerStyle}>{link}</View> : link;
 }
