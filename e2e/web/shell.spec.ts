@@ -37,7 +37,7 @@ test.describe('session gate', () => {
       await page.getByLabel('Password').fill(FIXTURE_PASSWORD);
       await page.getByLabel('Password').press('Enter');
       await expect(page).toHaveURL(/^http:\/\/localhost:\d+\/$/);
-      await expect(page.getByRole('heading', { name: 'Home', level: 1 })).toBeVisible();
+      await expect(page.getByTestId('home-screen')).toBeVisible();
       expect(errors).toEqual([]);
     });
   }
@@ -70,9 +70,9 @@ test.describe('desktop shell', () => {
     }
     const sidebar = await page.getByTestId('sidebar').boundingBox();
     expect(sidebar?.width).toBe(sidebarWidth[tier]);
-    const header = await page.getByRole('heading', { name: 'Home', level: 1 }).boundingBox();
+    const header = await page.getByRole('heading', { level: 1 }).first().boundingBox();
     expect(header?.x).toBe(sidebarWidth[tier] + { xl: 48, lg: 32, md: 24 }[tier]);
-    const card = await page.getByTestId('screen-placeholder').locator('> div > div').last().boundingBox();
+    const card = await page.getByTestId('home-screen').locator('> div').first().boundingBox();
     if (tier === 'xl') expect(card?.width).toBe(Math.min(1552, width - 368));
     if (tier === 'lg') expect(card?.width).toBe(width - 312);
     const scrollWidth = await page.evaluate(() => document.documentElement.scrollWidth);
@@ -104,9 +104,9 @@ test.describe('desktop shell', () => {
 
   test('pages scroll as a document, never fitted to the viewport', async ({ page }) => {
     await page.goto('/');
-    await expect(page.getByTestId('screen-placeholder')).toBeVisible();
+    await expect(page.getByTestId('home-screen')).toBeVisible();
     const viewport = page.viewportSize()!;
-    await page.getByTestId('screen-placeholder').evaluate((el) => {
+    await page.getByTestId('home-screen').evaluate((el) => {
       const tall = document.createElement('div');
       tall.style.height = '3000px';
       el.firstElementChild!.appendChild(tall);

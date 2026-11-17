@@ -4,7 +4,6 @@ import { renderApp } from '@/components/shell/testing/render-app';
 
 // Renders the real src/app route tree, so each URL from PLAN §5.3 must resolve inside the shell.
 const routes: [url: string, title: string][] = [
-  ['/', 'Home'],
   ['/sensors', 'Sensors'],
   ['/timeline', 'Timeline'],
   ['/chat', 'Chat'],
@@ -17,6 +16,12 @@ const routes: [url: string, title: string][] = [
 ];
 
 describe('route skeleton', () => {
+  it('resolves / to Home inside the shell', async () => {
+    const app = await renderApp('/');
+    expect(app.getPathname()).toBe('/');
+    expect(await screen.findByTestId('home-screen')).toBeTruthy();
+  });
+
   it.each(routes)('resolves %s inside the shell', async (url, title) => {
     const app = await renderApp(url);
     expect(app.getPathname()).toBe(url);
