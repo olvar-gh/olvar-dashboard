@@ -13,20 +13,20 @@ const SPECS: { kind: ExtremumKind; column: ReadingColumn; direction: 'asc' | 'de
 
 /**
  * Daily extrema for one local day. Completed days take the value from `readings_daily_v`
- * (exact local dates) and the time from a raw `limit 1` lookup; today takes both from raw,
- * because the daily row lags until the next rollup. Hourly rows are never used: UTC hours
- * straddle local midnight in :30/:45 zones.
+ * (exact local dates) and the time from a raw `limit 1` lookup; with `fromRaw` (today, or a day
+ * that ended before the next rollup run) both come from raw, because the daily row lags.
+ * Hourly rows are never used: UTC hours straddle local midnight in :30/:45 zones.
  */
 export async function fetchDayExtrema(
   source: DataSource,
   deviceId: string,
   timeZone: string,
   date: string,
-  isToday: boolean,
+  fromRaw: boolean,
   now: Date,
 ): Promise<Extremum[]> {
   const day = localDayBounds(timeZone, date);
-  if (isToday) {
+  if (fromRaw) {
     const end = new Date(Math.min(now.getTime() + 1, day.end.getTime()));
     return Promise.all(
       SPECS.map(async (s): Promise<Extremum> => {

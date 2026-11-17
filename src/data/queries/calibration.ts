@@ -1,4 +1,4 @@
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQueryClient, type QueryClient } from '@tanstack/react-query';
 
 import { STABLE_COUNT } from '@/domain/calibration';
 import { useDataSource } from '../context';
@@ -11,6 +11,13 @@ export function useCalibrationReadings() {
   return useLatestReadings(STABLE_COUNT);
 }
 
+/** Everything that carries soil %, which the server recomputes from the current calibration. */
+export function invalidateSoilDerived(qc: QueryClient) {
+  for (const root of ['latest', 'readings', 'hourly', 'daily', 'status', 'day']) {
+    void qc.invalidateQueries({ queryKey: [root] });
+  }
+}
+
 /** Writes dry/wet raw (server rule `dry > wet + 100`, error 23514) and re-reads everything soil % touches. */
 export function useSaveCalibration() {
   const source = useDataSource();
@@ -21,9 +28,7 @@ export function useSaveCalibration() {
       source.updateCalibration(deviceId, dryRaw, wetRaw),
     onSuccess: (device) => {
       if (plantId) qc.setQueryData(keys.device(plantId), device);
-      for (const root of ['latest', 'readings', 'hourly', 'daily', 'status', 'day']) {
-        void qc.invalidateQueries({ queryKey: [root] });
-      }
+      invalidateSoilDerived(qc);
     },
   });
 }

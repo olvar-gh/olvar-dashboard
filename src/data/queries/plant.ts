@@ -19,7 +19,7 @@ export function useUpdatePlant() {
     mutationFn: ({ plantId, patch }: { plantId: string; patch: PlantPatch }) => source.updatePlant(plantId, patch),
     onSuccess: (plant, { patch }) => {
       qc.setQueryData(keys.plant, plant);
-      void qc.invalidateQueries({ queryKey: keys.thresholds(plant.id) });
+      void qc.invalidateQueries({ queryKey: ['thresholds', plant.id] });
       void qc.invalidateQueries({ queryKey: keys.status(plant.id) });
       if (patch.timezone !== undefined) {
         // Local days and daily rollups move with the time zone.

@@ -8,9 +8,13 @@ import { useDevice } from './device';
 import { fetchDayExtrema } from './extrema';
 import { usePlant } from './plant';
 
+/** The daily row for a day exists only after the next hourly rollup run (:05), so read raw until then. */
+const DAILY_ROLLUP_LAG_MS = 2 * 3_600_000;
+
 /**
- * Shared shape of the per-(device, local date) queries. Today's window ends at the fetch time
- * and is refetched by the freshness triggers; past days are immutable.
+ * Shared shape of the per-(device, local date) queries. The window ends at the fetch time while
+ * the day is still running (refetched by the freshness triggers, and once more after midnight by
+ * `useLiveUpdates`); a completed day is immutable.
  */
 function useDayQuery<T>(date: string, part: DayPart, fetch: (ctx: DayContext) => Promise<T>) {
   const source = useDataSource();
@@ -19,14 +23,15 @@ function useDayQuery<T>(date: string, part: DayPart, fetch: (ctx: DayContext) =>
   const timeZone = plant?.timezone;
   const isToday = timeZone != null && date === localDate(timeZone, new Date());
   return useQuery({
-    queryKey: keys.day(device?.id ?? '', date, part),
+    queryKey: keys.day(device?.id ?? '', date, part, timeZone ?? ''),
     enabled: !!device && !!plant,
     staleTime: isToday ? 0 : Infinity,
     queryFn: () => {
       const now = new Date();
       const bounds = localDayBounds(timeZone!, date);
-      const end = isToday ? new Date(Math.min(now.getTime(), bounds.end.getTime())) : bounds.end;
-      return fetch({ source, deviceId: device!.id, plantId: plant!.id, timeZone: timeZone!, start: bounds.start, end, isToday, now });
+      const end = new Date(Math.min(now.getTime(), bounds.end.getTime()));
+      const fromRaw = now.getTime() < bounds.end.getTime() + DAILY_ROLLUP_LAG_MS;
+      return fetch({ source, deviceId: device!.id, plantId: plant!.id, timeZone: timeZone!, start: bounds.start, end, fromRaw, now });
     },
   });
 }
@@ -37,9 +42,10 @@ type DayContext = {
   plantId: string;
   timeZone: string;
   start: Date;
-  /** Day end, or the fetch time for today (the advancing `dayEnd`). */
+  /** Day end, or the fetch time while the day is running (the advancing `dayEnd`). */
   end: Date;
-  isToday: boolean;
+  /** The daily rollup row may not cover the day yet. */
+  fromRaw: boolean;
   now: Date;
 };
 
@@ -49,7 +55,7 @@ export function useOfflinePeriods(date: string) {
 }
 
 export function useDayExtrema(date: string) {
-  return useDayQuery(date, 'extrema', (c) => fetchDayExtrema(c.source, c.deviceId, c.timeZone, date, c.isToday, c.now));
+  return useDayQuery(date, 'extrema', (c) => fetchDayExtrema(c.source, c.deviceId, c.timeZone, date, c.fromRaw, c.now));
 }
 
 /** The day's first user message, for "You asked Sparks: …". */

@@ -22,7 +22,11 @@ export type LiveHandlers = {
   onChatMessage: (row: ChatMessageRow) => void;
   /** The channel (re)subscribed after a drop; everything may be stale. */
   onReconnect: () => void;
+  /** The server confirmed change delivery for a table; events before this can be missed. */
+  onReady?: (table: LiveTable) => void;
 };
+
+export type LiveTable = 'readings' | 'devices' | 'chat_messages';
 
 export type LiveTarget = { deviceId: string; plantId: string };
 

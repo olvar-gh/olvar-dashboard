@@ -74,15 +74,18 @@ test('a new reading reaches the Realtime signal and the latest row within 2 s', 
   const device = (await source.getDevice(plant.id))!;
   await client.realtime.setAuth();
   let signalled = 0;
-  let subscribed = false;
+  let readingsReady = false;
   const stop = source.subscribe(
     { deviceId: device.id, plantId: plant.id },
-    { onReading: () => signalled++, onDevice: () => {}, onChatMessage: () => {}, onReconnect: () => {} },
+    {
+      onReading: () => signalled++,
+      onDevice: () => {},
+      onChatMessage: () => {},
+      onReconnect: () => {},
+      onReady: (table) => (readingsReady ||= table === 'readings'),
+    },
   );
-  const channel = client.getChannels()[0];
-  await expect.poll(() => (subscribed ||= channel.state === 'joined'), { timeout: 10_000 }).toBe(true);
-  // The channel reports joined slightly before Postgres Changes are wired on the server.
-  await new Promise((r) => setTimeout(r, 1500));
+  await expect.poll(() => readingsReady, { timeout: 15_000 }).toBe(true);
 
   const writer = createClient<Database>(url, secret!, { auth: { persistSession: false } });
   const [prev] = await source.getLatestReadings(device.id, 1);

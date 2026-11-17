@@ -25,28 +25,38 @@ function builder(respond: (calls: Call[]) => { data: unknown; error: unknown }, 
   return proxy;
 }
 
+type FakeChannel = {
+  topic: string;
+  bindings: [string, Record<string, unknown>, (payload: unknown) => void][];
+  status?: (s: string) => void;
+};
+
 function fakeClient(respond: (calls: Call[]) => { data: unknown; error: unknown }) {
   const log: Call[][] = [];
-  const channelHandlers: { status?: (s: string) => void; on: unknown[][] } = { on: [] };
-  const channel = {
-    on: (...args: unknown[]) => {
-      channelHandlers.on.push(args);
-      return channel;
-    },
-    subscribe: (cb: (s: string) => void) => {
-      channelHandlers.status = cb;
-      return channel;
-    },
-  };
+  const channels: FakeChannel[] = [];
   const client = {
     from: (table: string) => builder((c) => respond([['from', table], ...c]), log),
     rpc: jest.fn(async () => ({ data: [], error: null })),
     functions: { invoke: jest.fn() },
-    channel: jest.fn(() => channel),
+    channel: jest.fn((topic: string) => {
+      const record: FakeChannel = { topic, bindings: [] };
+      channels.push(record);
+      const channel = {
+        on: (type: string, filter: Record<string, unknown>, cb: (payload: unknown) => void) => {
+          record.bindings.push([type, filter, cb]);
+          return channel;
+        },
+        subscribe: (cb: (s: string) => void) => {
+          record.status = cb;
+          return channel;
+        },
+      };
+      return channel;
+    }),
     removeChannel: jest.fn(),
     auth: {},
   };
-  return { client, log, channelHandlers };
+  return { client, log, channels };
 }
 
 const range = (calls: Call[]) => calls.find((c) => c[0] === 'range') as [string, number, number] | undefined;
@@ -120,24 +130,41 @@ describe('Supabase source', () => {
     await expect(createSupabaseSource(client as never).getEffectiveThresholds('p')).resolves.toBeNull();
   });
 
-  it('subscribes to readings, devices and chat_messages and reports re-subscribes as reconnects', () => {
-    const { client, channelHandlers } = fakeClient(() => ({ data: [], error: null }));
-    const handlers = { onReading: jest.fn(), onDevice: jest.fn(), onChatMessage: jest.fn(), onReconnect: jest.fn() };
+  it('subscribes on one channel per table, so a rejected table cannot silence the others', () => {
+    const { client, channels } = fakeClient(() => ({ data: [], error: null }));
+    const handlers = {
+      onReading: jest.fn(),
+      onDevice: jest.fn(),
+      onChatMessage: jest.fn(),
+      onReconnect: jest.fn(),
+      onReady: jest.fn(),
+    };
     const stop = createSupabaseSource(client as never).subscribe({ deviceId: 'dev', plantId: 'p' }, handlers);
-    const filters = channelHandlers.on.map((args) => args[1]);
-    expect(filters).toEqual([
-      { event: 'INSERT', schema: 'public', table: 'readings', filter: 'device_id=eq.dev' },
-      { event: 'UPDATE', schema: 'public', table: 'devices', filter: 'id=eq.dev' },
-      { event: 'INSERT', schema: 'public', table: 'chat_messages', filter: 'plant_id=eq.p' },
+    expect(channels.map((c) => c.topic)).toEqual(['live:readings:dev', 'live:devices:dev', 'live:chat_messages:dev']);
+    const changes = channels.map((c) => c.bindings.filter(([type]) => type === 'postgres_changes').map(([, f]) => f));
+    expect(changes).toEqual([
+      [{ event: 'INSERT', schema: 'public', table: 'readings', filter: 'device_id=eq.dev' }],
+      [{ event: 'UPDATE', schema: 'public', table: 'devices', filter: 'id=eq.dev' }],
+      [{ event: 'INSERT', schema: 'public', table: 'chat_messages', filter: 'plant_id=eq.p' }],
     ]);
-    (channelHandlers.on[0][2] as () => void)();
+
+    const system = (c: FakeChannel) => c.bindings.find(([type]) => type === 'system')![2];
+    const changesCb = (c: FakeChannel) => c.bindings.find(([type]) => type === 'postgres_changes')![2];
+    system(channels[2])({ extension: 'postgres_changes', status: 'error', message: 'not in publication' });
+    system(channels[0])({ extension: 'postgres_changes', status: 'ok' });
+    expect(handlers.onReady).toHaveBeenCalledWith('readings');
+    expect(handlers.onReady).toHaveBeenCalledTimes(1);
+    changesCb(channels[0])({ new: { id: 1 } });
     expect(handlers.onReading).toHaveBeenCalledTimes(1);
-    channelHandlers.status!('SUBSCRIBED');
+    changesCb(channels[1])({ new: { id: 'dev', status: 'offline' } });
+    expect(handlers.onDevice).toHaveBeenCalledWith({ id: 'dev', status: 'offline' });
+
+    channels[0].status!('SUBSCRIBED');
     expect(handlers.onReconnect).not.toHaveBeenCalled();
-    channelHandlers.status!('CHANNEL_ERROR');
-    channelHandlers.status!('SUBSCRIBED');
+    channels[0].status!('CHANNEL_ERROR');
+    channels[0].status!('SUBSCRIBED');
     expect(handlers.onReconnect).toHaveBeenCalledTimes(1);
     stop();
-    expect(client.removeChannel).toHaveBeenCalled();
+    expect(client.removeChannel).toHaveBeenCalledTimes(3);
   });
 });

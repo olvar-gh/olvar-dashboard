@@ -12,7 +12,10 @@ export function useThresholds() {
   const source = useDataSource();
   const plant = usePlant().data;
   return useQuery({
-    queryKey: keys.thresholds(plant?.id ?? ''),
+    queryKey: keys.thresholds(
+      plant?.id ?? '',
+      JSON.stringify([plant?.profile_id, plant?.profile.thresholds, plant?.threshold_overrides]),
+    ),
     enabled: !!plant,
     queryFn: async () =>
       (await source.getEffectiveThresholds(plant!.id)) ??

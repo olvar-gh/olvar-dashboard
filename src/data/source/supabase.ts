@@ -2,8 +2,8 @@ import { FunctionsHttpError, type SupabaseClient, type User } from '@supabase/su
 
 import type { Database } from '../database.types';
 import { fetchAll } from '../fetch-all';
-import type { ChatMessageRow, OfflinePeriodRow, PlantWithProfile, Reading, Session, Thresholds } from '../types';
-import { ChatError, DataError, type ChatErrorKind, type DataSource } from './index';
+import type { ChatMessageRow, Device, OfflinePeriodRow, PlantWithProfile, Reading, Session, Thresholds } from '../types';
+import { ChatError, DataError, type ChatErrorKind, type DataSource, type LiveTable } from './index';
 
 type Client = SupabaseClient<Database>;
 type PgError = { message: string; code?: string };
@@ -268,31 +268,31 @@ export function createSupabaseSource(client: Client): DataSource {
     },
 
     subscribe({ deviceId, plantId }, handlers) {
-      let subscribedOnce = false;
-      const channel = client
-        .channel(`live:${deviceId}`)
-        .on(
-          'postgres_changes',
-          { event: 'INSERT', schema: 'public', table: 'readings', filter: `device_id=eq.${deviceId}` },
-          () => handlers.onReading(),
-        )
-        .on(
-          'postgres_changes',
-          { event: 'UPDATE', schema: 'public', table: 'devices', filter: `id=eq.${deviceId}` },
-          (payload) => handlers.onDevice(payload.new as Database['public']['Tables']['devices']['Row']),
-        )
-        .on(
-          'postgres_changes',
-          { event: 'INSERT', schema: 'public', table: 'chat_messages', filter: `plant_id=eq.${plantId}` },
-          (payload) => handlers.onChatMessage(payload.new as ChatMessageRow),
-        )
-        .subscribe((status) => {
-          if (status !== 'SUBSCRIBED') return;
-          if (subscribedOnce) handlers.onReconnect();
-          subscribedOnce = true;
-        });
+      // One channel per table: Realtime rejects every binding on a channel when one of them is
+      // invalid (e.g. a table missing from the publication), which would silence the readings signal.
+      const bindings: [LiveTable, 'INSERT' | 'UPDATE', string, (row: Record<string, unknown>) => void][] = [
+        ['readings', 'INSERT', `device_id=eq.${deviceId}`, () => handlers.onReading()],
+        ['devices', 'UPDATE', `id=eq.${deviceId}`, (row) => handlers.onDevice(row as Device)],
+        ['chat_messages', 'INSERT', `plant_id=eq.${plantId}`, (row) => handlers.onChatMessage(row as ChatMessageRow)],
+      ];
+      const channels = bindings.map(([table, event, filter, apply]) => {
+        let subscribedOnce = false;
+        return client
+          .channel(`live:${table}:${deviceId}`)
+          .on('postgres_changes', { event, schema: 'public', table, filter }, (payload) =>
+            apply(payload.new as Record<string, unknown>),
+          )
+          .on('system', {}, (payload: { extension?: string; status?: string }) => {
+            if (payload.extension === 'postgres_changes' && payload.status === 'ok') handlers.onReady?.(table);
+          })
+          .subscribe((status) => {
+            if (status !== 'SUBSCRIBED') return;
+            if (subscribedOnce) handlers.onReconnect();
+            subscribedOnce = true;
+          });
+      });
       return () => {
-        void client.removeChannel(channel);
+        for (const channel of channels) void client.removeChannel(channel);
       };
     },
   };
