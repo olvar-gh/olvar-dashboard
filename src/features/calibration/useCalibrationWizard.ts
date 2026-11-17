@@ -14,6 +14,7 @@ import {
   saveErrorMessage,
   wizardReducer,
   wizardStep,
+  type Baseline,
   type CaptureStep,
 } from './wizard';
 
@@ -60,14 +61,30 @@ export function useCalibrationWizard() {
   const [state, dispatch] = useReducer(wizardReducer, initialWizard);
   const timeZone = plant.data?.timezone ?? 'UTC';
   const rows = readings.data;
-  const latestId = rows?.[0]?.id ?? 0;
-
-  // Cached rows from an earlier session would count readings taken while the sheet was closed,
-  // so the first baseline waits for this session's own fetch.
-  const fetchedNow = readings.isFetchedAfterMount && !readings.isFetching;
+  // Read at the moment of a capture or a confirmed retake, not from the render that showed
+  // the button (a confirmation alert can stay open while readings arrive).
+  const latestIdRef = useRef(0);
   useEffect(() => {
-    if (rows && fetchedNow) dispatch({ type: 'pin', latestId });
-  }, [rows, fetchedNow, latestId]);
+    latestIdRef.current = rows?.[0]?.id ?? 0;
+  }, [rows]);
+  const baselineNow = (): Baseline => ({ id: latestIdRef.current, at: Date.now() });
+
+  // Cached rows (possibly still fresh by staleTime, so no fetch on mount) would count readings
+  // taken while the sheet was closed, so every session pins its baseline from its own fetch.
+  const deviceId = device.data?.id;
+  const { refetch: refetchReadings } = readings;
+  useEffect(() => {
+    if (!deviceId) return;
+    let active = true;
+    void refetchReadings().then((result) => {
+      if (!active || result.isError) return;
+      latestIdRef.current = result.data?.[0]?.id ?? 0;
+      dispatch({ type: 'pin', baseline: baselineNow() });
+    });
+    return () => {
+      active = false;
+    };
+  }, [deviceId, refetchReadings]);
 
   const mounted = useRef(true);
   useEffect(() => {
@@ -77,7 +94,7 @@ export function useCalibrationWizard() {
     };
   }, []);
 
-  const live = rows ? deriveLive(rows, state.baselineId, now, device.data?.status === 'offline') : null;
+  const live = rows ? deriveLive(rows, state.baseline, now, device.data?.status === 'offline') : null;
   const step = wizardStep(state);
   const check = pairCheck(state);
 
@@ -87,7 +104,7 @@ export function useCalibrationWizard() {
     readings: readings.isError ? 'error' : readings.isPending ? 'pending' : 'ok',
     hasPlant: plant.data != null,
     hasDevice: device.data != null,
-    pinned: state.baselineId != null,
+    pinned: state.baseline != null,
     hasLive: live != null,
   });
 
@@ -100,12 +117,12 @@ export function useCalibrationWizard() {
   const capture = () => {
     if (step === 'review' || live?.capture == null) return;
     save.reset();
-    dispatch({ type: 'capture', step, value: live.capture, latestId });
+    dispatch({ type: 'capture', step, value: live.capture, baseline: baselineNow() });
   };
 
   const retake = (which: CaptureStep) => {
     save.reset();
-    dispatch({ type: 'retake', step: which, latestId });
+    dispatch({ type: 'retake', step: which, baseline: baselineNow() });
   };
 
   /**

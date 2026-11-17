@@ -18,19 +18,23 @@ export type WizardStep = CaptureStep | 'review';
 export type WizardState = {
   dry: number | null;
   wet: number | null;
-  /**
-   * Newest reading id when the current step began; only later readings count toward it, so
-   * values from before the probe was moved never reach a capture. Null until readings load.
-   */
-  baselineId: number | null;
+  /** Where the current step began. Null until this session's opening fetch. */
+  baseline: Baseline | null;
 };
 
-export type WizardAction =
-  | { type: 'pin'; latestId: number }
-  | { type: 'capture'; step: CaptureStep; value: number; latestId: number }
-  | { type: 'retake'; step: CaptureStep; latestId: number };
+/**
+ * Only readings both stored after `id` and recorded after `at` count toward the step: the gateway
+ * can flush buffered readings after a reconnect, which get new ids but were measured before the
+ * probe was moved.
+ */
+export type Baseline = { id: number; at: number };
 
-export const initialWizard: WizardState = { dry: null, wet: null, baselineId: null };
+export type WizardAction =
+  | { type: 'pin'; baseline: Baseline }
+  | { type: 'capture'; step: CaptureStep; value: number; baseline: Baseline }
+  | { type: 'retake'; step: CaptureStep; baseline: Baseline };
+
+export const initialWizard: WizardState = { dry: null, wet: null, baseline: null };
 
 export function wizardStep(state: Pick<WizardState, 'dry' | 'wet'>): WizardStep {
   if (state.dry == null) return 'dry';
@@ -41,12 +45,12 @@ export function wizardStep(state: Pick<WizardState, 'dry' | 'wet'>): WizardStep 
 export function wizardReducer(state: WizardState, action: WizardAction): WizardState {
   switch (action.type) {
     case 'pin':
-      return state.baselineId == null ? { ...state, baselineId: action.latestId } : state;
+      return state.baseline == null ? { ...state, baseline: action.baseline } : state;
     case 'capture':
       if (wizardStep(state) !== action.step) return state;
-      return { ...state, [action.step]: action.value, baselineId: action.latestId };
+      return { ...state, [action.step]: action.value, baseline: action.baseline };
     case 'retake':
-      return { ...state, [action.step]: null, baselineId: action.latestId };
+      return { ...state, [action.step]: null, baseline: action.baseline };
   }
 }
 
@@ -70,7 +74,7 @@ export type LiveReading = {
 /** `readings` newest first, as `useCalibrationReadings` returns them. */
 export function deriveLive(
   readings: readonly RawReading[],
-  baselineId: number | null,
+  baseline: Baseline | null,
   now: Date,
   deviceOffline = false,
 ): LiveReading | null {
@@ -79,10 +83,10 @@ export function deriveLive(
   const ageS = Math.max(0, secondsSince(latest.recorded_at, now));
   const offline = deviceOffline || ageS > DEVICE_OFFLINE_S;
   const fresh =
-    baselineId == null
+    baseline == null
       ? []
       : readings
-          .filter((r) => r.id > baselineId)
+          .filter((r) => r.id > baseline.id && Date.parse(r.recorded_at) > baseline.at)
           .slice(0, STABLE_COUNT)
           .reverse()
           .map((r) => r.soil_raw);
