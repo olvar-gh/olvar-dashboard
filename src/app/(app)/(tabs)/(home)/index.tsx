@@ -1,5 +1,3 @@
-import { ScreenPlaceholder } from '@/components/shell';
+import { HomeScreen } from '@/features/home';
 
-export default function HomeScreen() {
-  return <ScreenPlaceholder title="Home" body="Plant card, sensor cards, today's timeline and insights (T7)." />;
-}
+export default HomeScreen;
