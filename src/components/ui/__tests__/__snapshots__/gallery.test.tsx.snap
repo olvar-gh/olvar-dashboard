@@ -307,7 +307,7 @@ exports[`gallery (iOS) matches the snapshot 1`] = `
                             "fontSize": 34,
                             "letterSpacing": 0.4,
                             "lineHeight": 41,
-                            "marginTop": 10,
+                            "marginTop": 16,
                           }
                         }
                       >

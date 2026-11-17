@@ -1,30 +1,43 @@
-import { renderRouter } from 'expo-router/testing-library';
+import { screen } from 'expo-router/testing-library';
 
-// Renders the real src/app route tree, so each URL from PLAN §5.3 must resolve.
-const routes: [url: string, text: string][] = [
+import { renderApp } from '@/components/shell/testing/render-app';
+
+// Renders the real src/app route tree, so each URL from PLAN §5.3 must resolve inside the shell.
+const routes: [url: string, title: string][] = [
   ['/', 'Home'],
   ['/sensors', 'Sensors'],
   ['/timeline', 'Timeline'],
   ['/chat', 'Chat'],
   ['/calibrate', 'Soil calibration'],
-  ['/sign-in', 'Sign in'],
   ['/settings', 'Settings'],
   ['/settings/plant', 'Plant profile'],
   ['/settings/care-targets', 'Care targets'],
   ['/settings/devices', 'Devices & calibration'],
   ['/settings/account', 'Account'],
-  ['/gallery', 'Gallery'],
 ];
 
 describe('route skeleton', () => {
-  it.each(routes)('resolves %s', async (url, text) => {
-    const screen = await renderRouter('./src/app', { initialUrl: url });
-    expect(screen.getPathname()).toBe(url);
-    expect(screen.getByText(text)).toBeTruthy();
+  it.each(routes)('resolves %s inside the shell', async (url, title) => {
+    const app = await renderApp(url);
+    expect(app.getPathname()).toBe(url);
+    // Native tabs keep every tab mounted, so the other tabs' placeholders render too.
+    expect((await screen.findAllByTestId('screen-placeholder')).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(title).length).toBeGreaterThan(0);
+  });
+
+  it('resolves the sign-in page when signed out', async () => {
+    const app = await renderApp('/sign-in', { signedIn: false });
+    expect(app.getPathname()).toBe('/sign-in');
+    expect(await screen.findByTestId('sign-in')).toBeTruthy();
+  });
+
+  it('resolves the gallery', async () => {
+    await renderApp('/gallery');
+    expect(await screen.findByTestId('gallery')).toBeTruthy();
   });
 
   it('shows the not-found screen for unknown paths', async () => {
-    const screen = await renderRouter('./src/app', { initialUrl: '/nope' });
+    await renderApp('/nope');
     expect(screen.getByText('This page doesn’t exist.')).toBeTruthy();
   });
 });

@@ -1,0 +1,17 @@
+<svg width="196" height="196" viewBox="0 0 196 196" fill="none" xmlns="http://www.w3.org/2000/svg">
+<g id="Avatar circle" filter="url(#filter0_d_0_33)">
+<rect x="10" y="8" width="176" height="176" rx="88" fill="white"/>
+<path id="Olvar mark" d="M100.104 40C104.364 40.0001 107.818 43.4538 107.818 47.7143V92.1149C114.47 87.3257 122.66 80.8211 131.526 73.2521C133.882 71.2405 137.424 71.5201 139.436 73.8767C141.447 76.2333 141.168 79.7751 138.811 81.7869C127.058 91.8204 115.988 100.439 107.818 105.719V140.286C107.818 144.546 104.364 148 100.104 148C95.8433 148 92.3894 144.546 92.3894 140.286V125.378C83.2454 119.535 70.6436 109.733 57.1923 98.2702C54.834 96.2603 54.5513 92.7194 56.5609 90.3617C58.5706 88.0032 62.1113 87.7206 64.4697 89.7298C75.009 98.7113 84.6936 106.375 92.3894 111.835V86.055C85.205 81.3512 75.6647 73.914 65.599 65.3022C63.2446 63.2879 62.969 59.7458 64.9833 57.3914C66.9977 55.037 70.5398 54.7614 72.8942 56.7757C80.1036 62.9438 86.805 68.2943 92.3894 72.3837V47.7143C92.3894 43.4538 95.8433 40 100.104 40Z" fill="#7D8A64"/>
+</g>
+<defs>
+<filter id="filter0_d_0_33" x="0" y="0" width="196" height="196" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+<feFlood flood-opacity="0" result="BackgroundImageFix"/>
+<feColorMatrix in="SourceAlpha" type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0" result="hardAlpha"/>
+<feOffset dy="2"/>
+<feGaussianBlur stdDeviation="5"/>
+<feColorMatrix type="matrix" values="0 0 0 0 0.12 0 0 0 0 0.14 0 0 0 0 0.1 0 0 0 0.06 0"/>
+<feBlend mode="normal" in2="BackgroundImageFix" result="effect1_dropShadow_0_33"/>
+<feBlend mode="normal" in="SourceGraphic" in2="effect1_dropShadow_0_33" result="shape"/>
+</filter>
+</defs>
+</svg>

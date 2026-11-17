@@ -1,6 +1,16 @@
-import { Stack } from 'expo-router';
+import { Redirect, Slot, useGlobalSearchParams } from 'expo-router';
+import { useState } from 'react';
 
-// Placeholder; T6 owns the auth group.
+import { safeNext } from '@/components/shell';
+import { useSession } from '@/data';
+
 export default function AuthLayout() {
-  return <Stack screenOptions={{ headerShown: false }} />;
+  const { session, isLoading } = useSession();
+  const { next } = useGlobalSearchParams<{ next?: string }>();
+  // The redirect clears the query before this layout unmounts; a second redirect without `next` would win.
+  const [target, setTarget] = useState(next);
+  if (next && next !== target) setTarget(next);
+  if (isLoading) return null;
+  if (session) return <Redirect href={safeNext(target)} />;
+  return <Slot />;
 }

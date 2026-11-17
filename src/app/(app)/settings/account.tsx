@@ -1,10 +1,5 @@
-import { Text, View } from 'react-native';
+import { ScreenPlaceholder } from '@/components/shell';
 
-// Placeholder route from the T0 scaffold; T12 replaces it.
 export default function AccountScreen() {
-  return (
-    <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-      <Text>Account</Text>
-    </View>
-  );
+  return <ScreenPlaceholder title="Account" body="Settings and account (T12)." />;
 }

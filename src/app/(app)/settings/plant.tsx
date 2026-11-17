@@ -1,10 +1,5 @@
-import { Text, View } from 'react-native';
+import { ScreenPlaceholder } from '@/components/shell';
 
-// Placeholder route from the T0 scaffold; T12 replaces it.
-export default function PlantSettingsScreen() {
-  return (
-    <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-      <Text>Plant profile</Text>
-    </View>
-  );
+export default function PlantProfileScreen() {
+  return <ScreenPlaceholder title="Plant profile" body="Settings and account (T12)." />;
 }
