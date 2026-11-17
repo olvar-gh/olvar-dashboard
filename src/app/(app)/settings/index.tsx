@@ -1,5 +1,5 @@
-import { ScreenPlaceholder } from '@/components/shell';
+import { SettingsHome } from '@/features/settings';
 
-export default function SettingsScreen() {
-  return <ScreenPlaceholder title="Settings" body="Settings and account (T12)." />;
+export default function SettingsRoute() {
+  return <SettingsHome />;
 }

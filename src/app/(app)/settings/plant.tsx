@@ -1,5 +1,5 @@
-import { ScreenPlaceholder } from '@/components/shell';
+import { PlantProfileScreen } from '@/features/settings';
 
-export default function PlantProfileScreen() {
-  return <ScreenPlaceholder title="Plant profile" body="Settings and account (T12)." />;
+export default function PlantProfileRoute() {
+  return <PlantProfileScreen />;
 }

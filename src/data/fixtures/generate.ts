@@ -129,6 +129,7 @@ export function generateFixtures(options: FixtureOptions = {}): FixtureWorld {
   const lateMax = at(2, '23:50');
   const restartAfter = planned[0].after!;
   const calibratedAt = at(3, '10:15');
+  const todayMidnight = at(0, '00:00');
 
   const readings: FixtureWorld['readings'] = [];
   let id = 1;
@@ -142,7 +143,7 @@ export function generateFixtures(options: FixtureOptions = {}): FixtureWorld {
       bootStart = t;
       seq = 0;
     }
-    const hour = (((t - at(0, '00:00')) / 3_600_000) % 24 + 24) % 24;
+    const hour = (((t - todayMidnight) / 3_600_000) % 24 + 24) % 24;
     const day = Math.sin(((hour - 8) / 24) * 2 * Math.PI);
     const daylight = Math.max(0, Math.sin(((hour - 6) / 13) * Math.PI));
     const cycleDays = ((t - first) / DAY_MS) % 6;

@@ -1,5 +1,5 @@
-import { ScreenPlaceholder } from '@/components/shell';
+import { AccountScreen } from '@/features/settings';
 
-export default function AccountScreen() {
-  return <ScreenPlaceholder title="Account" body="Settings and account (T12)." />;
+export default function AccountRoute() {
+  return <AccountScreen />;
 }

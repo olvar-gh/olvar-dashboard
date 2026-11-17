@@ -3,26 +3,28 @@ import { screen } from 'expo-router/testing-library';
 import { renderApp } from '@/components/shell/testing/render-app';
 
 // Renders the real src/app route tree, so each URL from PLAN §5.3 must resolve inside the shell.
-const routes: [url: string, title: string][] = [
+const routes: [url: string, title: string, testID?: string][] = [
   ['/', 'Home'],
   ['/sensors', 'Sensors'],
   ['/timeline', 'Timeline'],
   ['/chat', 'Chat'],
   ['/calibrate', 'Soil calibration'],
-  ['/settings', 'Settings'],
-  ['/settings/plant', 'Plant profile'],
-  ['/settings/care-targets', 'Care targets'],
-  ['/settings/devices', 'Devices & calibration'],
-  ['/settings/account', 'Account'],
+  ['/settings', 'Care targets', 'settings-home'],
+  ['/settings/plant', 'Location', 'settings-plant-screen'],
+  ['/settings/care-targets', 'Use preset', 'care-targets-screen'],
+  ['/settings/devices', 'Sensor node', 'devices-screen'],
+  ['/settings/account', 'Change Password', 'account-screen'],
+  ['/settings/password', 'Update Password', 'password-screen'],
+  ['/settings/timezone', 'Asia/Seoul (GMT+9)', 'timezone-screen'],
 ];
 
 describe('route skeleton', () => {
-  it.each(routes)('resolves %s inside the shell', async (url, title) => {
+  it.each(routes)('resolves %s inside the shell', async (url, title, testID = 'screen-placeholder') => {
     const app = await renderApp(url);
     expect(app.getPathname()).toBe(url);
     // Native tabs keep every tab mounted, so the other tabs' placeholders render too.
-    expect((await screen.findAllByTestId('screen-placeholder')).length).toBeGreaterThan(0);
-    expect(screen.getAllByText(title).length).toBeGreaterThan(0);
+    expect((await screen.findAllByTestId(testID)).length).toBeGreaterThan(0);
+    expect((await screen.findAllByText(title)).length).toBeGreaterThan(0);
   });
 
   it('resolves the sign-in page when signed out', async () => {
