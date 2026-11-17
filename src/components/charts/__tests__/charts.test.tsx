@@ -1,7 +1,8 @@
 import { render } from '@testing-library/react-native';
+import { Stack } from 'expo-router';
+import { renderRouter } from 'expo-router/testing-library';
 import type { ReactElement } from 'react';
 import { StyleSheet } from 'react-native';
-import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import Gallery from '@/app/(dev)/gallery';
 import { colors } from '@/theme';
@@ -308,21 +309,14 @@ describe('ChartsGallery', () => {
   });
 });
 
-const insets = { top: 59, bottom: 34, left: 0, right: 0 };
-const metrics = { frame: { x: 0, y: 0, width: 320, height: 693 }, insets };
-
 describe('gallery route', () => {
-  it('puts the charts in a top-aligned scroll view below the safe-area inset', async () => {
-    const r = await render(
-      <SafeAreaProvider initialMetrics={metrics}>
-        <Gallery />
-      </SafeAreaProvider>,
-    );
+  it('puts the charts in a top-aligned scroll view that the native header insets below the safe area', async () => {
+    const r = await renderRouter({ _layout: () => <Stack />, gallery: Gallery }, { initialUrl: '/gallery' });
     const scroll = r.getByTestId('gallery-scroll');
     expect(scroll.type).toBe('RCTScrollView');
-    const content = StyleSheet.flatten(scroll.props.contentContainerStyle);
-    expect(content.justifyContent).toBeUndefined();
-    expect(content).toMatchObject({ paddingTop: 59, paddingBottom: 34 });
+    expect(scroll.props.contentInsetAdjustmentBehavior).toBe('automatic');
+    expect(StyleSheet.flatten(scroll.props.contentContainerStyle).justifyContent).toBeUndefined();
+    expect(r.getByTestId('charts-gallery')).toBeTruthy();
   });
 });
 
