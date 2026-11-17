@@ -23,6 +23,6 @@ export function BrandHeader({ title = 'Olvar', subtitle = 'Your plants, in their
 
 const styles = StyleSheet.create({
   root: { alignItems: 'center', gap: 6 },
-  title: { ...typography.iosLargeTitle, color: iosColors.labelPrimary, marginTop: 10 },
+  title: { ...typography.iosLargeTitle, color: iosColors.labelPrimary, marginTop: 16 },
   subtitle: { ...typography.iosSubheadline, color: iosColors.labelSecondary, textAlign: 'center' },
 });

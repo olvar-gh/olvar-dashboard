@@ -1,4 +1,5 @@
-import type { StyleProp, TextInputProps, ViewStyle } from 'react-native';
+import type { Ref } from 'react';
+import type { StyleProp, TextInputInstance, TextInputProps, ViewStyle } from 'react-native';
 
 type Common = {
   label: string;
@@ -11,7 +12,7 @@ type Common = {
   testID?: string;
 };
 
-export type FieldProps = Common & Omit<TextInputProps, 'style'>;
+export type FieldProps = Common & Omit<TextInputProps, 'style'> & { ref?: Ref<TextInputInstance> };
 
 export type SelectFieldProps = Common & {
   value?: string;

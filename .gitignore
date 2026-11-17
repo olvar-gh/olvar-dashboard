@@ -49,3 +49,4 @@ playwright-report/
 # local env (keep .env.example)
 .env
 .env.local
+.playwright-mcp/

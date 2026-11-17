@@ -7,16 +7,21 @@ import type { DataSource } from './index';
 
 const SCENARIOS: FixtureScenario[] = ['normal', 'offline', 'uncalibrated', 'null-reads'];
 
+function urlParam(name: string): string | null {
+  const search = (globalThis as { location?: { search?: string } }).location?.search;
+  return search ? new URLSearchParams(search).get(name) : null;
+}
+
 /** `?fixture=<scenario>` on web lets visual tests pick a fixture state without a rebuild. */
 function scenarioFromUrl(): FixtureScenario | undefined {
-  const search = (globalThis as { location?: { search?: string } }).location?.search;
-  const value = search ? new URLSearchParams(search).get('fixture') : null;
+  const value = urlParam('fixture');
   return SCENARIOS.find((s) => s === value);
 }
 
 export function createDataSource(): DataSource {
   if (getEnv().dataSource === 'fixtures') {
-    return createFixtureSource({ live: true, scenario: scenarioFromUrl() });
+    // `?session=signed-out` starts the fixtures at the sign-in screen (sign in with the fixture owner).
+    return createFixtureSource({ live: true, scenario: scenarioFromUrl(), signedIn: urlParam('session') !== 'signed-out' });
   }
   return createSupabaseSource(getSupabase());
 }
