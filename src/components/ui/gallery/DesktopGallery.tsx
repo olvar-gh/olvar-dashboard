@@ -26,6 +26,8 @@ export function DesktopGallery({ onOpenModal }: { onOpenModal: () => void }) {
   const [range, setRange] = useState<Range>('24h');
   const [name, setName] = useState('Sparks');
   const columns = bp.isDesktop ? styles.columns : styles.stack;
+  // flex: 1 means flexBasis 0, which collapses a card's height when the columns stack vertically.
+  const column = bp.isDesktop ? styles.flex : undefined;
 
   return (
     <View style={styles.root}>
@@ -51,13 +53,13 @@ export function DesktopGallery({ onOpenModal }: { onOpenModal: () => void }) {
       </GallerySection>
 
       <View style={columns}>
-        <Card title="Plant profile" subtitle="Name and location shown across the app" actions={<Button label="Save" />} style={styles.flex}>
+        <Card title="Plant profile" subtitle="Name and location shown across the app" actions={<Button label="Save" />} style={column} testID="plant-profile">
           <Field label="Nickname" value={name} onChangeText={setName} maxLength={60} />
           <Field label="Location" placeholder="e.g. Living room window" hint="Up to 60 characters" />
           <SelectField label="Time zone" value="Asia/Seoul" />
           <Field label="Species" value="Spathiphyllum" editable={false} />
         </Card>
-        <Card title="Devices" subtitle="Sensors stay paired to the gateway." style={styles.flex}>
+        <Card title="Devices" subtitle="Sensors stay paired to the gateway." style={column} testID="devices">
           <View>
             <ListRow icon="wifi" title="olvar-gateway" subtitle="Raspberry Pi 3B · Wi-Fi · MQTT" status={{ label: 'Live', live: true }} />
             <ListRow divider icon="cpu" title="olvar-node" subtitle="ESP32 · every minute" status={{ label: 'Offline', live: false }} />
