@@ -16,13 +16,18 @@ const routes: [url: string, title: string][] = [
   ['/settings/account', 'Account'],
 ];
 
+// A built screen puts its title in the native header, which Jest does not draw, so it is found by testID.
+const screenTestIds: Record<string, string> = { '/sensors': 'sensors-screen' };
+
 describe('route skeleton', () => {
   it.each(routes)('resolves %s inside the shell', async (url, title) => {
+    const screenTestId = screenTestIds[url];
     const app = await renderApp(url);
     expect(app.getPathname()).toBe(url);
     // Native tabs keep every tab mounted, so the other tabs' placeholders render too.
     expect((await screen.findAllByTestId('screen-placeholder')).length).toBeGreaterThan(0);
-    expect(screen.getAllByText(title).length).toBeGreaterThan(0);
+    if (screenTestId) expect(await screen.findByTestId(screenTestId)).toBeTruthy();
+    else expect(screen.getAllByText(title).length).toBeGreaterThan(0);
   });
 
   it('resolves the sign-in page when signed out', async () => {

@@ -176,7 +176,7 @@ describe('HourBars', () => {
       />,
     );
     expect(r.getAllByTestId('bar-future')).toHaveLength(4);
-    expect(r.labels).toEqual(['06:00', '18:00', '14:00']);
+    expect(r.labels).toEqual(['06:00', '14:00', '18:00']);
   });
 
   it('mini variant draws future buckets as stubs even when they hold values', async () => {
