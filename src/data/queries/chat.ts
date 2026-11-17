@@ -1,4 +1,4 @@
-import { useInfiniteQuery, useMutation, useQueryClient, type InfiniteData, type QueryClient } from '@tanstack/react-query';
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
 
 import { useDataSource } from '../context';
 import { keys } from '../keys';
@@ -8,11 +8,15 @@ import { usePlant } from './plant';
 
 export const CHAT_PAGE_SIZE = 50;
 
-type ChatPages = InfiniteData<ChatMessageRow[], ChatCursor | null>;
+const NO_ROWS: ChatMessageRow[] = [];
+
+function byTime(a: ChatMessageRow, b: ChatMessageRow) {
+  return a.created_at.localeCompare(b.created_at) || a.id - b.id;
+}
 
 /**
  * The conversation, keyset-paged 50 at a time (newest page first, `fetchNextPage` loads older).
- * `messages` is the loaded history, oldest first.
+ * `messages` is the loaded history plus rows that arrived live, oldest first.
  */
 export function useChatHistory() {
   const source = useDataSource();
@@ -27,18 +31,31 @@ export function useChatHistory() {
       return last.length < CHAT_PAGE_SIZE || !oldest ? undefined : { created_at: oldest.created_at, id: oldest.id };
     },
   });
-  const messages = query.data ? query.data.pages.flat().reverse() : undefined;
+  const live = useQuery({
+    queryKey: keys.chatLive(plantId ?? ''),
+    queryFn: () => NO_ROWS,
+    enabled: false,
+    initialData: NO_ROWS,
+    staleTime: Infinity,
+  }).data;
+  let messages: ChatMessageRow[] | undefined;
+  if (query.data) {
+    const loaded = query.data.pages.flat();
+    const ids = new Set(loaded.map((m) => m.id));
+    messages = [...loaded, ...live.filter((m) => !ids.has(m.id))].sort(byTime);
+  }
   return { ...query, messages };
 }
 
-/** Adds a message to the cached conversation unless it is already there (Realtime and the reply race). */
+/**
+ * Records a message that arrived outside a page fetch (Realtime, the chat reply). It is kept
+ * apart from the pages because a page fetch in flight writes back the pages it started from,
+ * which would drop a row merged into them meanwhile.
+ */
 export function addChatMessage(qc: QueryClient, row: ChatMessageRow) {
-  qc.setQueryData<ChatPages>(keys.chat(row.plant_id), (data) => {
-    if (!data || data.pages.some((p) => p.some((m) => m.id === row.id))) return data;
-    const [first = [], ...rest] = data.pages;
-    const merged = [row, ...first].sort((a, b) => b.created_at.localeCompare(a.created_at) || b.id - a.id);
-    return { ...data, pages: [merged, ...rest] };
-  });
+  qc.setQueryData<ChatMessageRow[]>(keys.chatLive(row.plant_id), (rows = NO_ROWS) =>
+    rows.some((m) => m.id === row.id) ? rows : [...rows, row],
+  );
 }
 
 /**

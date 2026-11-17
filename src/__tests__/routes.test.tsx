@@ -22,7 +22,8 @@ describe('route skeleton', () => {
     expect(app.getPathname()).toBe(url);
     // Native tabs keep every tab mounted, so the other tabs' placeholders render too.
     expect((await screen.findAllByTestId('screen-placeholder')).length).toBeGreaterThan(0);
-    expect(screen.getAllByText(title).length).toBeGreaterThan(0);
+    // A placeholder shows its title as text; a real iOS screen puts it in the native header.
+    expect(screen.queryAllByText(title).length > 0 || JSON.stringify(screen.toJSON()).includes(`"title":${JSON.stringify(title)}`)).toBe(true);
   });
 
   it('resolves the sign-in page when signed out', async () => {

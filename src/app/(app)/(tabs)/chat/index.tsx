@@ -1,5 +1,3 @@
-import { ScreenPlaceholder } from '@/components/shell';
+import { ChatScreen } from '@/features/chat';
 
-export default function ChatScreen() {
-  return <ScreenPlaceholder title="Chat" body="Talk with your plant (T10)." />;
-}
+export default ChatScreen;
