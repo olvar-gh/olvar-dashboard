@@ -8,7 +8,6 @@ const routes: [url: string, title: string][] = [
   ['/sensors', 'Sensors'],
   ['/timeline', 'Timeline'],
   ['/chat', 'Chat'],
-  ['/calibrate', 'Soil calibration'],
   ['/settings', 'Settings'],
   ['/settings/plant', 'Plant profile'],
   ['/settings/care-targets', 'Care targets'],
@@ -23,6 +22,12 @@ describe('route skeleton', () => {
     // Native tabs keep every tab mounted, so the other tabs' placeholders render too.
     expect((await screen.findAllByTestId('screen-placeholder')).length).toBeGreaterThan(0);
     expect(screen.getAllByText(title).length).toBeGreaterThan(0);
+  });
+
+  it('resolves /calibrate to the calibration sheet', async () => {
+    const app = await renderApp('/calibrate');
+    expect(app.getPathname()).toBe('/calibrate');
+    expect(await screen.findByTestId('calibration')).toBeTruthy();
   });
 
   it('resolves the sign-in page when signed out', async () => {
