@@ -25,7 +25,7 @@ export function AccountScreen() {
         <SkeletonCard lines={3} testID="account-loading" />
       ) : (
         <>
-          <ListSection header="Profile" footer={a.errors.name ?? a.saveError ?? undefined}>
+          <ListSection header="Profile" footer={a.errors.name ?? a.saveError ?? a.plantError ?? undefined}>
             <Field label="Name" value={a.name} onChangeText={a.setName} error={!!a.errors.name} textContentType="name" testID="account-name" />
             <Field label="Email" value={a.email} editable={false} separator testID="account-email" />
             <SelectField

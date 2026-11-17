@@ -28,14 +28,18 @@ import {
   usesPreset,
   type RangeDraft,
 } from './model';
+import { useDraft } from './drafts';
+
+/** `keep`: hold unsaved edits across the web Settings sections (see drafts.ts). */
+export type FormOptions = { keep?: boolean };
 
 /** Plant profile form: nickname and location are editable, the rest is read-only. */
-export function usePlantForm() {
+export function usePlantForm({ keep = false }: FormOptions = {}) {
   const plant = usePlant();
   const update = useUpdatePlant();
   // null = untouched, so the field follows the stored value (a save, or a change from another device).
-  const [nicknameDraft, setNickname] = useState<string | null>(null);
-  const [locationDraft, setLocation] = useState<string | null>(null);
+  const [nicknameDraft, setNickname] = useDraft<string | null>('plant.nickname', keep, null);
+  const [locationDraft, setLocation] = useDraft<string | null>('plant.location', keep, null);
   const [submitted, setSubmitted] = useState(false);
   const p = plant.data;
   const nickname = nicknameDraft ?? p?.nickname ?? '';
@@ -85,16 +89,16 @@ export function usePlantForm() {
  * metric's `ok_low`/`ok_high`. Turning the preset off only opens the editor; nothing is written
  * until Save.
  */
-export function useCareTargets() {
+export function useCareTargets({ keep = false }: FormOptions = {}) {
   const plant = usePlant();
   const thresholds = useThresholds();
   const latest = useLatest();
   const update = useUpdatePlant();
   const p = plant.data;
   const preset = usesPreset(p?.threshold_overrides);
-  const [editing, setEditing] = useState(false);
+  const [editing, setEditing] = useDraft('care.editing', keep, false);
   // The editor's values; null until the owner types, so it shows the effective ranges.
-  const [edits, setEdits] = useState<RangeDraft | null>(null);
+  const [edits, setEdits] = useDraft<RangeDraft | null>('care.edits', keep, null);
   const [submitted, setSubmitted] = useState(false);
   const draft = useMemo(() => edits ?? draftFrom(thresholds.data), [edits, thresholds.data]);
 
@@ -108,6 +112,7 @@ export function useCareTargets() {
   };
   const cancel = () => {
     update.reset();
+    setEdits(null);
     setEditing(false);
     setSubmitted(false);
   };
@@ -120,6 +125,7 @@ export function useCareTargets() {
     try {
       const overrides = buildOverrides(p.profile.thresholds, p.threshold_overrides, check.ranges);
       await update.mutateAsync({ plantId: p.id, patch: { threshold_overrides: overrides } });
+      setEdits(null);
       setEditing(false);
       setSubmitted(false);
       return true;
@@ -128,14 +134,16 @@ export function useCareTargets() {
     }
   };
 
-  const applyPreset = async () => {
-    if (!p) return false;
+  /** Resolves null on success, else the message to show (the switch springs back on failure). */
+  const applyPreset = async (): Promise<string | null> => {
+    if (!p) return saveErrorMessage(plant.error);
     try {
       await update.mutateAsync({ plantId: p.id, patch: { threshold_overrides: {} } });
+      setEdits(null);
       setEditing(false);
-      return true;
-    } catch {
-      return false;
+      return null;
+    } catch (err) {
+      return saveErrorMessage(err, 'ranges');
     }
   };
 
@@ -177,9 +185,15 @@ export function useDeviceRows() {
     latest: latest.data,
     timeZone,
   });
-  const isPending = plant.isPending || device.isPending || gateway.isPending;
-  const error = device.error ?? gateway.error ?? null;
+  // The device query stays disabled (and pending) until the plant has loaded.
+  const isPending = plant.isPending || (!!plant.data && device.isPending) || gateway.isPending;
+  const error = plant.error ?? device.error ?? gateway.error ?? null;
   const refetch = () => {
+    if (plant.error || !plant.data) {
+      void plant.refetch();
+      void gateway.refetch();
+      return;
+    }
     void device.refetch();
     void gateway.refetch();
     void latest.refetch();
@@ -197,14 +211,15 @@ export function useDeviceRows() {
 }
 
 /** Account form: display name (Auth metadata) and the plant time zone. */
-export function useAccountForm() {
+export function useAccountForm({ keep = false }: FormOptions = {}) {
   const { session } = useSession();
   const plant = usePlant();
   const updateName = useUpdateName();
   const updatePlant = useUpdatePlant();
-  const [nameDraft, setName] = useState<string | null>(null);
-  const [zoneDraft, setTimeZone] = useState<string | null>(null);
+  const [nameDraft, setName] = useDraft<string | null>('account.name', keep, null);
+  const [zoneDraft, setTimeZone] = useDraft<string | null>('account.timezone', keep, null);
   const [submitted, setSubmitted] = useState(false);
+  const [blocked, setBlocked] = useState<string | null>(null);
   const storedName = session?.name ?? '';
   const storedZone = plant.data?.timezone ?? '';
   const name = nameDraft ?? storedName;
@@ -214,19 +229,30 @@ export function useAccountForm() {
     setName(null);
     setTimeZone(null);
     setSubmitted(false);
+    setBlocked(null);
     updateName.reset();
     updatePlant.reset();
   };
 
   const errors = { name: nameError(name) };
-  const dirty = name !== storedName || timeZone !== storedZone;
+  const zoneDirty = zoneDraft !== null && zoneDraft !== storedZone;
+  const dirty = name !== storedName || zoneDirty;
 
   const save = async () => {
     setSubmitted(true);
+    setBlocked(null);
     if (errors.name) return false;
+    // The time zone lives on the plant row; without it there is nothing to save it to.
+    if (zoneDirty && !plant.data) {
+      setBlocked('Your plant couldn’t be loaded, so the time zone wasn’t saved. Retry, then save again.');
+      return false;
+    }
     try {
-      if (name.trim() !== storedName) await updateName.mutateAsync(name.trim());
-      if (plant.data && timeZone !== storedZone) {
+      if (name.trim() !== storedName) {
+        await updateName.mutateAsync(name.trim());
+        setName(null);
+      }
+      if (plant.data && zoneDirty) {
         await updatePlant.mutateAsync({ plantId: plant.data.id, patch: { timezone: timeZone } });
       }
       setName(null);
@@ -250,8 +276,10 @@ export function useAccountForm() {
     save,
     reset,
     saving: updateName.isPending || updatePlant.isPending,
-    saveError: failure ? saveErrorMessage(failure, updatePlant.error ? 'timezone' : 'account') : null,
+    saveError: blocked ?? (failure ? saveErrorMessage(failure, updatePlant.error ? 'timezone' : 'account') : null),
     plantPending: plant.isPending,
+    plantError: plant.error ? saveErrorMessage(plant.error) : null,
+    retryPlant: () => void plant.refetch(),
   };
 }
 

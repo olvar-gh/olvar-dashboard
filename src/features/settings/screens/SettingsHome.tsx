@@ -1,5 +1,5 @@
 import { useRouter } from 'expo-router';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { Icon } from '@/components/icons';
 import { hrefs, PageScroll } from '@/components/shell';
@@ -31,7 +31,9 @@ export function SettingsHome() {
       message: 'Your own ranges will be replaced by the preset ranges.',
       confirmLabel: 'Use Preset',
     });
-    if (ok) await c.applyPreset();
+    if (!ok) return;
+    const error = await c.applyPreset();
+    if (error) Alert.alert('Couldn’t use the preset', error);
   };
 
   const onSignOut = async () => {

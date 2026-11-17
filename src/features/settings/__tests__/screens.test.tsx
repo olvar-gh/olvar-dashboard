@@ -61,7 +61,20 @@ describe('Settings (iPhone)', () => {
     app.source.getPlant = jest.fn().mockRejectedValue(new Error('network down'));
     await app.queryClient.resetQueries({ queryKey: ['plant'] });
     expect(await screen.findByTestId('settings-error')).toBeTruthy();
-    expect(screen.getByText('Retry')).toBeTruthy();
+    expect(screen.getAllByText('Retry').length).toBeGreaterThan(0);
+    expect(screen.getByTestId('settings-devices-error')).toBeTruthy();
+  });
+
+  it('explains a failed preset restoration from the Settings switch', async () => {
+    const alert = acceptAlerts();
+    const app = await open('/settings');
+    await app.source.updatePlant('p', { threshold_overrides: { soil_pct: { ok_low: 30 } } });
+    await app.queryClient.invalidateQueries({ queryKey: ['plant'] });
+    await waitFor(() => expect(screen.getByLabelText('Use preset').props.value).toBe(false));
+    app.source.updatePlant = jest.fn().mockRejectedValue(new Error('offline'));
+    await fireEvent(screen.getByLabelText('Use preset'), 'valueChange', true);
+    await waitFor(() => expect(alert).toHaveBeenCalledWith('Couldn’t use the preset', expect.stringMatching(/connection/)));
+    expect(screen.getByLabelText('Use preset').props.value).toBe(false);
   });
 
   it('shows the node offline with its time', async () => {
@@ -122,6 +135,29 @@ describe('Care targets', () => {
     await fireEvent.press(screen.getByTestId('care-save'));
     await waitFor(() => expect(app.source.world.plant.threshold_overrides).toEqual({ soil_pct: { ok_low: 30 } }));
     expect(await screen.findByText('30–85%')).toBeTruthy();
+  });
+
+  it('opened from the Settings switch, leaves edit mode after a save', async () => {
+    const app = await open('/settings/care-targets?edit=1');
+    await fireEvent.changeText(await screen.findByTestId('target-soil_pct-low'), '40');
+    await fireEvent.press(screen.getByTestId('care-save'));
+    await waitFor(() => expect(app.source.world.plant.threshold_overrides).toEqual({ soil_pct: { ok_low: 40 } }));
+    expect(await screen.findByText('40–85%')).toBeTruthy();
+    await waitFor(() => expect(screen.queryByTestId('care-save')).toBeNull());
+    expect(screen.queryByTestId('target-soil_pct-low')).toBeNull();
+    expect(screen.getByTestId('care-edit')).toBeTruthy();
+  });
+
+  it('shows a failed preset restoration with the editor closed', async () => {
+    acceptAlerts();
+    const app = await open('/settings/care-targets');
+    await app.source.updatePlant('p', { threshold_overrides: { soil_pct: { ok_low: 30 } } });
+    await app.queryClient.invalidateQueries({ queryKey: ['plant'] });
+    await waitFor(() => expect(screen.getByLabelText('Use preset').props.value).toBe(false));
+    app.source.updatePlant = jest.fn().mockRejectedValue(new Error('offline'));
+    await fireEvent(screen.getByLabelText('Use preset'), 'valueChange', true);
+    expect(await screen.findByTestId('care-save-error')).toBeTruthy();
+    expect(screen.queryByTestId('care-save')).toBeNull();
   });
 
   it('mirrors the order check before saving', async () => {

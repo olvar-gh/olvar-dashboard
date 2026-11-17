@@ -10,7 +10,7 @@ import { RangeTrack } from '../RangeTrack';
 
 /** Desktop "Care targets" card: the preset switch, then one row per metric with its ideal range. */
 export function CareTargetsCard() {
-  const c = useCareTargets();
+  const c = useCareTargets({ keep: true });
   const p = c.plant.data;
   if (c.plant.isPending || (p && c.thresholds.isPending)) return <SkeletonCard minHeight={360} lines={4} testID="care-targets-loading" />;
   if (c.plant.error || c.thresholds.error || !p) {

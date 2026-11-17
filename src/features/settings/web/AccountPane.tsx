@@ -11,7 +11,7 @@ import { filterZones, PASSWORD_MIN, timeZoneLabel, timeZones } from '../model';
 
 /** Desktop Account pane: profile (name, email, time zone), password and sign out. */
 export function AccountPane() {
-  const a = useAccountForm();
+  const a = useAccountForm({ keep: true });
   const [picking, setPicking] = useState(false);
   if (a.plantPending) {
     return (
@@ -68,6 +68,15 @@ export function AccountPane() {
             />
             <View style={styles.field} />
           </View>
+          {a.plantError ? (
+            <Notice
+              tone="warn"
+              testID="account-plant-error"
+              action={<Button variant="secondary" label="Retry" onPress={a.retryPlant} />}
+            >
+              {`Your plant couldn’t be loaded, so the time zone can’t be changed yet. ${a.plantError}`}
+            </Notice>
+          ) : null}
           {a.saveError ? (
             <Notice tone="warn" testID="account-save-error">
               {a.saveError}

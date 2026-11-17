@@ -9,7 +9,7 @@ import { addedDate, LOCATION_MAX, NICKNAME_MAX, speciesName } from '../model';
 
 /** Desktop "Plant profile" card: nickname and location editable, species and added date read-only. */
 export function PlantProfileCard() {
-  const f = usePlantForm();
+  const f = usePlantForm({ keep: true });
   const p = f.plant.data;
   if (f.plant.isPending) return <SkeletonCard minHeight={168} lines={2} testID="plant-profile-loading" />;
   if (f.plant.error || !p) {

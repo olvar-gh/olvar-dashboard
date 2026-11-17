@@ -47,13 +47,14 @@ test.describe('session gate', () => {
     await expect(page).toHaveURL(/\/$/);
   });
 
+  const settingsPage: Record<string, string> = { '/settings': 'settings-plant', '/settings/account': 'settings-account' };
   for (const path of ['/sensors', '/timeline', '/chat', '/settings', '/settings/account']) {
     test(`deep link ${path} survives a reload`, async ({ page }) => {
       await page.goto(path);
-      await expect(page.getByTestId('screen-placeholder')).toBeVisible();
+      await expect(page.getByTestId(settingsPage[path] ?? 'screen-placeholder')).toBeVisible();
       await page.reload();
       await expect(page).toHaveURL(new RegExp(`${path}$`));
-      await expect(page.getByTestId('screen-placeholder')).toBeVisible();
+      await expect(page.getByTestId(settingsPage[path] ?? 'screen-placeholder')).toBeVisible();
     });
   }
 });

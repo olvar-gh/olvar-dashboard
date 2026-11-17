@@ -8,6 +8,8 @@ import { NavLink } from '@/components/shell/NavLink';
 import { PageHeader } from '@/components/ui';
 import { colors, typography, useBreakpoint } from '@/theme';
 
+import { useDraftScope } from '../drafts';
+
 export type SettingsSection = 'plant' | 'care' | 'devices' | 'account';
 
 const NAV: { key: SettingsSection; label: string; icon: IconName; href: Href }[] = [
@@ -19,6 +21,7 @@ const NAV: { key: SettingsSection; label: string; icon: IconName; href: Href }[]
 
 /** Desktop Settings page: page header, the Settings nav (208) and the pane, capped at 1040 on xl. */
 export function SettingsFrame({ active, children }: { active: SettingsSection; children: ReactNode }) {
+  useDraftScope();
   const bp = useBreakpoint();
   const account = useAccountButton();
   const s = bp.screens.settings;

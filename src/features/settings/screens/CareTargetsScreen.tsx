@@ -1,6 +1,6 @@
 import { useLocalSearchParams } from 'expo-router';
-import { useEffect } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { useEffect, useRef } from 'react';
+import { Alert, StyleSheet, View } from 'react-native';
 
 import { PageScroll } from '@/components/shell';
 import { Button, confirmAlert, ErrorState, Field, IosListRow, ListSection, NavBar, RangeCard, SkeletonCard } from '@/components/ui';
@@ -15,10 +15,14 @@ export function CareTargetsScreen() {
   const { edit } = useLocalSearchParams<{ edit?: string }>();
   const p = c.plant.data;
   const ready = !!p && !c.thresholds.isPending;
+  // `edit=1` (the Settings switch turned off) opens the editor once; a save changes the thresholds
+  // query, and the editor must not reopen when it settles.
+  const editConsumed = useRef(false);
 
   useEffect(() => {
-    if (edit === '1' && ready && !c.open) c.startEditing();
-    // Only when the screen opens in edit mode from the Settings switch.
+    if (edit !== '1' || !ready || editConsumed.current) return;
+    editConsumed.current = true;
+    if (!c.open) c.startEditing();
   }, [edit, ready]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const onPreset = async (on: boolean) => {
@@ -29,7 +33,9 @@ export function CareTargetsScreen() {
       message: 'Your own ranges will be replaced by the preset ranges.',
       confirmLabel: 'Use Preset',
     });
-    if (ok) await c.applyPreset();
+    if (!ok) return;
+    const error = await c.applyPreset();
+    if (error) Alert.alert('Couldn’t use the preset', error);
   };
 
   return (
@@ -103,13 +109,13 @@ export function CareTargetsScreen() {
               </View>
             );
           })}
+          {c.saveError ? (
+            <ListSection footer={c.saveError}>
+              <IosListRow label="Couldn’t save the ranges" icon="alert" iconTint={colors.status.alert} testID="care-save-error" />
+            </ListSection>
+          ) : null}
           {c.open ? (
             <View style={styles.actions}>
-              {c.saveError ? (
-                <ListSection footer={c.saveError}>
-                  <IosListRow label="Couldn’t save the ranges" icon="alert" iconTint={colors.status.alert} testID="care-save-error" />
-                </ListSection>
-              ) : null}
               <Button size="large" label="Save Ranges" onPress={() => void c.save()} loading={c.saving} testID="care-save" />
               <Button size="large" variant="plain" label="Cancel" onPress={c.cancel} disabled={c.saving} />
             </View>
