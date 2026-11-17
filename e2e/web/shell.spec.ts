@@ -50,10 +50,10 @@ test.describe('session gate', () => {
   for (const path of ['/sensors', '/timeline', '/chat', '/settings', '/settings/account']) {
     test(`deep link ${path} survives a reload`, async ({ page }) => {
       await page.goto(path);
-      await expect(page.getByTestId('screen-placeholder')).toBeVisible();
+      await expect(page.getByRole('heading', { level: 1 }).first()).toBeVisible();
       await page.reload();
       await expect(page).toHaveURL(new RegExp(`${path}$`));
-      await expect(page.getByTestId('screen-placeholder')).toBeVisible();
+      await expect(page.getByRole('heading', { level: 1 }).first()).toBeVisible();
     });
   }
 });
