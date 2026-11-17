@@ -132,6 +132,7 @@ exports[`gallery (iOS) matches the snapshot 1`] = `
                 },
               ]
             }
+            testID="gallery-scroll"
           >
             <View>
               <View
@@ -6982,6 +6983,1000 @@ exports[`gallery (iOS) matches the snapshot 1`] = `
                           </View>
                         </View>
                       </View>
+                    </View>
+                  </View>
+                </View>
+                <View
+                  style={
+                    {
+                      "alignSelf": "stretch",
+                      "gap": 16,
+                      "padding": 16,
+                    }
+                  }
+                  testID="charts-gallery"
+                >
+                  <Text
+                    style={
+                      {
+                        "color": "#1e2219",
+                        "fontFamily": "Inter-SemiBold",
+                        "fontSize": 16,
+                      }
+                    }
+                  >
+                    Charts
+                  </Text>
+                  <View
+                    style={
+                      {
+                        "flexDirection": "row",
+                        "flexWrap": "wrap",
+                        "gap": 16,
+                      }
+                    }
+                  >
+                    <View
+                      style={
+                        [
+                          {
+                            "backgroundColor": "#ffffff",
+                            "borderColor": "#e6e6df",
+                            "borderRadius": 20,
+                            "borderWidth": 1,
+                            "flexBasis": 360,
+                            "flexGrow": 1,
+                            "flexShrink": 1,
+                            "gap": 16,
+                            "minWidth": 0,
+                            "paddingHorizontal": 24,
+                            "paddingVertical": 20,
+                          },
+                          {
+                            "maxWidth": 764,
+                          },
+                        ]
+                      }
+                      testID="gallery-panel"
+                    >
+                      <Text
+                        style={
+                          {
+                            "color": "#1e2219",
+                            "fontFamily": "Inter-SemiBold",
+                            "fontSize": 14,
+                          }
+                        }
+                      >
+                        StepLine · soil 24 h
+                      </Text>
+                      <View
+                        accessible={false}
+                        onLayout={[Function]}
+                        style={
+                          [
+                            {
+                              "height": 216,
+                              "width": "100%",
+                            },
+                            undefined,
+                          ]
+                        }
+                        testID="step-line"
+                      />
+                    </View>
+                    <View
+                      style={
+                        [
+                          {
+                            "backgroundColor": "#ffffff",
+                            "borderColor": "#e6e6df",
+                            "borderRadius": 20,
+                            "borderWidth": 1,
+                            "flexBasis": 360,
+                            "flexGrow": 1,
+                            "flexShrink": 1,
+                            "gap": 16,
+                            "minWidth": 0,
+                            "paddingHorizontal": 24,
+                            "paddingVertical": 20,
+                          },
+                          {
+                            "maxWidth": 764,
+                          },
+                        ]
+                      }
+                      testID="gallery-panel"
+                    >
+                      <Text
+                        style={
+                          {
+                            "color": "#1e2219",
+                            "fontFamily": "Inter-SemiBold",
+                            "fontSize": 14,
+                          }
+                        }
+                      >
+                        HourBars · light 24 h
+                      </Text>
+                      <View
+                        accessible={false}
+                        onLayout={[Function]}
+                        style={
+                          [
+                            {
+                              "height": 216,
+                              "width": "100%",
+                            },
+                            undefined,
+                          ]
+                        }
+                        testID="hour-bars"
+                      />
+                    </View>
+                    <View
+                      style={
+                        [
+                          {
+                            "backgroundColor": "#ffffff",
+                            "borderColor": "#e6e6df",
+                            "borderRadius": 20,
+                            "borderWidth": 1,
+                            "flexBasis": 360,
+                            "flexGrow": 1,
+                            "flexShrink": 1,
+                            "gap": 16,
+                            "minWidth": 0,
+                            "paddingHorizontal": 24,
+                            "paddingVertical": 20,
+                          },
+                          {
+                            "maxWidth": 764,
+                          },
+                        ]
+                      }
+                      testID="gallery-panel"
+                    >
+                      <Text
+                        style={
+                          {
+                            "color": "#1e2219",
+                            "fontFamily": "Inter-SemiBold",
+                            "fontSize": 14,
+                          }
+                        }
+                      >
+                        LineArea · temperature 24 h (read-failed gap)
+                      </Text>
+                      <View
+                        accessible={false}
+                        onLayout={[Function]}
+                        style={
+                          [
+                            {
+                              "height": 216,
+                              "width": "100%",
+                            },
+                            undefined,
+                          ]
+                        }
+                        testID="line-area"
+                      />
+                    </View>
+                    <View
+                      style={
+                        [
+                          {
+                            "backgroundColor": "#ffffff",
+                            "borderColor": "#e6e6df",
+                            "borderRadius": 20,
+                            "borderWidth": 1,
+                            "flexBasis": 360,
+                            "flexGrow": 1,
+                            "flexShrink": 1,
+                            "gap": 16,
+                            "minWidth": 0,
+                            "paddingHorizontal": 24,
+                            "paddingVertical": 20,
+                          },
+                          {
+                            "maxWidth": 764,
+                          },
+                        ]
+                      }
+                      testID="gallery-panel"
+                    >
+                      <Text
+                        style={
+                          {
+                            "color": "#1e2219",
+                            "fontFamily": "Inter-SemiBold",
+                            "fontSize": 14,
+                          }
+                        }
+                      >
+                        LineArea · humidity 24 h
+                      </Text>
+                      <View
+                        accessible={false}
+                        onLayout={[Function]}
+                        style={
+                          [
+                            {
+                              "height": 216,
+                              "width": "100%",
+                            },
+                            undefined,
+                          ]
+                        }
+                        testID="line-area"
+                      />
+                    </View>
+                    <View
+                      style={
+                        [
+                          {
+                            "backgroundColor": "#ffffff",
+                            "borderColor": "#e6e6df",
+                            "borderRadius": 20,
+                            "borderWidth": 1,
+                            "flexBasis": 360,
+                            "flexGrow": 1,
+                            "flexShrink": 1,
+                            "gap": 16,
+                            "minWidth": 0,
+                            "paddingHorizontal": 24,
+                            "paddingVertical": 20,
+                          },
+                          {
+                            "maxWidth": 544,
+                          },
+                        ]
+                      }
+                      testID="gallery-panel"
+                    >
+                      <Text
+                        style={
+                          {
+                            "color": "#1e2219",
+                            "fontFamily": "Inter-SemiBold",
+                            "fontSize": 14,
+                          }
+                        }
+                      >
+                        LineArea mini · soil 7 d
+                      </Text>
+                      <View
+                        accessible={false}
+                        onLayout={[Function]}
+                        style={
+                          [
+                            {
+                              "height": 64,
+                              "width": "100%",
+                            },
+                            undefined,
+                          ]
+                        }
+                        testID="line-area"
+                      />
+                    </View>
+                    <View
+                      style={
+                        [
+                          {
+                            "backgroundColor": "#ffffff",
+                            "borderColor": "#e6e6df",
+                            "borderRadius": 20,
+                            "borderWidth": 1,
+                            "flexBasis": 360,
+                            "flexGrow": 1,
+                            "flexShrink": 1,
+                            "gap": 16,
+                            "minWidth": 0,
+                            "paddingHorizontal": 24,
+                            "paddingVertical": 20,
+                          },
+                          {
+                            "maxWidth": 544,
+                          },
+                        ]
+                      }
+                      testID="gallery-panel"
+                    >
+                      <Text
+                        style={
+                          {
+                            "color": "#1e2219",
+                            "fontFamily": "Inter-SemiBold",
+                            "fontSize": 14,
+                          }
+                        }
+                      >
+                        HourBars mini · light today
+                      </Text>
+                      <View
+                        accessible={false}
+                        onLayout={[Function]}
+                        style={
+                          [
+                            {
+                              "height": 78,
+                              "width": "100%",
+                            },
+                            undefined,
+                          ]
+                        }
+                        testID="hour-bars"
+                      />
+                    </View>
+                    <View
+                      style={
+                        [
+                          {
+                            "backgroundColor": "#ffffff",
+                            "borderColor": "#e6e6df",
+                            "borderRadius": 20,
+                            "borderWidth": 1,
+                            "flexBasis": 360,
+                            "flexGrow": 1,
+                            "flexShrink": 1,
+                            "gap": 16,
+                            "minWidth": 0,
+                            "paddingHorizontal": 24,
+                            "paddingVertical": 20,
+                          },
+                          {
+                            "maxWidth": 544,
+                          },
+                        ]
+                      }
+                      testID="gallery-panel"
+                    >
+                      <Text
+                        style={
+                          {
+                            "color": "#1e2219",
+                            "fontFamily": "Inter-SemiBold",
+                            "fontSize": 14,
+                          }
+                        }
+                      >
+                        RangeBar · temperature today
+                      </Text>
+                      <View
+                        accessible={false}
+                        onLayout={[Function]}
+                        style={
+                          [
+                            {
+                              "height": 50,
+                              "width": "100%",
+                            },
+                            undefined,
+                          ]
+                        }
+                        testID="range-bar"
+                      />
+                    </View>
+                    <View
+                      style={
+                        [
+                          {
+                            "backgroundColor": "#ffffff",
+                            "borderColor": "#e6e6df",
+                            "borderRadius": 20,
+                            "borderWidth": 1,
+                            "flexBasis": 360,
+                            "flexGrow": 1,
+                            "flexShrink": 1,
+                            "gap": 16,
+                            "minWidth": 0,
+                            "paddingHorizontal": 24,
+                            "paddingVertical": 20,
+                          },
+                          {
+                            "maxWidth": 544,
+                          },
+                        ]
+                      }
+                      testID="gallery-panel"
+                    >
+                      <Text
+                        style={
+                          {
+                            "color": "#1e2219",
+                            "fontFamily": "Inter-SemiBold",
+                            "fontSize": 14,
+                          }
+                        }
+                      >
+                        Gauge · humidity
+                      </Text>
+                      <View
+                        style={
+                          {
+                            "flexDirection": "row",
+                            "flexWrap": "wrap",
+                            "gap": 24,
+                          }
+                        }
+                        testID="gauge-row"
+                      >
+                        <View
+                          accessible={false}
+                          style={
+                            [
+                              {
+                                "height": 87,
+                                "width": 124,
+                              },
+                              undefined,
+                            ]
+                          }
+                          testID="gauge"
+                        >
+                          <RNSVGSvgView
+                            bbHeight={87}
+                            bbWidth={124}
+                            focusable={false}
+                            height={87}
+                            style={
+                              [
+                                {
+                                  "backgroundColor": "transparent",
+                                  "borderWidth": 0,
+                                },
+                                {
+                                  "flex": 0,
+                                  "height": 87,
+                                  "width": 124,
+                                },
+                              ]
+                            }
+                            width={124}
+                          >
+                            <RNSVGGroup
+                              fill={
+                                {
+                                  "payload": 4278190080,
+                                  "type": 0,
+                                }
+                              }
+                            >
+                              <RNSVGGroup
+                                fill={
+                                  {
+                                    "payload": 4278190080,
+                                    "type": 0,
+                                  }
+                                }
+                              >
+                                <RNSVGPath
+                                  d="M10,60.49999999999999A52,52 0 0 1 114,60.5"
+                                  fill={null}
+                                  propList={
+                                    [
+                                      "fill",
+                                      "stroke",
+                                      "strokeWidth",
+                                      "strokeLinecap",
+                                    ]
+                                  }
+                                  stroke={
+                                    {
+                                      "payload": 4293322463,
+                                      "type": 0,
+                                    }
+                                  }
+                                  strokeLinecap={1}
+                                  strokeWidth={10}
+                                />
+                                <RNSVGPath
+                                  d="M45.931116292502736,11.04506115265201A52,52 0 0 1 92.5648331192086,18.431116292502736"
+                                  fill={null}
+                                  propList={
+                                    [
+                                      "fill",
+                                      "stroke",
+                                      "strokeWidth",
+                                      "strokeOpacity",
+                                    ]
+                                  }
+                                  stroke={
+                                    {
+                                      "payload": 4284457896,
+                                      "type": 0,
+                                    }
+                                  }
+                                  strokeOpacity={0.25}
+                                  strokeWidth={10}
+                                  testID="gauge-band"
+                                />
+                                <RNSVGGroup
+                                  fill={
+                                    {
+                                      "payload": 4278190080,
+                                      "type": 0,
+                                    }
+                                  }
+                                  testID="gauge-value"
+                                >
+                                  <RNSVGPath
+                                    d="M10,60.49999999999999A52,52 0 0 1 74.93187413257245,10.133675621311184"
+                                    fill={null}
+                                    propList={
+                                      [
+                                        "fill",
+                                        "stroke",
+                                        "strokeWidth",
+                                        "strokeLinecap",
+                                      ]
+                                    }
+                                    stroke={
+                                      {
+                                        "payload": 4284457896,
+                                        "type": 0,
+                                      }
+                                    }
+                                    strokeLinecap={1}
+                                    strokeWidth={10}
+                                  />
+                                  <RNSVGCircle
+                                    cx={74.93187413257245}
+                                    cy={10.133675621311184}
+                                    fill={
+                                      {
+                                        "payload": 4294967295,
+                                        "type": 0,
+                                      }
+                                    }
+                                    propList={
+                                      [
+                                        "fill",
+                                        "stroke",
+                                        "strokeWidth",
+                                      ]
+                                    }
+                                    r={7}
+                                    stroke={
+                                      {
+                                        "payload": 4284457896,
+                                        "type": 0,
+                                      }
+                                    }
+                                    strokeWidth={3}
+                                  />
+                                </RNSVGGroup>
+                                <RNSVGGroup
+                                  fill={
+                                    {
+                                      "payload": 4278190080,
+                                      "type": 0,
+                                    }
+                                  }
+                                >
+                                  <RNSVGText
+                                    content={null}
+                                    dx={[]}
+                                    dy={[]}
+                                    fill={
+                                      {
+                                        "payload": 4288323474,
+                                        "type": 0,
+                                      }
+                                    }
+                                    font={
+                                      {
+                                        "fontFamily": "Inter-Regular",
+                                        "fontSize": 10,
+                                        "textAnchor": "middle",
+                                      }
+                                    }
+                                    propList={
+                                      [
+                                        "fill",
+                                      ]
+                                    }
+                                    rotate={[]}
+                                    x={
+                                      [
+                                        10,
+                                      ]
+                                    }
+                                    y={
+                                      [
+                                        82.7,
+                                      ]
+                                    }
+                                  >
+                                    <RNSVGTSpan
+                                      content="0"
+                                      dx={[]}
+                                      dy={[]}
+                                      fill={
+                                        {
+                                          "payload": 4278190080,
+                                          "type": 0,
+                                        }
+                                      }
+                                      font={{}}
+                                      rotate={[]}
+                                      x={[]}
+                                      y={[]}
+                                    />
+                                  </RNSVGText>
+                                  <RNSVGText
+                                    content={null}
+                                    dx={[]}
+                                    dy={[]}
+                                    fill={
+                                      {
+                                        "payload": 4288323474,
+                                        "type": 0,
+                                      }
+                                    }
+                                    font={
+                                      {
+                                        "fontFamily": "Inter-Regular",
+                                        "fontSize": 10,
+                                        "textAnchor": "middle",
+                                      }
+                                    }
+                                    propList={
+                                      [
+                                        "fill",
+                                      ]
+                                    }
+                                    rotate={[]}
+                                    x={
+                                      [
+                                        114,
+                                      ]
+                                    }
+                                    y={
+                                      [
+                                        82.7,
+                                      ]
+                                    }
+                                  >
+                                    <RNSVGTSpan
+                                      content="100"
+                                      dx={[]}
+                                      dy={[]}
+                                      fill={
+                                        {
+                                          "payload": 4278190080,
+                                          "type": 0,
+                                        }
+                                      }
+                                      font={{}}
+                                      rotate={[]}
+                                      x={[]}
+                                      y={[]}
+                                    />
+                                  </RNSVGText>
+                                </RNSVGGroup>
+                              </RNSVGGroup>
+                            </RNSVGGroup>
+                          </RNSVGSvgView>
+                        </View>
+                        <View
+                          accessible={false}
+                          style={
+                            [
+                              {
+                                "height": 87,
+                                "width": 124,
+                              },
+                              undefined,
+                            ]
+                          }
+                          testID="gauge"
+                        >
+                          <RNSVGSvgView
+                            bbHeight={87}
+                            bbWidth={124}
+                            focusable={false}
+                            height={87}
+                            style={
+                              [
+                                {
+                                  "backgroundColor": "transparent",
+                                  "borderWidth": 0,
+                                },
+                                {
+                                  "flex": 0,
+                                  "height": 87,
+                                  "width": 124,
+                                },
+                              ]
+                            }
+                            width={124}
+                          >
+                            <RNSVGGroup
+                              fill={
+                                {
+                                  "payload": 4278190080,
+                                  "type": 0,
+                                }
+                              }
+                            >
+                              <RNSVGGroup
+                                fill={
+                                  {
+                                    "payload": 4278190080,
+                                    "type": 0,
+                                  }
+                                }
+                              >
+                                <RNSVGPath
+                                  d="M10,60.49999999999999A52,52 0 0 1 114,60.5"
+                                  fill={null}
+                                  propList={
+                                    [
+                                      "fill",
+                                      "stroke",
+                                      "strokeWidth",
+                                      "strokeLinecap",
+                                    ]
+                                  }
+                                  stroke={
+                                    {
+                                      "payload": 4293322463,
+                                      "type": 0,
+                                    }
+                                  }
+                                  strokeLinecap={1}
+                                  strokeWidth={10}
+                                />
+                                <RNSVGPath
+                                  d="M45.931116292502736,11.04506115265201A52,52 0 0 1 92.5648331192086,18.431116292502736"
+                                  fill={null}
+                                  propList={
+                                    [
+                                      "fill",
+                                      "stroke",
+                                      "strokeWidth",
+                                      "strokeOpacity",
+                                    ]
+                                  }
+                                  stroke={
+                                    {
+                                      "payload": 4284457896,
+                                      "type": 0,
+                                    }
+                                  }
+                                  strokeOpacity={0.25}
+                                  strokeWidth={10}
+                                  testID="gauge-band"
+                                />
+                                <RNSVGGroup
+                                  fill={
+                                    {
+                                      "payload": 4278190080,
+                                      "type": 0,
+                                    }
+                                  }
+                                >
+                                  <RNSVGText
+                                    content={null}
+                                    dx={[]}
+                                    dy={[]}
+                                    fill={
+                                      {
+                                        "payload": 4288323474,
+                                        "type": 0,
+                                      }
+                                    }
+                                    font={
+                                      {
+                                        "fontFamily": "Inter-Regular",
+                                        "fontSize": 10,
+                                        "textAnchor": "middle",
+                                      }
+                                    }
+                                    propList={
+                                      [
+                                        "fill",
+                                      ]
+                                    }
+                                    rotate={[]}
+                                    x={
+                                      [
+                                        10,
+                                      ]
+                                    }
+                                    y={
+                                      [
+                                        82.7,
+                                      ]
+                                    }
+                                  >
+                                    <RNSVGTSpan
+                                      content="0"
+                                      dx={[]}
+                                      dy={[]}
+                                      fill={
+                                        {
+                                          "payload": 4278190080,
+                                          "type": 0,
+                                        }
+                                      }
+                                      font={{}}
+                                      rotate={[]}
+                                      x={[]}
+                                      y={[]}
+                                    />
+                                  </RNSVGText>
+                                  <RNSVGText
+                                    content={null}
+                                    dx={[]}
+                                    dy={[]}
+                                    fill={
+                                      {
+                                        "payload": 4288323474,
+                                        "type": 0,
+                                      }
+                                    }
+                                    font={
+                                      {
+                                        "fontFamily": "Inter-Regular",
+                                        "fontSize": 10,
+                                        "textAnchor": "middle",
+                                      }
+                                    }
+                                    propList={
+                                      [
+                                        "fill",
+                                      ]
+                                    }
+                                    rotate={[]}
+                                    x={
+                                      [
+                                        114,
+                                      ]
+                                    }
+                                    y={
+                                      [
+                                        82.7,
+                                      ]
+                                    }
+                                  >
+                                    <RNSVGTSpan
+                                      content="100"
+                                      dx={[]}
+                                      dy={[]}
+                                      fill={
+                                        {
+                                          "payload": 4278190080,
+                                          "type": 0,
+                                        }
+                                      }
+                                      font={{}}
+                                      rotate={[]}
+                                      x={[]}
+                                      y={[]}
+                                    />
+                                  </RNSVGText>
+                                </RNSVGGroup>
+                              </RNSVGGroup>
+                            </RNSVGGroup>
+                          </RNSVGSvgView>
+                        </View>
+                      </View>
+                    </View>
+                    <View
+                      style={
+                        [
+                          {
+                            "backgroundColor": "#ffffff",
+                            "borderColor": "#e6e6df",
+                            "borderRadius": 20,
+                            "borderWidth": 1,
+                            "flexBasis": 360,
+                            "flexGrow": 1,
+                            "flexShrink": 1,
+                            "gap": 16,
+                            "minWidth": 0,
+                            "paddingHorizontal": 24,
+                            "paddingVertical": 20,
+                          },
+                          {
+                            "maxWidth": 1104,
+                          },
+                        ]
+                      }
+                      testID="gallery-panel"
+                    >
+                      <Text
+                        style={
+                          {
+                            "color": "#1e2219",
+                            "fontFamily": "Inter-SemiBold",
+                            "fontSize": 14,
+                          }
+                        }
+                      >
+                        WeekChart · this week
+                      </Text>
+                      <View
+                        accessible={false}
+                        onLayout={[Function]}
+                        style={
+                          [
+                            {
+                              "height": 228,
+                              "width": "100%",
+                            },
+                            undefined,
+                          ]
+                        }
+                        testID="week-chart"
+                      />
+                    </View>
+                    <View
+                      style={
+                        [
+                          {
+                            "backgroundColor": "#ffffff",
+                            "borderColor": "#e6e6df",
+                            "borderRadius": 20,
+                            "borderWidth": 1,
+                            "flexBasis": 360,
+                            "flexGrow": 1,
+                            "flexShrink": 1,
+                            "gap": 16,
+                            "minWidth": 0,
+                            "paddingHorizontal": 24,
+                            "paddingVertical": 20,
+                          },
+                          {
+                            "maxWidth": 764,
+                          },
+                        ]
+                      }
+                      testID="gallery-panel"
+                    >
+                      <Text
+                        style={
+                          {
+                            "color": "#1e2219",
+                            "fontFamily": "Inter-SemiBold",
+                            "fontSize": 14,
+                          }
+                        }
+                      >
+                        Empty and all-null series
+                      </Text>
+                      <View
+                        accessible={false}
+                        onLayout={[Function]}
+                        style={
+                          [
+                            {
+                              "height": 160,
+                              "width": "100%",
+                            },
+                            undefined,
+                          ]
+                        }
+                        testID="line-area"
+                      />
+                      <View
+                        accessible={false}
+                        onLayout={[Function]}
+                        style={
+                          [
+                            {
+                              "height": 160,
+                              "width": "100%",
+                            },
+                            undefined,
+                          ]
+                        }
+                        testID="line-area"
+                      />
                     </View>
                   </View>
                 </View>

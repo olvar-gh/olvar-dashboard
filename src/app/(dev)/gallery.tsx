@@ -2,6 +2,7 @@ import { useContext, useState } from 'react';
 import { Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaInsetsContext } from 'react-native-safe-area-context';
 
+import { ChartsGallery } from '@/components/charts/ChartsGallery';
 import { Modal, Notice, PageHeader } from '@/components/ui';
 import { iosGroupedBackground } from '@/components/ui/color';
 import { DesktopGallery } from '@/components/ui/gallery/DesktopGallery';
@@ -37,6 +38,7 @@ export default function GalleryScreen() {
 
   return (
     <ScrollView
+      testID="gallery-scroll"
       contentInsetAdjustmentBehavior="automatic"
       style={[styles.page, !isWeb && styles.pageIos]}
       contentContainerStyle={
@@ -51,6 +53,7 @@ export default function GalleryScreen() {
           <>
             <DesktopGallery onOpenModal={openModal} />
             <StatesGallery />
+            <ChartsGallery />
             <GallerySection title="iPhone components (web preview)">
               <View style={styles.phone}>
                 <IphoneGallery onOpenSheet={openModal} />
@@ -61,6 +64,7 @@ export default function GalleryScreen() {
           <>
             <IphoneGallery onOpenSheet={openModal} />
             <StatesGallery />
+            <ChartsGallery />
           </>
         )}
       </View>
