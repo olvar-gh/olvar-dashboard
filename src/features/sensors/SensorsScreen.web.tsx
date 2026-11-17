@@ -42,8 +42,8 @@ export function SensorsScreen() {
 
 function Body({ state, bp }: { state: SensorsScreenState; bp: Breakpoint }) {
   const now = useNow(15_000);
-  if (state.pending) return <LoadingGrid bp={bp} />;
   if (state.error) return <ErrorState title="Sensors" message="Couldn’t load the sensor readings. Check your connection and try again." onRetry={() => void state.refresh()} />;
+  if (state.pending) return <LoadingGrid bp={bp} />;
   if (state.display?.offline) return <OfflineSensors state={state} now={now} />;
   if (!state.latest || state.display?.overall === 'no_data') return <NoReadings />;
   return <LiveSensors state={state} bp={bp} />;

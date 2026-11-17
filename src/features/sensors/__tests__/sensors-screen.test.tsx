@@ -110,6 +110,16 @@ describe('iPhone Sensors tab', () => {
     expect(screen.queryByTestId('soil-not-calibrated')).toBeNull();
   });
 
+  it('shows Retry when the device fails to load', async () => {
+    const app = await renderApp('/', {});
+    app.source.getDevice = async () => {
+      throw new Error('network');
+    };
+    await app.queryClient.resetQueries();
+    await app.queryClient.invalidateQueries();
+    expect((await screen.findAllByRole('button', { name: 'Retry' })).length).toBeGreaterThan(0);
+  });
+
   it('uncalibrated soil shows the raw value and Calibrate', async () => {
     await renderApp('/sensors', { scenario: 'uncalibrated' });
     await screen.findByTestId('soil-not-calibrated');
@@ -160,6 +170,27 @@ describe('desktop Sensors page', () => {
       },
     );
     expect(await screen.findByRole('button', { name: 'Retry' })).toBeTruthy();
+  });
+
+  it.each(['getPlant', 'getDevice'] as const)('shows Retry, not skeletons, when %s fails', async (method) => {
+    const source = createFixtureSource({ days: 2 });
+    source[method] = async () => {
+      throw new Error('network');
+    };
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    await renderRouter(
+      { _layout: () => <Stack />, sensors: DesktopSensorsScreen },
+      {
+        initialUrl: '/sensors',
+        wrapper: ({ children }: { children: ReactNode }) => (
+          <DataProvider source={source} queryClient={queryClient}>
+            {children}
+          </DataProvider>
+        ),
+      },
+    );
+    expect(await screen.findByRole('button', { name: 'Retry' })).toBeTruthy();
+    expect(screen.queryByTestId('sensor-skeleton')).toBeNull();
   });
 
   it('shows the waiting state before the first reading', async () => {

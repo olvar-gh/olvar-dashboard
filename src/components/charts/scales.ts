@@ -164,20 +164,26 @@ export function hourTicks(domain: TimeDomain, timeZone: string, everyHours: numb
   return out;
 }
 
-/** Local midnights inside `domain`, every `everyDays` days, labelled "Nov 5". */
+/**
+ * Local midnights inside `domain`, every `everyDays` days from the first one,
+ * labelled "Nov 5".
+ */
 export function dayTicks(domain: TimeDomain, timeZone: string, everyDays = 1): Tick[] {
   const out: Tick[] = [];
   const last = localDate(timeZone, domain[1]);
-  for (let d: LocalDate = localDate(timeZone, domain[0]), i = 0; d <= last; d = addDays(d, 1), i++) {
+  let i = 0;
+  for (let d: LocalDate = localDate(timeZone, domain[0]); d <= last; d = addDays(d, 1)) {
     const t = startOfLocalDay(timeZone, d).getTime();
-    if (t < domain[0] || i % everyDays !== 0) continue;
-    out.push({ t, label: formatLocalDate(d) });
+    if (t < domain[0]) continue;
+    if (i++ % everyDays === 0) out.push({ t, label: formatLocalDate(d) });
   }
   return out;
 }
 
 const HOUR_STEPS = [1, 2, 3, 6, 12];
 const DAY_STEPS = [1, 2, 7, 14];
+// "Nov 12" is about 34 px wide, so date labels need far less room than the hour default.
+const DAY_MIN_SPACING = 72;
 
 /**
  * Time-axis ticks for a plot `width` pixels wide: hours for spans up to 36 h,
@@ -191,7 +197,8 @@ export function timeTicks(domain: TimeDomain, timeZone: string, width: number, m
     const every = HOUR_STEPS.find((h) => h * HOUR_MS * pxPerMs >= minSpacing) ?? 24;
     return every === 24 ? dayTicks(domain, timeZone) : hourTicks(domain, timeZone, every);
   }
-  const every = DAY_STEPS.find((d) => d * 24 * HOUR_MS * pxPerMs >= minSpacing) ?? 28;
+  const spacing = Math.min(minSpacing, DAY_MIN_SPACING);
+  const every = DAY_STEPS.find((d) => d * 24 * HOUR_MS * pxPerMs >= spacing) ?? 28;
   return dayTicks(domain, timeZone, every);
 }
 

@@ -56,10 +56,10 @@ function subtitle(state: SensorsScreenState, now: Date): string | undefined {
 
 function Body({ state }: { state: SensorsScreenState }) {
   const now = useNow(15_000);
-  if (state.pending) return <Loading />;
   if (state.error) {
     return <ErrorState message="Couldn’t load the sensor readings. Pull down or tap Retry." onRetry={() => void state.refresh()} />;
   }
+  if (state.pending) return <Loading />;
   if (state.display?.offline) return <Offline state={state} now={now} />;
   if (!state.latest || state.display?.overall === 'no_data') {
     return (

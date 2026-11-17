@@ -6,6 +6,7 @@ import { figmaDiff, type Rect } from './figma';
 
 const FIGMA_MAX_DIFF = 0.08;
 const METRICS = ['soil', 'light', 'temperature', 'humidity'] as const;
+const FIXED_NOW = new Date('2026-11-17T05:00:00Z');
 
 async function open(page: Page, query = '') {
   await page.goto(`/sensors${query}`);
@@ -27,6 +28,8 @@ test.describe('Sensors', () => {
   });
 
   test('the range switch updates the URL and the axis', async ({ page }) => {
+    // The fixtures generate history back from the browser clock, so the date labels need a fixed one.
+    await page.clock.install({ time: FIXED_NOW });
     await open(page);
     await expect(page.getByTestId('chart-temperature').getByText('Now')).toBeVisible();
     await page.getByRole('tab', { name: '30 days' }).click();
@@ -35,6 +38,23 @@ test.describe('Sensors', () => {
     await page.getByRole('tab', { name: '24 hours' }).click();
     await expect(page).toHaveURL(/\/sensors$/);
   });
+
+  for (const range of ['7d', '30d'] as const) {
+    test(`${range} charts show date labels that do not overlap`, async ({ page }) => {
+      await page.clock.install({ time: FIXED_NOW });
+      await open(page, `?range=${range}`);
+      for (const m of METRICS) {
+        const labels = page.getByTestId(`chart-${m}`).getByText(/^(Oct|Nov) \d+$|^Now$/);
+        await expect(labels.first()).toBeVisible();
+        const boxes = (await Promise.all((await labels.all()).map((l) => l.boundingBox()))).map((b) => b!);
+        expect(boxes.length, `${m} labels`).toBeGreaterThanOrEqual(range === '7d' ? 3 : 2);
+        boxes.sort((a, b) => a.x - b.x);
+        for (let i = 1; i < boxes.length; i++) {
+          expect(boxes[i].x, `${m} label ${i}`).toBeGreaterThanOrEqual(boxes[i - 1].x + boxes[i - 1].width);
+        }
+      }
+    });
+  }
 
   test('cards sit in two columns on desktop and one on narrow web, without horizontal scroll', async ({ page }) => {
     await open(page);
