@@ -1,4 +1,4 @@
-import { act, fireEvent, screen, waitFor } from 'expo-router/testing-library';
+import { act, fireEvent, screen, waitFor, within } from 'expo-router/testing-library';
 import { Alert, Keyboard, StyleSheet, type KeyboardEvent } from 'react-native';
 
 import { renderApp } from '@/components/shell/testing/render-app';
@@ -21,7 +21,7 @@ describe('iPhone chat screen', () => {
     const last = app.source.world.chat.at(-1)!;
     expect((await screen.findAllByText(last.content, {}, { timeout: 5000 })).length).toBeGreaterThan(0);
     expect(screen.getByTestId('chat-reading-chips')).toBeTruthy();
-    expect(screen.getByLabelText(/^Soil moisture /)).toBeTruthy();
+    expect(within(screen.getByTestId('chat-reading-chips')).getByLabelText(/^Soil moisture /)).toBeTruthy();
   });
 
   it('marks a stored fallback reply', async () => {
@@ -36,9 +36,10 @@ describe('iPhone chat screen', () => {
     await fireEvent.changeText(screen.getByTestId('chat-input'), '  오늘 물 줘야 해?  ');
     await fireEvent.press(screen.getByTestId('chat-send'));
     expect(send).toHaveBeenCalledWith(app.source.world.plant.id, '오늘 물 줘야 해?');
-    expect(await screen.findByText('오늘 물 줘야 해?')).toBeTruthy();
-    expect(await screen.findByText(/Thanks for asking!/, {}, { timeout: 3000 })).toBeTruthy();
-    expect(screen.getAllByText('오늘 물 줘야 해?')).toHaveLength(1);
+    const chat = within(screen.getByTestId('chat-screen'));
+    expect(await chat.findByText('오늘 물 줘야 해?')).toBeTruthy();
+    expect(await chat.findByText(/Thanks for asking!/, {}, { timeout: 3000 })).toBeTruthy();
+    expect(chat.getAllByText('오늘 물 줘야 해?')).toHaveLength(1);
   });
 
   it('counts down after a 429 and gives the draft back', async () => {

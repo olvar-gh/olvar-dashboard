@@ -4,7 +4,6 @@ import { renderApp } from '@/components/shell/testing/render-app';
 
 // Renders the real src/app route tree, so each URL from PLAN §5.3 must resolve inside the shell.
 const routes: [url: string, title: string][] = [
-  ['/', 'Home'],
   ['/sensors', 'Sensors'],
   ['/timeline', 'Timeline'],
   ['/chat', 'Chat'],
@@ -16,14 +15,30 @@ const routes: [url: string, title: string][] = [
   ['/settings/account', 'Account'],
 ];
 
+type JsonNode = { type: string; props: Record<string, unknown>; children: (JsonNode | string)[] | null };
+
+function hasHeaderTitle(node: unknown, title: string): boolean {
+  if (!node || typeof node !== 'object') return false;
+  if (Array.isArray(node)) return node.some((n) => hasHeaderTitle(n, title));
+  const n = node as JsonNode;
+  if (n.type === 'RNSScreenStackHeaderConfig' && n.props.title === title) return true;
+  return (n.children ?? []).some((c) => hasHeaderTitle(c, title));
+}
+
 describe('route skeleton', () => {
+  it('resolves / to Home inside the shell', async () => {
+    const app = await renderApp('/');
+    expect(app.getPathname()).toBe('/');
+    expect(await screen.findByTestId('home-screen')).toBeTruthy();
+  });
+
   it.each(routes)('resolves %s inside the shell', async (url, title) => {
     const app = await renderApp(url);
     expect(app.getPathname()).toBe(url);
     // Native tabs keep every tab mounted, so the other tabs' placeholders render too.
     expect((await screen.findAllByTestId('screen-placeholder')).length).toBeGreaterThan(0);
-    // A placeholder shows its title as text; a real iOS screen puts it in the native header.
-    expect(screen.queryAllByText(title).length > 0 || JSON.stringify(screen.toJSON()).includes(`"title":${JSON.stringify(title)}`)).toBe(true);
+    // A built iOS screen puts its title in the native header config instead of a Text.
+    expect(screen.queryAllByText(title).length > 0 || hasHeaderTitle(screen.toJSON(), title)).toBe(true);
   });
 
   it('resolves the sign-in page when signed out', async () => {
