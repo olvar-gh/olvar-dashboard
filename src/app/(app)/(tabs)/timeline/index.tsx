@@ -1,5 +1,3 @@
-import { ScreenPlaceholder } from '@/components/shell';
+import { TimelineScreen } from '@/features/timeline/TimelineScreen';
 
-export default function TimelineScreen() {
-  return <ScreenPlaceholder title="Timeline" body="This week's chart, week summary and daily activity (T9)." />;
-}
+export default TimelineScreen;

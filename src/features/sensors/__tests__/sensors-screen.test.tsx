@@ -67,18 +67,17 @@ describe('iPhone Sensors tab', () => {
     const app = await renderApp('/sensors');
     const raw = jest.spyOn(app.source, 'getReadings');
     const rollup = jest.spyOn(app.source, 'getHourly');
-    await screen.findByTestId('sensor-card-soil');
+    const sensors = within(await screen.findByTestId('sensors-screen'));
+    await sensors.findByTestId('sensor-card-soil');
     const rawCalls = raw.mock.calls.length;
-    await fireEvent.press(screen.getByRole('tab', { name: '7D' }));
-    await waitFor(() => expect(rollup).toHaveBeenCalledTimes(1));
-    const [, from7, to7] = rollup.mock.calls[0];
-    expect((to7.getTime() - from7.getTime()) / 86_400_000).toBeGreaterThan(6.9);
-    await fireEvent.press(screen.getByRole('tab', { name: '30D' }));
-    await waitFor(() => expect(rollup).toHaveBeenCalledTimes(2));
-    const [, from30, to30] = rollup.mock.calls[1];
-    expect((to30.getTime() - from30.getTime()) / 86_400_000).toBeGreaterThan(29.9);
+    const spans = () => rollup.mock.calls.map(([, from, to]) => (to.getTime() - from.getTime()) / 86_400_000);
+    // Home already holds the 7-day rollup in the shared cache, so 7D may not fetch again.
+    await fireEvent.press(sensors.getByRole('tab', { name: '7D' }));
+    expect((await sensors.findAllByText(/in 7 d$/)).length).toBe(4);
+    await fireEvent.press(sensors.getByRole('tab', { name: '30D' }));
+    await waitFor(() => expect(spans().some((d) => d > 29.9)).toBe(true));
     expect(raw).toHaveBeenCalledTimes(rawCalls);
-    expect((await screen.findAllByText(/in 30 d$/)).length).toBe(4);
+    expect((await sensors.findAllByText(/in 30 d$/)).length).toBe(4);
   });
 
   it('updates the value when a new reading arrives', async () => {
@@ -104,9 +103,10 @@ describe('iPhone Sensors tab', () => {
 
   it('a failed read shows a dash and the time, without a calibration prompt', async () => {
     await renderApp('/sensors', { scenario: 'null-reads' });
-    await screen.findByTestId('sensor-card-soil');
+    const sensors = within(await screen.findByTestId('sensors-screen'));
+    await sensors.findByTestId('sensor-card-soil');
     expect(screen.getByTestId('sensor-value-soil').props.children).toBe('—');
-    expect(screen.getAllByText(/^Read failed at \d\d:\d\d$/)).toHaveLength(2);
+    expect(sensors.getAllByText(/^Read failed at \d\d:\d\d$/)).toHaveLength(2);
     expect(screen.queryByTestId('soil-not-calibrated')).toBeNull();
   });
 
@@ -124,7 +124,7 @@ describe('iPhone Sensors tab', () => {
     await renderApp('/sensors', { scenario: 'uncalibrated' });
     await screen.findByTestId('soil-not-calibrated');
     expect(within(screen.getByTestId('sensor-card-soil')).getByText('raw')).toBeTruthy();
-    expect(screen.getByRole('button', { name: 'Calibrate' })).toBeTruthy();
+    expect(within(screen.getByTestId('sensors-screen')).getByRole('button', { name: 'Calibrate' })).toBeTruthy();
   });
 });
 
