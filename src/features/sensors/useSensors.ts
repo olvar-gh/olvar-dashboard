@@ -44,7 +44,8 @@ export function useSensorsScreen() {
 
   const calibrated = isCalibrated(device.data);
   const timeZone = plant.data?.timezone ?? 'UTC';
-  const pending = plant.isPending || device.isPending || latest.isPending || status.isPending;
+  // isLoading, not isPending: without a device the latest query is disabled and would stay pending forever.
+  const pending = plant.isLoading || device.isLoading || latest.isLoading || status.isLoading;
   const error = plant.error ?? device.error ?? latest.error ?? status.error ?? null;
 
   const refresh = useCallback(() => queryClient.invalidateQueries(), [queryClient]);
