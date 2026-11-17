@@ -16,7 +16,15 @@ export function IosMessages({ chat, onDayLayout, onLayout }: Props) {
   const { days = [], messages = [], timeZone } = chat;
   return (
     <View style={styles.list} onLayout={onLayout}>
-      {chat.history.isFetchingNextPage ? <Text style={[styles.divider, styles.older]}>Loading earlier messages…</Text> : null}
+      {chat.history.hasNextPage ? (
+        // Its space is kept while idle, so showing it does not move the conversation.
+        <Text
+          testID="chat-loading-older"
+          accessibilityElementsHidden={!chat.history.isFetchingNextPage}
+          style={[styles.divider, styles.older, !chat.history.isFetchingNextPage && styles.idle]}>
+          Loading earlier messages…
+        </Text>
+      ) : null}
       {days.map((day) => (
         <Day key={day.date} day={day} chat={chat} all={messages} timeZone={timeZone} onDayLayout={onDayLayout} />
       ))}
@@ -131,6 +139,7 @@ const styles = StyleSheet.create({
   list: { flexGrow: 1, justifyContent: 'flex-end', paddingHorizontal: 16 },
   day: { gap: 14, paddingBottom: 14 },
   older: { paddingBottom: 14 },
+  idle: { opacity: 0 },
   divider: { ...typography.iosCaption1, color: iosColors.labelTertiary, textAlign: 'center', paddingTop: 4 },
   user: { alignItems: 'flex-end', gap: 4, paddingLeft: 48 },
   userBubble: { backgroundColor: colors.brand.olive, borderRadius: 20, paddingHorizontal: 14, paddingVertical: 9 },

@@ -6,7 +6,7 @@ import { Notice } from '@/components/ui';
 import { formatNumber } from '@/domain/format';
 import { colors, typography } from '@/theme';
 
-import { DISCLAIMER, MAX_MESSAGE_CHARS, RATE_LIMIT_RULE, suggestions } from '../model';
+import { DISCLAIMER, isSendKey, MAX_MESSAGE_CHARS, RATE_LIMIT_RULE, suggestions, type ComposerKey } from '../model';
 import type { ChatModel } from '../useChat';
 
 const COUNTER_FROM = MAX_MESSAGE_CHARS - 200;
@@ -17,8 +17,8 @@ const INPUT_MAX = 160;
 export function Composer({ chat }: { chat: ChatModel }) {
   const length = chat.draft.trim().length;
   const [height, setHeight] = useState(INPUT_MIN);
-  const onKeyPress = (e: NativeSyntheticEvent<{ key: string; shiftKey?: boolean }>) => {
-    if (e.nativeEvent.key === 'Enter' && !e.nativeEvent.shiftKey) {
+  const onKeyPress = (e: NativeSyntheticEvent<ComposerKey>) => {
+    if (isSendKey(e.nativeEvent)) {
       e.preventDefault();
       chat.submit(chat.draft);
     }

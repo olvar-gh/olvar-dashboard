@@ -11,6 +11,7 @@ import { iosColors, typography } from '@/theme';
 import { IosComposer, Suggestions } from './ios/Composer';
 import { IosMessages } from './ios/Messages';
 import { ReadingChips } from './ios/ReadingChips';
+import { bottomPadding, offsetAfterPrepend, type OlderAnchor } from './ios/scroll';
 import { useComposerInsets } from './ios/useComposerInsets';
 import { emptyText, RATE_LIMIT_RULE } from './model';
 import { useChat } from './useChat';
@@ -18,6 +19,7 @@ import { useChat } from './useChat';
 const LOAD_OLDER_WITHIN = 160;
 const FOLLOW_WITHIN = 240;
 const SETTLE_MS = 1500;
+const PROGRAMMATIC_SCROLL_MS = 450;
 
 /**
  * iPhone Chat (Figma 33:86): large title, live reading chips, bubbles and a glass composer docked
@@ -37,7 +39,8 @@ export function ChatScreen() {
   const seenFirst = useRef(false);
   const dragged = useRef(false);
   const listY = useRef(0);
-  const olderFrom = useRef<{ offset: number; height: number } | null>(null);
+  const olderFrom = useRef<OlderAnchor | null>(null);
+  const followingUntil = useRef(0);
 
   const lastKey = chat.messages ? `${chat.messages.at(-1)?.id ?? 'none'}:${chat.pending?.text ?? ''}:${chat.sending}` : null;
   useEffect(() => {
@@ -51,18 +54,25 @@ export function ChatScreen() {
     }
   }, [lastKey]);
 
+  // The keyboard lifts the composer and grows the bottom padding by the same amount; a reader at
+  // the end stays on the newest message instead of having it slide under the keyboard.
+  useEffect(() => {
+    if (atEnd.current && seenFirst.current) follow.current = 'animate';
+  }, [insets.lift]);
+
   const onContentSizeChange = (_w: number, height: number) => {
     const older = olderFrom.current;
-    if (older && height > older.height) {
-      // Older messages went in above: keep the message that was on screen where it was.
+    const anchored = older ? offsetAfterPrepend(older, height, chat.messages?.[0]?.id) : null;
+    if (anchored != null) {
       olderFrom.current = null;
-      scroll.current?.scrollTo({ y: older.offset + height - older.height, animated: false });
+      scroll.current?.scrollTo({ y: anchored, animated: false });
       return;
     }
     if (follow.current === 'none') return;
     const animated = follow.current === 'animate';
     // The first jump repeats while the history and fonts settle, so it lands on the newest message.
     if (animated || Date.now() > jumpUntil.current) follow.current = 'none';
+    if (animated) followingUntil.current = Date.now() + PROGRAMMATIC_SCROLL_MS;
     scroll.current?.scrollToEnd({ animated });
   };
 
@@ -73,9 +83,11 @@ export function ChatScreen() {
 
   const onScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
     const { contentOffset, contentSize, layoutMeasurement } = e.nativeEvent;
-    atEnd.current = contentOffset.y + layoutMeasurement.height >= contentSize.height - FOLLOW_WITHIN;
+    // An animated scroll to the end passes through offsets far from it; it still counts as at the end.
+    const following = Date.now() < followingUntil.current;
+    atEnd.current = following || contentOffset.y + layoutMeasurement.height >= contentSize.height - FOLLOW_WITHIN;
     if (dragged.current && contentOffset.y < LOAD_OLDER_WITHIN && chat.history.hasNextPage && !chat.history.isFetchingNextPage) {
-      olderFrom.current = { offset: contentOffset.y, height: contentSize.height };
+      olderFrom.current = { offset: contentOffset.y, height: contentSize.height, oldestId: chat.messages?.[0]?.id };
       void chat.history.fetchNextPage();
     }
   };
@@ -121,18 +133,22 @@ export function ChatScreen() {
       <Stack.Screen options={{ headerTransparent: false, headerStyle: { backgroundColor: iosGroupedBackground } }} />
       <ScrollView
         ref={scroll}
+        testID="chat-scroll"
         contentInsetAdjustmentBehavior="never"
         keyboardDismissMode="interactive"
         keyboardShouldPersistTaps="handled"
         onScroll={onScroll}
-        onScrollBeginDrag={() => (dragged.current = true)}
+        onScrollBeginDrag={() => {
+          dragged.current = true;
+          followingUntil.current = 0;
+        }}
         onContentSizeChange={onContentSizeChange}
         onLayout={() => {
           if (atEnd.current) scroll.current?.scrollToEnd({ animated: false });
         }}
         scrollEventThrottle={64}
         style={styles.scroll}
-        contentContainerStyle={[styles.content, { paddingBottom: insets.dockHeight }]}
+        contentContainerStyle={[styles.content, { paddingBottom: bottomPadding(insets.dockHeight, insets.lift) }]}
       >
         <View style={styles.top}>
           <Text style={styles.subtitle}>{`Answers come from ${chat.plantName}’s live readings`}</Text>
@@ -142,11 +158,13 @@ export function ChatScreen() {
           ) : null}
         </View>
         {body ? <View style={styles.state}>{body}</View> : null}
-        {body ? null : <IosMessages
+        {body ? null : (
+          <IosMessages
             chat={chat}
             onLayout={(e) => (listY.current = e.nativeEvent.layout.y)}
             onDayLayout={(date, y) => dayOffsets.current.set(date, y)}
-          />}
+          />
+        )}
         <View style={styles.suggestions}>
           <Suggestions chat={chat} />
         </View>

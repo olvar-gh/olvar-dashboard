@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
 import { PageScroll, useAccountButton } from '@/components/shell';
@@ -9,27 +9,10 @@ import { ChatCard } from './desktop/ChatCard';
 import { CONTEXT_CARD_HEIGHT, ContextCard } from './desktop/ContextCard';
 import { Conversations } from './desktop/Conversations';
 import { dayAnchorId } from './desktop/Messages';
+import { useFollowLatest } from './desktop/useFollowLatest';
 import { useChat } from './useChat';
 
 const STICKY_TOP = 24;
-const NEAR_BOTTOM_PX = 240;
-
-function scrollToEnd(behavior: ScrollBehavior) {
-  window.scrollTo({ top: document.documentElement.scrollHeight, behavior });
-}
-
-/** Keeps the newest message in view: on first load, and as messages arrive while the reader is at the end. */
-function useFollowLatest(lastKey: string | null) {
-  const seen = useRef<string | null>(null);
-  useEffect(() => {
-    if (lastKey == null || typeof window === 'undefined') return;
-    const first = seen.current == null;
-    seen.current = lastKey;
-    const atEnd = window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - NEAR_BOTTOM_PX;
-    if (first || atEnd) requestAnimationFrame(() => scrollToEnd(first ? 'auto' : 'smooth'));
-  }, [lastKey]);
-}
-
 /** Desktop Chat (Figma Chat / Desktop 1920 and 1512): conversations, chat and what the plant sees. */
 export function ChatScreen() {
   const chat = useChat();

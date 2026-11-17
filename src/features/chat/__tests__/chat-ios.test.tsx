@@ -1,5 +1,5 @@
 import { act, fireEvent, screen, waitFor } from 'expo-router/testing-library';
-import { Alert } from 'react-native';
+import { Alert, Keyboard, StyleSheet, type KeyboardEvent } from 'react-native';
 
 import { renderApp } from '@/components/shell/testing/render-app';
 import { ChatError } from '@/data';
@@ -82,5 +82,23 @@ describe('iPhone chat screen', () => {
       return app.queryClient.resetQueries({ queryKey: ['chat'] });
     });
     await waitFor(() => expect(screen.getByTestId('chat-load-error')).toBeTruthy());
+  });
+
+  it('keeps the conversation above the keyboard', async () => {
+    const shows: ((e: KeyboardEvent) => void)[] = [];
+    const listen = Keyboard.addListener.bind(Keyboard);
+    const spy = jest.spyOn(Keyboard, 'addListener').mockImplementation((event, fn, ctx) => {
+      if (event === 'keyboardWillShow') shows.push(fn as (e: KeyboardEvent) => void);
+      return listen(event, fn, ctx);
+    });
+    afterThis(() => spy.mockRestore());
+    const app = await openChat();
+    await screen.findAllByText(app.source.world.chat.at(-1)!.content, {}, { timeout: 5000 });
+    const padding = () => StyleSheet.flatten(screen.getByTestId('chat-scroll').props.contentContainerStyle).paddingBottom;
+    const before = padding();
+    await act(async () => {
+      shows.forEach((fn) => fn({ duration: 0, endCoordinates: { height: 336, screenX: 0, screenY: 538, width: 402 } } as KeyboardEvent));
+    });
+    expect(padding()).toBe(before + 336);
   });
 });

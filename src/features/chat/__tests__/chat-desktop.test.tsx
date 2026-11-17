@@ -87,4 +87,21 @@ describe('desktop chat', () => {
     await renderWithFixtures(<DesktopChat />, { scenario: 'null-reads' });
     expect((await screen.findAllByText(/^Read failed at \d{2}:\d{2}$/)).length).toBeGreaterThan(0);
   });
+
+  it('sends on Enter but not while a Korean IME composition is being committed', async () => {
+    const { source } = await renderWithFixtures(<DesktopChat />);
+    await screen.findByTestId('chat-messages');
+    const send = jest.spyOn(source, 'sendChat');
+    const input = screen.getByTestId('chat-input');
+    await fireEvent.changeText(input, '오늘 물 줘야 해');
+    const key = (nativeEvent: object) => ({ nativeEvent: { key: 'Enter', ...nativeEvent }, preventDefault: jest.fn() });
+    const composing = key({ isComposing: true });
+    await fireEvent(input, 'keyPress', composing);
+    await fireEvent(input, 'keyPress', key({ isComposing: false, keyCode: 229 }));
+    expect(send).not.toHaveBeenCalled();
+    expect(composing.preventDefault).not.toHaveBeenCalled();
+    expect(input.props.value).toBe('오늘 물 줘야 해');
+    await fireEvent(input, 'keyPress', key({ isComposing: false, keyCode: 13 }));
+    expect(send).toHaveBeenCalledWith(source.world.plant.id, '오늘 물 줘야 해');
+  });
 });

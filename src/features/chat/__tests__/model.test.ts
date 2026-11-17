@@ -1,6 +1,6 @@
 import type { ChatMessageRow, PlantStatus, Reading } from '@/data';
 
-import { chipValue, contextRows, formatCountdown, optimisticVisible, questionFor, rateLimitText, sendErrorText, suggestions } from '../model';
+import { chipValue, contextRows, formatCountdown, isSendKey, optimisticVisible, questionFor, rateLimitText, sendErrorText, suggestions } from '../model';
 import { ChatError } from '@/data';
 
 const TZ = 'Asia/Seoul';
@@ -72,5 +72,19 @@ describe('chat model', () => {
   it('finds the question a fallback reply answers', () => {
     const all = [row(1, 'user', 'Need water?'), row(2, 'plant', 'Sorry', 1)];
     expect(questionFor(all, all[1])).toBe('Need water?');
+  });
+});
+
+describe('composer send key', () => {
+  it('sends on Enter and adds a line on Shift+Enter', () => {
+    expect(isSendKey({ key: 'Enter' })).toBe(true);
+    expect(isSendKey({ key: 'Enter', shiftKey: true })).toBe(false);
+    expect(isSendKey({ key: 'a' })).toBe(false);
+  });
+
+  it('only commits a Korean IME composition on Enter', () => {
+    expect(isSendKey({ key: 'Enter', isComposing: true })).toBe(false);
+    expect(isSendKey({ key: 'Enter', isComposing: false, keyCode: 229 })).toBe(false);
+    expect(isSendKey({ key: 'Enter', isComposing: false, keyCode: 13 })).toBe(true);
   });
 });

@@ -123,3 +123,14 @@ function failedAt(reading: Reading, timeZone: string): string {
 export function emptyText(plantName: string): string {
   return `Ask how it’s doing. ${plantName} answers from the readings its ESP32 sends over Wi-Fi/MQTT to the Raspberry Pi 3B gateway every 60 s.`;
 }
+
+export type ComposerKey = { key: string; shiftKey?: boolean; isComposing?: boolean; keyCode?: number };
+
+/**
+ * Enter sends, Shift+Enter adds a line. While an IME composition is active (Korean, Japanese,
+ * Chinese), Enter only commits the composed text; Safari reports that keydown as keyCode 229
+ * after `isComposing` has already turned false.
+ */
+export function isSendKey(e: ComposerKey): boolean {
+  return e.key === 'Enter' && !e.shiftKey && !e.isComposing && e.keyCode !== 229;
+}
