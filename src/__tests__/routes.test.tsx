@@ -1,10 +1,9 @@
-import { screen } from 'expo-router/testing-library';
+import { screen, waitFor } from 'expo-router/testing-library';
 
 import { renderApp } from '@/components/shell/testing/render-app';
 
 // Renders the real src/app route tree, so each URL from PLAN §5.3 must resolve inside the shell.
 const routes: [url: string, title: string, testID?: string][] = [
-  ['/', 'Home'],
   ['/sensors', 'Sensors'],
   ['/timeline', 'Timeline'],
   ['/chat', 'Chat'],
@@ -18,13 +17,30 @@ const routes: [url: string, title: string, testID?: string][] = [
   ['/settings/timezone', 'Asia/Seoul (GMT+9)', 'timezone-screen'],
 ];
 
+type JsonNode = { type: string; props: Record<string, unknown>; children: (JsonNode | string)[] | null };
+
+function hasHeaderTitle(node: unknown, title: string): boolean {
+  if (!node || typeof node !== 'object') return false;
+  if (Array.isArray(node)) return node.some((n) => hasHeaderTitle(n, title));
+  const n = node as JsonNode;
+  if (n.type === 'RNSScreenStackHeaderConfig' && n.props.title === title) return true;
+  return (n.children ?? []).some((c) => hasHeaderTitle(c, title));
+}
+
 describe('route skeleton', () => {
+  it('resolves / to Home inside the shell', async () => {
+    const app = await renderApp('/');
+    expect(app.getPathname()).toBe('/');
+    expect(await screen.findByTestId('home-screen')).toBeTruthy();
+  });
+
   it.each(routes)('resolves %s inside the shell', async (url, title, testID = 'screen-placeholder') => {
     const app = await renderApp(url);
     expect(app.getPathname()).toBe(url);
     // Native tabs keep every tab mounted, so the other tabs' placeholders render too.
     expect((await screen.findAllByTestId(testID)).length).toBeGreaterThan(0);
-    expect((await screen.findAllByText(title)).length).toBeGreaterThan(0);
+    // A built iOS screen puts its title in the native header config instead of a Text.
+    await waitFor(() => expect(screen.queryAllByText(title).length > 0 || hasHeaderTitle(screen.toJSON(), title)).toBe(true));
   });
 
   it('resolves the sign-in page when signed out', async () => {

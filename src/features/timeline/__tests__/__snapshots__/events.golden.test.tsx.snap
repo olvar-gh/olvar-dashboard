@@ -1,0 +1,54 @@
+// Jest Snapshot v1, https://jestjs.io/docs/snapshot-testing
+
+exports[`Timeline activity per fixture day matches the golden event lists 1`] = `
+{
+  "2026-11-12": [
+    "23:30 Offline 23:30–24:00 (30 min)",
+    "23:09 Soil was driest at 56 %",
+    "14:10 Humidity dropped to 51 %",
+    "13:27 Temperature peaked at 24.3 °C",
+    "12:30 Light peaked at 1,725 lux",
+    "08:12 You asked Sparks: How was the light this afternoon?",
+  ],
+  "2026-11-13": [
+    "23:47 Soil was driest at 47 %",
+    "13:56 Humidity dropped to 51 %",
+    "13:31 Temperature peaked at 24.3 °C",
+    "12:06 Light peaked at 1,716 lux",
+    "08:12 You asked Sparks: Should I move you away from the heater?",
+    "00:00 Offline 00:00–00:40 (40 min)",
+  ],
+  "2026-11-14": [
+    "23:56 Soil was driest at 38 %",
+    "13:35 Humidity dropped to 51 %",
+    "13:22 Temperature peaked at 24.3 °C",
+    "12:14 Light peaked at 1,716 lux",
+    "10:15 Soil sensor calibrated",
+    "08:12 You asked Sparks: Did you sleep well?",
+    "03:10 Offline 03:10–03:50 (40 min)",
+  ],
+  "2026-11-15": [
+    "23:50 Temperature peaked at 27.9 °C",
+    "23:44 Soil was driest at 29 %",
+    "14:06 Humidity dropped to 51 %",
+    "12:05 Light peaked at 1,715 lux",
+    "09:30 Offline 09:30–09:34 (4 min)",
+    "08:12 You asked Sparks: Is it too bright by the window?",
+  ],
+  "2026-11-16": [
+    "14:23 Soil was driest at 23 %",
+    "14:00 Device restarted, offline 4 min",
+    "13:30 Humidity dropped to 51 %",
+    "13:28 Temperature peaked at 24.3 °C",
+    "12:33 Light peaked at 1,723 lux",
+    "08:12 You asked Sparks: Do you need water?",
+  ],
+  "2026-11-17": [
+    "14:30 Soil was driest at 42 %",
+    "13:41 Humidity dropped to 51 %",
+    "13:31 Temperature peaked at 24.3 °C",
+    "12:37 Light peaked at 1,720 lux",
+    "08:12 You asked Sparks: How are you feeling today?",
+  ],
+}
+`;

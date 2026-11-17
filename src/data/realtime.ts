@@ -10,7 +10,7 @@ import { addChatMessage } from './queries/chat';
 import { useDevice } from './queries/device';
 import { usePlant } from './queries/plant';
 import { usePlantStatus } from './queries/status';
-import type { Device } from './types';
+import type { Device, OfflinePeriodRow } from './types';
 
 /** A gateway outbox flush arrives as a burst of INSERTs; they collapse into one re-read. */
 export const SIGNAL_COALESCE_MS = 500;
@@ -37,6 +37,9 @@ export function useLiveUpdates(): void {
   const timeZone = plant?.timezone;
 
   const lastDayRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (timeZone) lastDayRef.current = localDate(timeZone, new Date());
+  }, [timeZone]);
   const refreshLive = useCallback(() => {
     if (!plantId || !deviceId || !timeZone) return;
     const today = localDate(timeZone, new Date());
@@ -113,10 +116,30 @@ export function useLiveUpdates(): void {
 
   const latestReadingAt = status.data?.latest_reading_at;
   const fetchedAt = status.dataUpdatedAt;
+
+  // Past days are otherwise never refetched, so one cached while its outage was still running
+  // would keep "Offline since …" after the device came back.
+  useEffect(() => {
+    if (!deviceId || !timeZone || !latestReadingAt) return;
+    const today = localDate(timeZone, new Date());
+    void qc.invalidateQueries({
+      predicate: (q) =>
+        q.queryKey[0] === 'day' &&
+        q.queryKey[1] === deviceId &&
+        q.queryKey[2] !== today &&
+        q.queryKey[3] === 'offline' &&
+        hasOngoingBefore(q.state.data as OfflinePeriodRow[] | undefined, latestReadingAt),
+    });
+  }, [qc, deviceId, timeZone, latestReadingAt]);
+
   useEffect(() => {
     const delay = statusRefetchDelayMs(latestReadingAt, new Date());
     if (delay == null) return;
     const id = setTimeout(() => refreshRef.current(), delay);
     return () => clearTimeout(id);
   }, [latestReadingAt, fetchedAt]);
+}
+
+function hasOngoingBefore(rows: OfflinePeriodRow[] | undefined, readingAt: string): boolean {
+  return !!rows?.some((r) => r.ongoing && Date.parse(r.started_at) < Date.parse(readingAt));
 }
