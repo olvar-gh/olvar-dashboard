@@ -16,37 +16,37 @@ import {
 import { formatNumber, formatShortDate } from '@/domain/format';
 import { iosColors, typography } from '@/theme';
 
-import { closeCalibration, useCalibrationWizard, type CalibrationWizard } from './useCalibrationWizard';
+import { useCalibrationWizard, type CalibrationWizard } from './useCalibrationWizard';
+import { useDismissGuard } from './useDismissGuard';
 import { SENSOR_LABEL, ageLabel, stabilityLabel, type CaptureStep } from './wizard';
 
 const ACTION_LABEL = { dry: 'Capture Dry Reading', wet: 'Capture Wet Reading', review: 'Save Calibration' } as const;
 
 /** iPhone "Soil Calibration" form sheet (Figma 134:2509), presented by the shell's native stack. */
 export function CalibrationScreen() {
-  return <CalibrationSheet header />;
+  const w = useCalibrationWizard();
+  const guard = useDismissGuard({ dirty: w.dirty, saving: w.saving });
+  return <CalibrationSheet w={w} onClose={guard.close} onSaved={guard.leave} />;
 }
 
-/** The sheet without the native header configuration, which needs the router's stack. */
-export function CalibrationSheet({ header = false }: { header?: boolean }) {
-  const w = useCalibrationWizard();
+export type CalibrationSheetProps = {
+  w: CalibrationWizard;
+  /** Shows the native header with a Close button; needs the router's stack. */
+  onClose?: () => void;
+  onSaved: () => void;
+};
 
-  const close = async () => {
-    if (w.dirty && !(await confirmAlert({ title: 'Discard calibration?', message: 'The readings you captured will be lost.', confirmLabel: 'Discard', destructive: true }))) {
-      return;
-    }
-    closeCalibration();
-  };
-
+export function CalibrationSheet({ w, onClose, onSaved }: CalibrationSheetProps) {
   const primary = async () => {
     if (w.step !== 'review') return w.capture();
-    const error = await w.submit();
-    if (error === null) closeCalibration();
-    else Alert.alert('Calibration Not Saved', error);
+    const result = await w.submit();
+    if (result === 'saved') onSaved();
+    else if (result !== 'gone') Alert.alert('Calibration Not Saved', result);
   };
 
   return (
     <>
-      {header ? <NavBar title="Soil Calibration" onBack={close} backLabel="Close" /> : null}
+      {onClose ? <NavBar title="Soil Calibration" onBack={onClose} backLabel="Close" /> : null}
       <PageScroll testID="calibration" contentContainerStyle={styles.content}>
         <Body w={w} />
         {w.load === 'ready' ? (
@@ -159,7 +159,7 @@ function StepRow({ w, step }: { w: CalibrationWizard; step: CaptureStep }) {
       separator={step === 'wet'}
       value={captured != null ? formatNumber(captured) : w.step === step ? 'Measuring…' : '—'}
       accessory={captured != null ? 'chevron' : 'none'}
-      onPress={captured != null ? retake : undefined}
+      onPress={captured != null && !w.saving ? retake : undefined}
     />
   );
 }

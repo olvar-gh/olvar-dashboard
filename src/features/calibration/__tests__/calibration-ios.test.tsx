@@ -1,16 +1,18 @@
 import { act, fireEvent, screen, waitFor } from '@testing-library/react-native';
-import { router } from 'expo-router';
 import { Alert } from 'react-native';
 
 import { renderWithFixtures } from '@/components/shell/testing/render-app';
 import type { FixtureSource } from '@/data';
 
-import { CalibrationSheet } from '../CalibrationScreen';
+import { CalibrationSheet as Sheet } from '../CalibrationScreen';
+import { useCalibrationWizard } from '../useCalibrationWizard';
 
-jest.mock('expo-router', () => ({
-  ...jest.requireActual('expo-router'),
-  router: { canGoBack: jest.fn(() => true), back: jest.fn(), replace: jest.fn() },
-}));
+const onSaved = jest.fn();
+
+// The route adds the native header and the dismiss guard (useDismissGuard.test.tsx).
+function CalibrationSheet() {
+  return <Sheet w={useCalibrationWizard()} onSaved={onSaved} />;
+}
 
 const WAIT = { timeout: 4000 };
 // Each capture waits for the 500 ms reading-signal coalesce, as in the app.
@@ -48,7 +50,7 @@ describe('iOS calibration sheet', () => {
     await fireEvent.press(primary());
     await waitFor(() => expect(save).toHaveBeenCalledWith(source.world.device.id, 2905, 1305));
     expect(source.world.device).toMatchObject({ soil_dry_raw: 2905, soil_wet_raw: 1305 });
-    await waitFor(() => expect(router.back).toHaveBeenCalled());
+    await waitFor(() => expect(onSaved).toHaveBeenCalled());
   });
 
   it('only counts readings that arrive after the step starts', async () => {
@@ -86,7 +88,7 @@ describe('iOS calibration sheet', () => {
     await fireEvent.press(primary());
     await fireEvent.press(primary());
     await waitFor(() => expect(alert).toHaveBeenCalledWith('Calibration Not Saved', expect.stringMatching(/connection/)));
-    expect(router.back).not.toHaveBeenCalled();
+    expect(onSaved).not.toHaveBeenCalled();
   });
 
   it('shows a failed read without treating the sensor as uncalibrated', async () => {

@@ -1,3 +1,4 @@
+import { loadState } from '../useCalibrationWizard';
 import {
   ageLabel,
   calibrationSummary,
@@ -130,5 +131,28 @@ describe('saveErrorMessage', () => {
   it('maps the check violation and falls back to a connection message', () => {
     expect(saveErrorMessage({ code: '23514' })).toMatch(/more than 100 above wet/);
     expect(saveErrorMessage(new Error('fetch failed'))).toBe(SAVE_FAILED);
+  });
+});
+
+describe('loadState', () => {
+  const ok = { plant: 'ok', device: 'ok', readings: 'ok', hasPlant: true, hasDevice: true, pinned: true, hasLive: true } as const;
+
+  it('reports a failed plant request even though the device query waits forever', () => {
+    expect(loadState({ ...ok, plant: 'error', device: 'pending', readings: 'pending', hasPlant: false, hasDevice: false, hasLive: false })).toBe('error');
+  });
+
+  it('loads while the plant or device is pending', () => {
+    expect(loadState({ ...ok, plant: 'pending', device: 'pending', hasPlant: false, hasDevice: false })).toBe('loading');
+    expect(loadState({ ...ok, device: 'pending', hasDevice: false })).toBe('loading');
+  });
+
+  it('waits for the opening fetch before showing cached readings', () => {
+    expect(loadState({ ...ok, pinned: false })).toBe('loading');
+    expect(loadState(ok)).toBe('ready');
+  });
+
+  it('tells no device and no readings apart', () => {
+    expect(loadState({ ...ok, hasDevice: false, readings: 'pending', hasLive: false })).toBe('no-device');
+    expect(loadState({ ...ok, hasLive: false, pinned: false })).toBe('no-readings');
   });
 });

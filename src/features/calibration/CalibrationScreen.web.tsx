@@ -1,6 +1,7 @@
 import { StyleSheet, Text, View } from 'react-native';
 
-import { Button, EmptyState, ErrorState, ListRow, Modal, Notice, OfflineBanner, Skeleton } from '@/components/ui';
+import { Icon } from '@/components/icons';
+import { Button, EmptyState, ErrorState, Modal, Notice, OfflineBanner, Skeleton } from '@/components/ui';
 import { formatNumber } from '@/domain/format';
 import { colors, typography } from '@/theme';
 
@@ -12,16 +13,20 @@ export function CalibrationScreen() {
   const w = useCalibrationWizard();
   const subtitle = w.device ? `${SENSOR_LABEL} · ${calibrationSummary(w.device, w.timeZone)}` : SENSOR_LABEL;
   const save = async () => {
-    if ((await w.submit()) === null) closeCalibration();
+    if ((await w.submit()) === 'saved') closeCalibration();
+  };
+  // Leaving mid-save would let the save's own close pop whatever page is under the dialog.
+  const dismiss = () => {
+    if (!w.saving) closeCalibration();
   };
   return (
     <Modal
       visible
       testID="calibration"
-      onDismiss={closeCalibration}
+      onDismiss={dismiss}
       title="Calibrate soil sensor"
       subtitle={subtitle}
-      cancel={{ label: 'Cancel', onPress: closeCalibration }}
+      cancel={{ label: 'Cancel', onPress: dismiss, disabled: w.saving }}
       confirm={w.load === 'ready' ? { label: 'Save calibration', onPress: save, disabled: !w.canSave, loading: w.saving } : undefined}
     >
       <Body w={w} />
@@ -110,43 +115,63 @@ const STEPS: Record<CaptureStep, { title: string; subtitle: string; icon: 'sun' 
   wet: { title: '2 · Wet reading', subtitle: 'Stand the probe in a glass of water, up to the line', icon: 'droplet' },
 };
 
+/** Step row in the Desktop/List row look; the instructions wrap instead of truncating on narrow windows. */
 function StepRow({ w, step }: { w: CalibrationWizard; step: CaptureStep }) {
   const s = STEPS[step];
   const captured = w.state[step];
   const current = w.step === step;
+  const status = captured != null ? `Captured · ${formatNumber(captured)}` : current ? null : 'After the dry reading';
   return (
-    <ListRow
-      testID={`step-${step}`}
-      title={s.title}
-      subtitle={s.subtitle}
-      icon={s.icon}
-      divider={step === 'wet'}
-      status={
-        captured != null
-          ? { label: `Captured · ${formatNumber(captured)}`, live: true }
-          : current
-            ? undefined
-            : { label: 'After the dry reading', live: false }
-      }
-      action={
-        captured != null ? (
-          <Button variant="plain" label="Retake" accessibilityLabel={`Retake ${step} reading`} onPress={() => w.retake(step)} />
-        ) : current ? (
+    <View testID={`step-${step}`} style={[styles.step, step === 'wet' && styles.stepDivider]}>
+      <View style={styles.stepMain}>
+        <View style={styles.iconChip}>
+          <Icon name={s.icon} size={18} color={colors.text.secondary} />
+        </View>
+        <View style={styles.stepText}>
+          <Text style={styles.stepTitle}>{s.title}</Text>
+          <Text style={styles.stepSubtitle}>{s.subtitle}</Text>
+        </View>
+      </View>
+      <View style={styles.stepTrailing}>
+        {status ? (
+          <View style={styles.status}>
+            <View style={[styles.dot, captured != null ? styles.dotLive : styles.dotOff]} />
+            <Text style={styles.statusLabel}>{status}</Text>
+          </View>
+        ) : null}
+        {captured != null ? (
           <Button
-            variant="secondary"
-            label="Capture"
-            accessibilityLabel={`Capture ${step} reading`}
-            disabled={!w.canCapture}
-            onPress={w.capture}
+            variant="plain"
+            label="Retake"
+            accessibilityLabel={`Retake ${step} reading`}
+            disabled={w.saving}
+            onPress={() => w.retake(step)}
           />
-        ) : undefined
-      }
-    />
+        ) : current ? (
+          <Button variant="secondary" label="Capture" accessibilityLabel={`Capture ${step} reading`} disabled={!w.canCapture} onPress={w.capture} />
+        ) : null}
+      </View>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   content: { gap: 20 },
+  step: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', columnGap: 14, rowGap: 8, paddingVertical: 9 },
+  stepDivider: { borderTopWidth: 1, borderTopColor: colors.border.subtle },
+  stepMain: { flexDirection: 'row', alignItems: 'center', gap: 14, flexGrow: 1, flexShrink: 1, flexBasis: 240 },
+  iconChip: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: colors.brand.sageTint,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  stepText: { flex: 1, minWidth: 0, gap: 2 },
+  stepTitle: { ...typography.sensorTitle, color: colors.text.primary },
+  stepSubtitle: { ...typography.meta, color: colors.text.tertiary },
+  stepTrailing: { flexDirection: 'row', alignItems: 'center', gap: 14, marginLeft: 'auto' },
   live: {
     flexDirection: 'row',
     alignItems: 'center',
