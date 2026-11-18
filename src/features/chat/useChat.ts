@@ -29,8 +29,9 @@ export function useChat() {
   const secondsLeft = retryUntil ? (retryUntil - now.getTime()) / 1000 : 0;
   const rateLimited = secondsLeft > 0;
 
-  const submit = useCallback(
-    (text: string) => {
+  /** Sends `text`; only a send from the composer (`fromDraft`) clears it, so a chip or retry keeps the draft. */
+  const deliver = useCallback(
+    (text: string, fromDraft: boolean) => {
       const message = text.trim();
       if (!message || message.length > MAX_MESSAGE_CHARS || send.isPending || rateLimited) return false;
       setLastIdAtSend(Math.max(0, ...(messages ?? []).map((m) => m.id)));
@@ -43,11 +44,13 @@ export function useChat() {
           }
         },
       });
-      if (text === draft) setDraft('');
+      if (fromDraft) setDraft('');
       return true;
     },
-    [draft, messages, rateLimited, send],
+    [messages, rateLimited, send],
   );
+  const submit = useCallback((text: string) => deliver(text, false), [deliver]);
+  const sendDraft = useCallback(() => deliver(draft, true), [deliver, draft]);
 
   const pendingText = send.variables;
   const showPending =
@@ -81,6 +84,7 @@ export function useChat() {
     draft,
     setDraft,
     submit,
+    sendDraft,
     canSend: draft.trim().length > 0 && draft.trim().length <= MAX_MESSAGE_CHARS && !send.isPending && !rateLimited,
     sending: send.isPending,
     pending: showPending ? { text: pendingText!, failed: send.isError } : null,

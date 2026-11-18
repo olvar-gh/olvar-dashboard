@@ -67,6 +67,17 @@ describe('iPhone chat screen', () => {
     send.mockRestore();
   });
 
+  it('keeps a draft identical to the suggestion that is tapped', async () => {
+    const app = await openChat();
+    await screen.findAllByText(app.source.world.chat.at(-1)!.content, {}, { timeout: 5000 });
+    const send = jest.spyOn(app.source, 'sendChat');
+    await fireEvent.changeText(screen.getByTestId('chat-input'), 'Do you need water?');
+    const chat = within(screen.getByTestId('chat-screen'));
+    await fireEvent.press(chat.getByRole('button', { name: 'Do you need water?' }));
+    expect(send).toHaveBeenCalledWith(app.source.world.plant.id, 'Do you need water?');
+    expect(screen.getByTestId('chat-input').props.value).toBe('Do you need water?');
+  });
+
   it('suggests questions when there is no conversation yet', async () => {
     await openChat((app) => {
       app.source.world.chat.length = 0;

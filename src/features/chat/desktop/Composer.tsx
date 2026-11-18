@@ -22,7 +22,7 @@ export function Composer({ chat }: { chat: ChatModel }) {
   const onKeyPress = (e: NativeSyntheticEvent<ComposerKey>) => {
     if (isSendKey(e.nativeEvent)) {
       e.preventDefault();
-      chat.submit(chat.draft);
+      chat.sendDraft();
     }
   };
   return (
@@ -67,7 +67,7 @@ export function Composer({ chat }: { chat: ChatModel }) {
           accessibilityLabel="Send"
           accessibilityState={{ disabled: !chat.canSend }}
           disabled={!chat.canSend}
-          onPress={() => chat.submit(chat.draft)}
+          onPress={() => chat.sendDraft()}
           style={[styles.send, !chat.canSend && styles.sendDisabled]}
         >
           <Icon name="arrow" size={18} color={colors.surface.card} style={styles.up} />

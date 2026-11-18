@@ -1,6 +1,8 @@
 import { useEffect, useRef } from 'react';
 
 export const NEAR_BOTTOM_PX = 240;
+/** How far past the end of the chat still counts as at the end; Past conversations start 24 px below it. */
+export const PAST_END_PX = 16;
 
 /** The scrolling document, injectable so the follow rules can be tested without a browser. */
 export type FollowPage = {
@@ -57,8 +59,10 @@ export function useFollowLatest(lastKey: string | null, page: FollowPage) {
   useEffect(() => {
     return page.subscribe(
       () => {
-        const near = page.distanceToEnd() <= NEAR_BOTTOM_PX;
-        if (following.current && page.distanceToEnd() <= 1) following.current = false;
+        const distance = page.distanceToEnd();
+        // Negative once the reader has scrolled past the chat, e.g. down to Past conversations.
+        const near = distance >= -PAST_END_PX && distance <= NEAR_BOTTOM_PX;
+        if (following.current && distance <= 1) following.current = false;
         atEnd.current = following.current || near;
       },
       () => {

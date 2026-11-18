@@ -1,6 +1,6 @@
 import { renderHook } from '@testing-library/react-native';
 
-import { anchorPage, NEAR_BOTTOM_PX, useFollowLatest, type FollowPage } from '../desktop/useFollowLatest';
+import { anchorPage, NEAR_BOTTOM_PX, PAST_END_PX, useFollowLatest, type FollowPage } from '../desktop/useFollowLatest';
 
 function fakePage() {
   const page = {
@@ -34,6 +34,16 @@ describe('desktop follow-latest', () => {
     page.distance = NEAR_BOTTOM_PX + 600;
     await rerender({ k: 'b' });
     expect(page.scrolled).toEqual(['auto', 'smooth']);
+  });
+
+  it('leaves a reader who scrolled below the chat, to Past conversations, where they are', async () => {
+    const page = fakePage();
+    const { rerender } = await render(page);
+    page.onInput();
+    page.distance = -(PAST_END_PX + 1);
+    page.onScroll();
+    await rerender({ k: 'b' });
+    expect(page.scrolled).toEqual(['auto']);
   });
 
   it('leaves a reader who scrolled up where they are', async () => {

@@ -58,7 +58,7 @@ export function IosComposer({ chat }: { chat: ChatModel }) {
           accessibilityLabel="Send"
           accessibilityState={{ disabled: !chat.canSend }}
           disabled={!chat.canSend}
-          onPress={() => chat.submit(chat.draft)}
+          onPress={() => chat.sendDraft()}
           style={[styles.send, !chat.canSend && styles.sendDisabled]}
         >
           <Icon name="arrow" size={20} color="#ffffff" style={styles.up} />

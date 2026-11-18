@@ -69,6 +69,16 @@ describe('desktop chat', () => {
     expect(screen.getByTestId('chat-input').props.value).toBe('내일 물 줄까?');
   });
 
+  it('keeps a draft identical to the suggestion chip that is sent', async () => {
+    const { source } = await renderWithFixtures(<DesktopChat />);
+    await screen.findByTestId('chat-messages');
+    const send = jest.spyOn(source, 'sendChat');
+    await fireEvent.changeText(screen.getByTestId('chat-input'), 'How am I doing this week?');
+    await fireEvent.press(screen.getByRole('button', { name: 'How am I doing this week?' }));
+    expect(send).toHaveBeenCalledWith(source.world.plant.id, 'How am I doing this week?');
+    expect(screen.getByTestId('chat-input').props.value).toBe('How am I doing this week?');
+  });
+
   it('keeps an unsent draft when a failed message is retried', async () => {
     const { source } = await renderWithFixtures(<DesktopChat />);
     await screen.findByTestId('chat-messages');
