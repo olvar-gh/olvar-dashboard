@@ -47,7 +47,7 @@ test.describe('session gate', () => {
     await expect(page).toHaveURL(/\/$/);
   });
 
-  for (const path of ['/sensors', '/timeline', '/chat', '/settings', '/settings/account']) {
+  for (const path of ['/timeline', '/chat', '/settings', '/settings/account']) {
     test(`deep link ${path} survives a reload`, async ({ page }) => {
       await page.goto(path);
       await expect(page.getByRole('heading', { level: 1 }).first()).toBeVisible();

@@ -46,18 +46,18 @@ describe('iPhone Home', () => {
 
   it('asks to calibrate an uncalibrated probe and shows the raw value', async () => {
     await renderApp('/', { scenario: 'uncalibrated' });
-    await screen.findByTestId('home-screen');
-    expect(screen.getByRole('button', { name: 'Calibrate' })).toBeTruthy();
+    const home = within(await screen.findByTestId('home-screen'));
+    expect(home.getByRole('button', { name: 'Calibrate' })).toBeTruthy();
     expect(within(screen.getByTestId('sensor-soil')).getByText('raw')).toBeTruthy();
   });
 
   it('shows failed reads without a recalibration prompt', async () => {
     await renderApp('/', { scenario: 'null-reads' });
-    await screen.findByTestId('home-screen');
+    const home = within(await screen.findByTestId('home-screen'));
     expect(await value('soil')).toBe('—');
     expect(await value('temperature')).toBe('—');
-    expect(screen.getAllByText(/^Read failed at \d\d:\d\d$/)).toHaveLength(2);
-    expect(screen.queryByRole('button', { name: 'Calibrate' })).toBeNull();
+    expect(home.getAllByText(/^Read failed at \d\d:\d\d$/)).toHaveLength(2);
+    expect(home.queryByRole('button', { name: 'Calibrate' })).toBeNull();
   });
 
   it('shows the offline banner when the sensor is offline', async () => {

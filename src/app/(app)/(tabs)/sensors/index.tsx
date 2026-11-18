@@ -1,5 +1,3 @@
-import { ScreenPlaceholder } from '@/components/shell';
+import { SensorsScreen } from '@/features/sensors';
 
-export default function SensorsScreen() {
-  return <ScreenPlaceholder title="Sensors" body="24 h / 7 d / 30 d charts for every sensor (T8)." />;
-}
+export default SensorsScreen;
