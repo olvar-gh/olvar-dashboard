@@ -2,7 +2,9 @@
 // Runs only with SUPABASE_LOCAL=1:
 //   SUPABASE_LOCAL=1 EXPO_PUBLIC_SUPABASE_URL=http://127.0.0.1:54321 EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY=sb_publishable_... \
 //   [SUPABASE_SECRET_KEY=sb_secret_...] npx playwright test e2e/web/live.spec.ts
-// SUPABASE_SECRET_KEY (local stack only) lets the Realtime check write a reading the way the gateway does.
+// SUPABASE_SECRET_KEY (local stack only) lets the suite write readings the way the gateway does: it tops up
+// the last 32 h with one reading a minute wherever the seed has gaps, so a seed older than a day still passes.
+// Without the key a stale seed skips the history checks instead of failing them.
 import { expect, test } from '@playwright/test';
 import { createClient } from '@supabase/supabase-js';
 
@@ -15,7 +17,73 @@ const secret = process.env.SUPABASE_SECRET_KEY;
 const email = process.env.OLVAR_OWNER_EMAIL ?? 'dev@olvar.local';
 const password = process.env.OLVAR_OWNER_PASSWORD ?? 'olvar-dev-password';
 
+const MIN = 60_000;
+const HOUR = 60 * MIN;
+const HISTORY = 32 * HOUR;
+
 test.skip(process.env.SUPABASE_LOCAL !== '1', 'needs the local Supabase stack (SUPABASE_LOCAL=1)');
+let historyGap: string | null = null;
+
+test.beforeAll(async ({}, info) => {
+  test.skip(info.project.name !== 'fhd-1920', 'live checks do not depend on the viewport; one project writes');
+  const { source } = await signedIn();
+  const plant = (await source.getPlant())!;
+  const device = (await source.getDevice(plant.id))!;
+  const now = Date.now();
+  const from = now - HISTORY;
+  const rows = await source.getReadings(device.id, new Date(from), new Date(now));
+  const missing = missingMinutes(
+    rows.map((r) => Date.parse(r.recorded_at)),
+    from,
+    now,
+  );
+  if (missing.length === 0) return;
+  if (!secret) {
+    const latest = rows.length ? rows[rows.length - 1].recorded_at : 'none in the last 32 h';
+    historyGap =
+      `local history has ${missing.length} missing minutes in the last 32 h (latest reading ${latest}); ` +
+      'set SUPABASE_SECRET_KEY so live.spec tops it up, or re-seed olvar-gateway';
+    return;
+  }
+  await writeReadings(device.id, missing);
+});
+
+/** Minutes to add so no two consecutive readings in [from, to] are more than 2 min apart and one lands at `to`. */
+function missingMinutes(times: number[], from: number, to: number) {
+  const out: number[] = [];
+  let prev = from - MIN;
+  for (const t of [...times.filter((x) => x >= from).sort((a, b) => a - b), to]) {
+    while (t - prev > 2 * MIN) out.push((prev += MIN));
+    prev = Math.max(prev, t);
+  }
+  if (times.every((t) => t < to - MIN) && out.at(-1) !== to) out.push(to);
+  return out;
+}
+
+async function writeReadings(deviceId: string, times: number[]) {
+  const writer = createClient<Database>(url, secret!, { auth: { persistSession: false } });
+  const bootId = Math.floor(Math.random() * 0xffffffff).toString(16).padStart(8, '0');
+  const rows = times.map((t, seq) => {
+    const phase = Math.sin((2 * Math.PI * (t % (24 * HOUR))) / (24 * HOUR));
+    return {
+      device_id: deviceId,
+      recorded_at: new Date(t).toISOString(),
+      received_at: new Date(t).toISOString(),
+      boot_id: bootId,
+      seq,
+      uptime_ms: seq * MIN,
+      temperature_c: Math.round((21.5 + 2.5 * phase) * 10) / 10,
+      humidity_pct: Math.round(58 - 6 * phase),
+      lux: Math.max(0, Math.round(1600 * phase)),
+      soil_raw: 2200,
+      clock_source: 'ntp' as const,
+    };
+  });
+  for (let i = 0; i < rows.length; i += 500) {
+    const { error } = await writer.from('readings').insert(rows.slice(i, i + 500));
+    expect(error).toBeNull();
+  }
+}
 
 function newClient() {
   return createClient<Database>(url, key, { auth: { persistSession: false, autoRefreshToken: false } });
@@ -37,6 +105,7 @@ test('signed-out reads fail', async () => {
 });
 
 test('the 24 h query returns every row past the 1,000-row limit, ending at latest_reading_at', async () => {
+  test.skip(historyGap !== null, historyGap ?? '');
   const { source } = await signedIn();
   const plant = await source.getPlant();
   expect(plant).not.toBeNull();
@@ -52,12 +121,13 @@ test('the 24 h query returns every row past the 1,000-row limit, ending at lates
   expect(latest.id).toBe(rows[rows.length - 1].id);
 });
 
-test('device_offline_periods matches the seeded history and returns nothing past retention', async () => {
+test('device_offline_periods finds no gap in a covered day and returns nothing past retention', async () => {
+  test.skip(historyGap !== null, historyGap ?? '');
   const { source } = await signedIn();
   const plant = (await source.getPlant())!;
   const device = (await source.getDevice(plant.id))!;
   const now = Date.now();
-  // The seed's reboot 24 h ago has no gap, so a fully covered day has no offline period.
+  // The last 32 h hold a reading at least every 2 min (seed reboot included), so this day has no offline period.
   const seeded = await source.getOfflinePeriods(device.id, new Date(now - 30 * 3_600_000), new Date(now - 6 * 3_600_000));
   expect(seeded).toEqual([]);
   const old = await source.getOfflinePeriods(device.id, new Date(now - 100 * 86_400_000), new Date(now - 99 * 86_400_000));

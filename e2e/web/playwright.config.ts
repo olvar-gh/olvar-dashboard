@@ -11,6 +11,7 @@ const baseURL = process.env.PLAYWRIGHT_BASE_URL ?? `http://localhost:${port}`;
 export default defineConfig({
   testDir: '.',
   outputDir: '../../test-results',
+  snapshotPathTemplate: '{testDir}/__screenshots__/{testFileName}/{arg}-{projectName}-{platform}{ext}',
   reporter: process.env.CI ? [['list'], ['html', { open: 'never', outputFolder: '../../playwright-report' }]] : 'list',
   use: { baseURL, trace: 'retain-on-failure' },
   webServer: process.env.PLAYWRIGHT_BASE_URL

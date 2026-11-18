@@ -57,7 +57,11 @@
     "typecheck": "tsc --noEmit",
     "test": "jest",
     "export": "expo export -p web",
-    "doctor": "npx expo-doctor"
+    "doctor": "npx expo-doctor",
+    "test:e2e": "playwright test -c e2e/web/playwright.config.ts",
+    "test:visual": "playwright test -c e2e/web/playwright.config.ts e2e/web/visual.spec.ts --project fhd-1920 --project mbp-1512",
+    "test:visual:update": "playwright test -c e2e/web/playwright.config.ts e2e/web/visual.spec.ts --project fhd-1920 --project mbp-1512 --update-snapshots",
+    "test:live": "SUPABASE_LOCAL=1 playwright test -c e2e/web/playwright.config.ts e2e/web/live.spec.ts --project fhd-1920"
   },
   "private": true
 }
