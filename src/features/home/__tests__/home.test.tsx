@@ -151,6 +151,23 @@ describe('Home data states', () => {
     expect(within(screen.getByTestId('home-screen')).getByText(/^Nothing to report yet today/)).toBeTruthy();
     expect(screen.queryByTestId('home-loading')).toBeNull();
   });
+
+  it('keeps the waiting state after pull-to-refresh when the plant has no device', async () => {
+    const app = await renderApp('/');
+    app.source.getDevice = async () => null;
+    await app.queryClient.resetQueries();
+    await waitFor(() => expect(screen.getByTestId('sensor-soil-value').props.children).toBe('—'));
+    const readings = jest.spyOn(app.source, 'getReadings');
+    const periods = jest.spyOn(app.source, 'getOfflinePeriods');
+    await act(async () => {
+      await screen.getByTestId('home-screen').props.refreshControl.props.onRefresh();
+    });
+    expect(readings).not.toHaveBeenCalled();
+    expect(periods).not.toHaveBeenCalled();
+    expect(screen.queryByTestId('today-error')).toBeNull();
+    expect(screen.queryByTestId('home-error')).toBeNull();
+    expect(within(screen.getByTestId('home-screen')).getByText(/^Nothing to report yet today/)).toBeTruthy();
+  });
 });
 
 describe('Home on a 25-hour day', () => {

@@ -113,6 +113,7 @@ function Cards({ query, range, state }: { query: RangeQuery; range: Range; state
   const data = query.data;
   return (
     <>
+      {query.error ? <RefreshError onRetry={query.refetch} message="Couldn’t refresh the charts. Showing the last ones loaded." testID="sensors-chart-error" /> : null}
       {METRICS.map((spec) => (
         <SensorCard
           key={spec.key}

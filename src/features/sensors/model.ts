@@ -296,9 +296,12 @@ export function silentFor(seconds: number): string {
 
 export type GatewayState = 'checking' | 'unavailable' | 'online' | 'offline';
 
-/** What the offline view may say about the gateway: nothing definite while its request is loading or failed. */
+/**
+ * What the offline view may say about the gateway: nothing definite while its request is loading
+ * or failed. A lookup that finds no gateway row means it never sent a heartbeat.
+ */
 export function gatewayState(gateway: { data?: unknown; error: Error | null; stale: boolean }): GatewayState {
   if (gateway.error) return 'unavailable';
-  if (gateway.data == null) return 'checking';
-  return gateway.stale ? 'offline' : 'online';
+  if (gateway.data === undefined) return 'checking';
+  return gateway.data === null || gateway.stale ? 'offline' : 'online';
 }

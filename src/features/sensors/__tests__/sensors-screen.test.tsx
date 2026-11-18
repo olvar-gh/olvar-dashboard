@@ -291,6 +291,33 @@ describe('Sensors with cached data and the offline view', () => {
     expect(screen.queryByText('Gateway Is Offline')).toBeNull();
   });
 
+  it('keeps the cached charts with a retryable notice when the range query fails', async () => {
+    const app = await renderApp('/sensors');
+    await screen.findByTestId('sensor-card-soil');
+    const getReadings = app.source.getReadings;
+    app.source.getReadings = async () => {
+      throw new DataError('fetch failed');
+    };
+    await act(async () => {
+      await app.queryClient.refetchQueries({ queryKey: ['readings', '24h'] });
+    });
+    const notice = await screen.findByTestId('sensors-chart-error');
+    expect(screen.getByTestId('sensor-card-soil')).toBeTruthy();
+    app.source.getReadings = getReadings;
+    await fireEvent.press(within(notice).getByRole('button', { name: 'Retry' }));
+    await waitFor(() => expect(screen.queryByTestId('sensors-chart-error')).toBeNull());
+  });
+
+  it('treats a gateway lookup with no row as no heartbeat, not as still checking', async () => {
+    const app = await renderApp('/sensors', { scenario: 'offline' });
+    await screen.findByTestId('sensors-offline');
+    app.source.getGateway = async () => null;
+    await act(async () => {
+      await app.queryClient.resetQueries({ queryKey: ['gateway'] });
+    });
+    await waitFor(() => expect(within(screen.getByTestId('gateway-row')).getByText('Gateway Is Offline')).toBeTruthy());
+  });
+
   it('says the gateway status is unavailable when its request fails', async () => {
     const app = await renderApp('/sensors', { scenario: 'offline' });
     await screen.findByTestId('sensors-offline');

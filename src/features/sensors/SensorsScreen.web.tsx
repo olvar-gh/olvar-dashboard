@@ -106,7 +106,12 @@ function Cards({ query, range, state, bp }: { query: RangeQuery; range: Range; s
       minHeight={cardMinHeight}
     />
   ));
-  return <Grid bp={bp}>{cards}</Grid>;
+  return (
+    <>
+      {query.error ? <RefreshError onRetry={query.refetch} message="Couldn’t refresh the charts. Showing the last ones loaded." testID="sensors-chart-error" /> : null}
+      <Grid bp={bp}>{cards}</Grid>
+    </>
+  );
 }
 
 function Grid({ bp, children }: { bp: Breakpoint; children: ReactElement[] }) {

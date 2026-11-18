@@ -188,8 +188,10 @@ export function useHome(): HomeState {
   };
 
   const refresh = async () => {
-    await Promise.all([status, latest, todayReadings, week, chat, device].map((q) => q.refetch()));
-    events.refetch();
+    // A manual refetch ignores `enabled`, so device-bound queries wait until there is a device.
+    const deviceBound = device.data ? [latest, todayReadings, week] : [];
+    await Promise.all([status, chat, device, ...deviceBound].map((q) => q.refetch()));
+    if (device.data) events.refetch();
   };
   return { kind: 'ready', data, refresh, retry, retrying };
 }
