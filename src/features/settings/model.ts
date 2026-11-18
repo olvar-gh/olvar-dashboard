@@ -170,14 +170,14 @@ export function draftFrom(thresholds: Thresholds | null | undefined, locale?: st
   return out;
 }
 
-/** A value as the owner would type it: the locale's decimal mark, no grouping. */
+/** A value as the owner would type it: Latin digits, the locale's decimal mark, no grouping. */
 export function formatInput(v: number, locale?: string): string {
-  return new Intl.NumberFormat(locale, { useGrouping: false, maximumFractionDigits: 6 }).format(v);
+  return new Intl.NumberFormat(locale, { useGrouping: false, maximumFractionDigits: 6, numberingSystem: 'latn' }).format(v);
 }
 
 function separators(locale?: string): { decimal: string; group: string } {
   try {
-    const parts = new Intl.NumberFormat(locale).formatToParts(12345.5);
+    const parts = new Intl.NumberFormat(locale, { numberingSystem: 'latn' }).formatToParts(12345.5);
     return {
       decimal: parts.find((p) => p.type === 'decimal')?.value ?? '.',
       group: parts.find((p) => p.type === 'group')?.value ?? ',',
@@ -185,6 +185,17 @@ function separators(locale?: string): { decimal: string; group: string } {
   } catch {
     return { decimal: '.', group: ',' };
   }
+}
+
+/** First code point of each run of native decimal digits a keyboard may type (Arabic-Indic, Devanagari, …). */
+const DIGIT_ZEROS = [0x660, 0x6f0, 0x966, 0x9e6, 0xa66, 0xae6, 0xb66, 0xbe6, 0xc66, 0xce6, 0xd66, 0xe50, 0xed0, 0xf20, 0x1040, 0xff10];
+
+function latinDigits(s: string): string {
+  return s.replace(/\p{Nd}/gu, (d) => {
+    const cp = d.codePointAt(0)!;
+    const zero = DIGIT_ZEROS.find((z) => cp >= z && cp <= z + 9);
+    return zero === undefined ? d : String(cp - zero);
+  });
 }
 
 const escape = (c: string) => c.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -198,14 +209,18 @@ const escape = (c: string) => c.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 export function parseNumber(s: string, locale?: string): number | null {
   const { decimal, group } = separators(locale);
   const spaceGroup = /\s/.test(group);
-  let t = s.trim().replace(/[\u2212\u2012\u2013]/g, '-');
+  let t = latinDigits(s.trim())
+    .replace(/[\u2212\u2012\u2013]/g, '-')
+    .replace(/\u066b/g, decimal)
+    .replace(/\u066c/g, group);
   if (t === '') return null;
   if (spaceGroup) t = t.replace(/\s/g, ' ');
   const g = spaceGroup ? ' ' : group;
   const grouped = new RegExp(`^-?\\d{1,3}(${escape(g)}\\d{3})+(${escape(decimal)}\\d+)?$`);
   if (t.includes(g) && grouped.test(t)) t = t.split(g).join('');
   if (t.includes(g)) {
-    if (t.split(g).length !== 2 || t.includes(decimal)) return null;
+    // A space can only group thousands; "18 50" is malformed, never a decimal.
+    if (spaceGroup || t.split(g).length !== 2 || t.includes(decimal)) return null;
     t = t.replace(g, decimal);
   }
   const foreign = ['.', ','].find((c) => c !== decimal && c !== g && t.includes(c));
@@ -320,7 +335,18 @@ export function timeZones(current?: string | null): string[] {
     zones = [...IANA_TIME_ZONES];
   }
   if (!zones.includes('UTC')) zones = ['UTC', ...zones];
+  // The bundled list can be newer than the device's tz data; a zone it cannot format would break Home and Timeline.
+  zones = zones.filter(canFormatZone);
   return current && !zones.includes(current) ? [current, ...zones] : zones;
+}
+
+function canFormatZone(timeZone: string): boolean {
+  try {
+    new Intl.DateTimeFormat('en-US', { timeZone }).format(0);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 /** "GMT+9", "GMT-3:30", "GMT" at `at`; empty for an unknown zone. */

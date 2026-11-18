@@ -42,6 +42,7 @@ export function ChatScreen() {
   const listY = useRef(0);
   const olderFrom = useRef<OlderAnchor | null>(null);
   const followingUntil = useRef(0);
+  const scrollAt = useRef({ offset: 0, height: 0 });
 
   const lastKey = chat.messages ? `${chat.messages.at(-1)?.id ?? 'none'}:${chat.pending?.text ?? ''}:${chat.sending}` : null;
   useEffect(() => {
@@ -82,14 +83,20 @@ export function ChatScreen() {
     if (limited) Alert.alert(`${chat.plantName} needs a breather`, RATE_LIMIT_RULE);
   }, [limited, chat.plantName]);
 
+  /** Requests the older page, anchored where the reader is now (also for a Retry after a failure). */
+  const loadOlder = () => {
+    olderFrom.current = { ...scrollAt.current, oldestId: chat.messages?.[0]?.id };
+    void chat.history.fetchNextPage();
+  };
+
   const onScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
     const { contentOffset, contentSize, layoutMeasurement } = e.nativeEvent;
     // An animated scroll to the end passes through offsets far from it; it still counts as at the end.
     const following = Date.now() < followingUntil.current;
     atEnd.current = following || contentOffset.y + layoutMeasurement.height >= contentSize.height - FOLLOW_WITHIN;
+    scrollAt.current = { offset: contentOffset.y, height: contentSize.height };
     if (dragged.current && contentOffset.y < LOAD_OLDER_WITHIN && chat.history.hasNextPage && !chat.history.isFetchingNextPage) {
-      olderFrom.current = { offset: contentOffset.y, height: contentSize.height, oldestId: chat.messages?.[0]?.id };
-      void chat.history.fetchNextPage();
+      loadOlder();
     }
   };
 
@@ -166,6 +173,7 @@ export function ChatScreen() {
         {body ? null : (
           <IosMessages
             chat={chat}
+            onLoadOlder={loadOlder}
             onLayout={(e) => (listY.current = e.nativeEvent.layout.y)}
             onDayLayout={(date, y) => dayOffsets.current.set(date, y)}
           />

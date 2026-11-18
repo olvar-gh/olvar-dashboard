@@ -9,10 +9,16 @@ import { ERROR_ROW_TEXT, questionFor, type ChatRow } from '../model';
 import { PlantAvatar } from '../PlantAvatar';
 import type { ChatModel } from '../useChat';
 
-type Props = { chat: ChatModel; onDayLayout: (date: string, y: number) => void; onLayout?: (e: LayoutChangeEvent) => void };
+type Props = {
+  chat: ChatModel;
+  onDayLayout: (date: string, y: number) => void;
+  onLayout?: (e: LayoutChangeEvent) => void;
+  /** Fetches the older page with a fresh scroll anchor. */
+  onLoadOlder: () => void;
+};
 
 /** Day-grouped bubbles; a failed send or a fallback answer offers a native action sheet. */
-export function IosMessages({ chat, onDayLayout, onLayout }: Props) {
+export function IosMessages({ chat, onDayLayout, onLayout, onLoadOlder }: Props) {
   const { days = [], messages = [], timeZone } = chat;
   return (
     <View style={styles.list} onLayout={onLayout}>
@@ -28,7 +34,7 @@ export function IosMessages({ chat, onDayLayout, onLayout }: Props) {
       {chat.history.isFetchNextPageError && !chat.history.isFetchingNextPage ? (
         <View style={styles.olderError} testID="chat-older-error">
           <Text style={[styles.note, styles.noteError]}>Couldn’t load earlier messages.</Text>
-          <Pressable accessibilityRole="button" onPress={() => void chat.history.fetchNextPage()} hitSlop={8}>
+          <Pressable accessibilityRole="button" onPress={onLoadOlder} hitSlop={8}>
             <Text style={styles.retry}>Retry</Text>
           </Pressable>
         </View>

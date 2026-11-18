@@ -94,6 +94,21 @@ describe('care targets', () => {
     expect(parseNumber('1 500,5', 'fr-FR')).toBe(1500.5);
   });
 
+  it('fills and reads Latin digits in every locale, and accepts typed native digits', () => {
+    const draft = draftFrom(SPATHIPHYLLUM_THRESHOLDS, 'ar-EG');
+    expect(draft.temperature_c).toEqual({ low: '18', high: '29' });
+    draft.temperature_c = { low: '18.5', high: draft.temperature_c.high };
+    expect(checkDraft(draft, ['temperature_c'], SPATHIPHYLLUM_THRESHOLDS, 'ar-EG').ranges.temperature_c).toEqual({ low: 18.5, high: 29 });
+    expect(parseNumber('٢٩٫٥', 'ar-EG')).toBe(29.5);
+    expect(parseNumber('२९', 'hi-IN')).toBe(29);
+  });
+
+  it('rejects malformed space grouping instead of reading it as a decimal', () => {
+    expect(parseNumber('18 50', 'fr-FR')).toBeNull();
+    expect(parseNumber('1 50', 'fr-FR')).toBeNull();
+    expect(parseNumber('1 500', 'fr-FR')).toBe(1500);
+  });
+
   it('rejects ambiguous or mixed separators', () => {
     expect(parseNumber('1.500', 'fr-FR')).toBeNull();
     expect(parseNumber('1.500,5', 'en-US')).toBeNull();
@@ -217,6 +232,23 @@ describe('time zones', () => {
     expect(zones[0]).toBe('Mars/Olympus_Mons');
     expect(zones).toContain('Asia/Seoul');
     expect(filterZones(zones, 'new york')).toEqual(['America/New_York']);
+  });
+
+  it('offers only zones this device can format', () => {
+    const Real = Intl.DateTimeFormat;
+    const spy = jest.spyOn(Intl, 'DateTimeFormat').mockImplementation(((locale?: string, options?: Intl.DateTimeFormatOptions) => {
+      if (options?.timeZone === 'America/Coyhaique') throw new RangeError('Invalid time zone');
+      return new Real(locale, options);
+    }) as typeof Intl.DateTimeFormat);
+    const intl = Intl as unknown as { supportedValuesOf?: unknown };
+    const original = intl.supportedValuesOf;
+    intl.supportedValuesOf = () => ['Asia/Seoul', 'America/Coyhaique', 'Europe/Berlin'];
+    try {
+      expect(timeZones('Asia/Seoul')).toEqual(['UTC', 'Asia/Seoul', 'Europe/Berlin']);
+    } finally {
+      intl.supportedValuesOf = original;
+      spy.mockRestore();
+    }
   });
 
   it('offers the full IANA list where Intl.supportedValuesOf is missing (Hermes)', () => {

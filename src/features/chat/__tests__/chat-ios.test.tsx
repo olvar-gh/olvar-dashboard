@@ -131,13 +131,14 @@ describe('iPhone chat screen', () => {
     });
   }
 
-  function scrollToTop() {
+  function scrollTo(y: number, height: number) {
     const scroll = screen.getByTestId('chat-scroll');
     fireEvent(scroll, 'scrollBeginDrag');
     fireEvent.scroll(scroll, {
-      nativeEvent: { contentOffset: { x: 0, y: 0 }, contentSize: { width: 402, height: 4000 }, layoutMeasurement: { width: 402, height: 700 } },
+      nativeEvent: { contentOffset: { x: 0, y }, contentSize: { width: 402, height }, layoutMeasurement: { width: 402, height: 700 } },
     });
   }
+  const scrollToTop = () => scrollTo(0, 4000);
 
   it('shows Retry inline when the earlier messages fail to load', async () => {
     const app = await openLongChat();
@@ -163,5 +164,27 @@ describe('iPhone chat screen', () => {
       fireEvent(screen.getByTestId('chat-scroll'), 'contentSizeChange', 402, 4200);
     });
     expect(toEnd).not.toHaveBeenCalled();
+  });
+
+  it('anchors a retried older page where the reader tapped Retry', async () => {
+    const app = await openLongChat();
+    await screen.findAllByText(app.source.world.chat.at(-1)!.content, {}, { timeout: 5000 });
+    const real = app.source.getChatPage.bind(app.source);
+    const page = jest.spyOn(app.source, 'getChatPage').mockRejectedValue(new Error('offline'));
+    await act(async () => scrollToTop());
+    await screen.findByTestId('chat-older-error');
+    await act(async () => scrollTo(300, 5000));
+    page.mockImplementation(real);
+    const scrollToSpy = jest.spyOn(ScrollView.prototype as unknown as { scrollTo: (o: object) => void }, 'scrollTo');
+    afterThis(() => scrollToSpy.mockRestore());
+    await fireEvent.press(within(screen.getByTestId('chat-older-error')).getByRole('button', { name: 'Retry' }));
+    await waitFor(() => expect(screen.queryByTestId('chat-older-error')).toBeNull());
+    await waitFor(() => expect(page).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(screen.getAllByText('Older question 59').length).toBeGreaterThan(0));
+    scrollToSpy.mockClear();
+    await act(async () => {
+      fireEvent(screen.getByTestId('chat-scroll'), 'contentSizeChange', 402, 6000);
+    });
+    expect(scrollToSpy).toHaveBeenCalledWith({ y: 1300, animated: false });
   });
 });
