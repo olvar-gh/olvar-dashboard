@@ -21,6 +21,8 @@ type Screen = {
   /** Waits for the data and charts; also run again after a resize, since charts re-measure. */
   ready: (page: Page) => Promise<void>;
   masks?: (page: Page) => Promise<Rect[]>;
+  /** Runs before the Figma capture, e.g. to bring the top of the page into view. */
+  beforeCapture?: (page: Page) => Promise<void>;
   /** Share of differing pixels the current build reaches; a regression past it fails. */
   budget: { 1920: number; 1512: number };
 };
@@ -88,7 +90,12 @@ const screens: Screen[] = [
       await expect(page.getByTestId('chat-screen')).toBeVisible();
       await expect(page.getByPlaceholder('Ask Sparks anything…')).toBeVisible();
     },
-    budget: { 1920: 0.055, 1512: 0.065 },
+    // The page follows the latest message by scrolling the document; the frame shows the top of the page.
+    beforeCapture: async (page) => {
+      await page.evaluate(() => window.scrollTo(0, 0));
+      await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(0);
+    },
+    budget: { 1920: 0.045, 1512: 0.055 },
   },
   {
     name: 'Calibration',
@@ -149,6 +156,7 @@ for (const screen of screens) {
         ...(maskTable[screen.name === 'Calibration' ? 'Settings' : screen.name]?.[width] ?? []),
         ...((await screen.masks?.(page)) ?? []),
       ];
+      await screen.beforeCapture?.(page);
       const share = await figmaDiff(page, frame, info.outputPath('figma'), { masks: regions });
       const percent = (share * 100).toFixed(1);
       info.annotations.push({ type: 'figma-diff', description: `${frame} (${screen.frames[width]}): ${percent} %` });

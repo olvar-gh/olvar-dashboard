@@ -32,7 +32,7 @@ export async function figmaDiff(
   const crop = (src: PNG) => {
     const out = new PNG({ width: clip.width, height: clip.height });
     PNG.bitblt(src, out, clip.x, clip.y, clip.width, clip.height, 0, 0);
-    for (const m of options.masks ?? []) {
+    for (const m of (options.masks ?? []).map(toPixels)) {
       for (let y = Math.max(0, m.y - clip.y); y < Math.min(clip.height, m.y - clip.y + m.height); y++) {
         for (let x = Math.max(0, m.x - clip.x); x < Math.min(clip.width, m.x - clip.x + m.width); x++) {
           const i = (y * clip.width + x) * 4;
@@ -53,4 +53,11 @@ export async function figmaDiff(
   fs.writeFileSync(path.join(outDir, `${name}-capture.png`), PNG.sync.write(a));
   fs.writeFileSync(path.join(outDir, `${name}-diff.png`), PNG.sync.write(diff));
   return changed / (clip.width * clip.height);
+}
+
+/** Grows a rect to whole pixels, so a fractional bounding box masks every pixel it touches. */
+function toPixels({ x, y, width, height }: Rect): Rect {
+  const left = Math.floor(x);
+  const top = Math.floor(y);
+  return { x: left, y: top, width: Math.ceil(x + width) - left, height: Math.ceil(y + height) - top };
 }

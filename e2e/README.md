@@ -33,9 +33,10 @@ Each of the 8 v1 screens (Sign in, Home, Sensors, Timeline, Chat, Soil calibrati
 is opened on the fixtures with the clock fixed to the Figma frames' time (Home Fri Nov 6 14:32 Seoul,
 the rest Sat Nov 7 14:30). Two tests run per screen and size:
 
-- **Figma comparison.** The first screenful is diffed against `design/figma/<Screen>-<width>.png`, the
+- **Figma comparison.** The first screenful (Chat is scrolled to the top first, since it follows the
+  latest message) is diffed against `design/figma/<Screen>-<width>.png`, the
   1× export of the frame `<Screen> / Desktop <width>`. Regions that v1 removes or changes on purpose
-  (PLAN §2.1.1) are masked from `e2e/web/figma-masks.json`, in CSS px. The share of differing pixels is
+  (PLAN §2.1.1) are masked from `e2e/web/figma-masks.json`, in CSS px, rounded out to whole pixels. The share of differing pixels is
   printed (`figma-diff <Screen>-<width>: x %`), added as a test annotation, and must stay at or under the
   screen's `budget`. The budget is the current value plus a small margin, so a drift away from Figma
   fails, and a fix toward Figma lets you lower it. The capture and diff images are written to
@@ -43,8 +44,8 @@ the rest Sat Nov 7 14:30). Two tests run per screen and size:
 - **Full-page baseline.** `toHaveScreenshot` against
   `e2e/web/__screenshots__/visual.spec.ts/<Screen>-<project>-<platform>.png`. The viewport grows to the
   document height before the capture, because Playwright's `fullPage` resize can catch the charts
-  while they re-measure. Baselines are per platform. Record Linux baselines on CI with
-  `npm run test:visual:update`.
+  while they re-measure. Baselines exist for macOS only, so run the visual suite locally on a Mac. It does
+  not run in CI.
 
 ### Refreshing the Figma exports
 
@@ -66,7 +67,12 @@ SUPABASE_SECRET_KEY=sb_secret_... \
 npm run test:live
 ```
 
-The checks only run in the `fhd-1920` project. Before they start, the suite looks at the last 32 h of
-readings. Wherever two readings are more than 2 min apart, it adds one reading a minute under a new
-boot id, ending at now. It only appends, so a seed that is days old still passes. Without
-`SUPABASE_SECRET_KEY`, a gap skips the history checks with a message instead of failing them.
+The checks only run in the `fhd-1920` project. Before they start, the suite reads the last 32 h of
+`readings` straight from the table, not through the app's data source. Every whole minute with no
+reading within 30 s gets one synthetic reading under a new boot id. It only appends, then checks
+coverage again, so a seed that is days old still passes. The 24 h test compares the paginated result
+with an exact `count` of the same window.
+
+The suite writes **only** when `SUPABASE_SECRET_KEY` is set **and** `EXPO_PUBLIC_SUPABASE_URL` points
+at `localhost` or `127.0.0.1`; it never writes readings to a hosted project. Otherwise, missing minutes
+skip the history checks and the Realtime write check skips, each with a message saying why.
