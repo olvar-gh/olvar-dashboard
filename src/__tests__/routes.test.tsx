@@ -38,8 +38,8 @@ describe('route skeleton', () => {
     const screenTestId = screenTestIds[url];
     const app = await renderApp(url);
     expect(app.getPathname()).toBe(url);
-    // Native tabs keep every tab mounted, so the other tabs' placeholders render too.
-    expect((await screen.findAllByTestId('screen-placeholder')).length).toBeGreaterThan(0);
+    // Native tabs keep every tab mounted, so Home renders under the tabs; settings pages are still placeholders.
+    expect((await screen.findAllByTestId(/^(home-screen|screen-placeholder)$/)).length).toBeGreaterThan(0);
     if (screenTestId) expect(await screen.findByTestId(screenTestId)).toBeTruthy();
     // A built iOS screen puts its title in the native header config instead of a Text.
     else expect(screen.queryAllByText(title).length > 0 || hasHeaderTitle(screen.toJSON(), title)).toBe(true);

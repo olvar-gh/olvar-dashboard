@@ -18,6 +18,7 @@ export const keys = {
   day: (deviceId: string, date: string, part: DayPart, timeZone: string) =>
     ['day', deviceId, date, part, timeZone] as const,
   chat: (plantId: string) => ['chat', plantId] as const,
+  chatLive: (plantId: string) => ['chat-live', plantId] as const,
 };
 
 /** One local day's activity queries (offline periods, extrema, first message) for a device. */

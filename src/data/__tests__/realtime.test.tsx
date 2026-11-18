@@ -73,4 +73,27 @@ describe('chat history', () => {
     expect(result.current.messages!.map((m) => m.id)).toEqual(source.world.chat.map((m) => m.id));
     expect(result.current.hasNextPage).toBe(false);
   });
+
+  it('keeps a message that arrives while an older page is loading', async () => {
+    const { result, source, handlers } = await renderWithData(
+      () => ({ history: useChatHistory(), plant: usePlant() }),
+      { now: NOW },
+    );
+    await settle(() => !!result.current.history.messages);
+    let release!: () => void;
+    const getPage = source.getChatPage.bind(source);
+    jest.spyOn(source, 'getChatPage').mockImplementationOnce(async (...args) => {
+      await new Promise<void>((r) => (release = r));
+      return getPage(...args);
+    });
+    const loading = result.current.history.fetchNextPage();
+    await settle(() => !!release);
+    const row = { ...result.current.history.messages!.at(-1)!, id: 9999, content: 'Live!', created_at: NOW.toISOString() };
+    handlers[0].onChatMessage(row);
+    await settle(() => result.current.history.messages!.some((m) => m.id === 9999));
+    release();
+    await loading;
+    await settle(() => result.current.history.messages!.length === source.world.chat.length + 1);
+    expect(result.current.history.messages!.at(-1)).toMatchObject({ id: 9999, content: 'Live!' });
+  });
 });

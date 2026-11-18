@@ -2,7 +2,7 @@ export { AppProviders } from './AppProviders';
 export { AppShell, type AppShellProps } from './AppShell';
 export { AppTabs } from './AppTabs';
 export { GatewayStatus, gatewayStatusText } from './GatewayStatus';
-export { hrefs, safeNext, sectionFor, shellTabs, type Section, type ShellTab } from './navigation';
+export { BOTTOM_BAR_CLEARANCE, hrefs, safeNext, sectionFor, shellTabs, type Section, type ShellTab } from './navigation';
 export { NoPlant } from './NoPlant';
 export { PageScroll, type PageScrollProps } from './PageScroll';
 export { RootNavigator } from './RootNavigator';
