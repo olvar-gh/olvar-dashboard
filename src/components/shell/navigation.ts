@@ -19,6 +19,9 @@ const tabRoutes: Record<string, Pick<ShellTab, 'section' | 'route' | 'href'>> = 
   chat: { section: 'chat', route: 'chat', href: '/chat' },
 };
 
+/** Room the narrow-web bottom bar takes at the foot of the viewport. */
+export const BOTTOM_BAR_CLEARANCE = 96;
+
 /** Home · Sensors · Timeline · Chat: the iOS tab bar, the desktop sidebar and the narrow-web bottom bar. */
 export const shellTabs: readonly ShellTab[] = appTabs.map((tab) => ({ ...tab, ...tabRoutes[tab.name] }));
 

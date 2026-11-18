@@ -15,7 +15,7 @@ describe('session gate', () => {
     await fireEvent.press(screen.getByTestId('sign-in-submit'));
 
     await waitFor(() => expect(app.getPathname()).toBe('/timeline'));
-    expect((await screen.findAllByTestId('screen-placeholder')).length).toBeGreaterThan(0);
+    expect(await screen.findByTestId('timeline')).toBeTruthy();
   });
 
   it('keeps a signed-out visitor of / on sign in without a next parameter', async () => {
@@ -31,7 +31,7 @@ describe('session gate', () => {
 
   it('returns to sign in when the owner signs out', async () => {
     const app = await renderApp('/sensors');
-    expect((await screen.findAllByTestId('screen-placeholder')).length).toBeGreaterThan(0);
+    expect(await screen.findByTestId('sensors-screen')).toBeTruthy();
     await act(async () => {
       await app.source.auth.signOut();
     });

@@ -36,11 +36,11 @@ describe('route skeleton', () => {
     expect(await screen.findByTestId('home-screen')).toBeTruthy();
   });
 
-  it.each(routes)('resolves %s inside the shell', async (url, title, testID = 'screen-placeholder') => {
+  it.each(routes)('resolves %s inside the shell', async (url, title, testID: string | RegExp = /^(home-screen|screen-placeholder)$/) => {
     const screenTestId = screenTestIds[url];
     const app = await renderApp(url);
     expect(app.getPathname()).toBe(url);
-    // Native tabs keep every tab mounted, so the other tabs' placeholders render too.
+    // Native tabs keep every tab mounted, so Home renders under the tabs; a built settings page by its testID.
     expect((await screen.findAllByTestId(testID)).length).toBeGreaterThan(0);
     if (screenTestId) expect(await screen.findByTestId(screenTestId)).toBeTruthy();
     // A built iOS screen puts its title in the native header config instead of a Text.

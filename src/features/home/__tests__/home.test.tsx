@@ -29,9 +29,9 @@ describe('iPhone Home', () => {
 
   it('shows the latest plant reply', async () => {
     const { source } = await renderApp('/');
-    await screen.findByTestId('home-screen');
+    const home = within(await screen.findByTestId('home-screen'));
     const reply = (await source.getChatPage(source.world.plant.id, 50)).find((m) => m.role === 'plant' && !m.error)!;
-    expect(await screen.findByText(reply.content)).toBeTruthy();
+    expect(await home.findByText(reply.content)).toBeTruthy();
   });
 
   it('updates the cards when a new reading arrives, without a reload', async () => {
