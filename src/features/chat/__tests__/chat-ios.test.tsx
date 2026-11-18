@@ -1,5 +1,5 @@
 import { act, fireEvent, screen, waitFor, within } from 'expo-router/testing-library';
-import { Alert, Keyboard, StyleSheet, type KeyboardEvent } from 'react-native';
+import { Alert, Keyboard, ScrollView, StyleSheet, type KeyboardEvent } from 'react-native';
 
 import { renderApp } from '@/components/shell/testing/render-app';
 import { ChatError } from '@/data';
@@ -112,5 +112,56 @@ describe('iPhone chat screen', () => {
       shows.forEach((fn) => fn({ duration: 0, endCoordinates: { height: 336, screenX: 0, screenY: 538, width: 402 } } as KeyboardEvent));
     });
     expect(padding()).toBe(before + 336);
+  });
+
+  async function openLongChat() {
+    return openChat((app) => {
+      const first = app.source.world.chat[0];
+      const start = Date.parse(first.created_at) - 120 * 60_000;
+      const older = Array.from({ length: 60 }, (_, i) => ({
+        ...first,
+        id: 100_000 + i,
+        role: 'user',
+        reply_to: null,
+        content: `Older question ${i}`,
+        created_at: new Date(start + i * 60_000).toISOString(),
+      }));
+      app.source.world.chat.unshift(...older);
+      return app.queryClient.resetQueries({ queryKey: ['chat'] });
+    });
+  }
+
+  function scrollToTop() {
+    const scroll = screen.getByTestId('chat-scroll');
+    fireEvent(scroll, 'scrollBeginDrag');
+    fireEvent.scroll(scroll, {
+      nativeEvent: { contentOffset: { x: 0, y: 0 }, contentSize: { width: 402, height: 4000 }, layoutMeasurement: { width: 402, height: 700 } },
+    });
+  }
+
+  it('shows Retry inline when the earlier messages fail to load', async () => {
+    const app = await openLongChat();
+    await screen.findAllByText(app.source.world.chat.at(-1)!.content, {}, { timeout: 5000 });
+    const real = app.source.getChatPage.bind(app.source);
+    const page = jest.spyOn(app.source, 'getChatPage').mockRejectedValue(new Error('offline'));
+    await act(async () => scrollToTop());
+    expect(await screen.findByTestId('chat-older-error')).toBeTruthy();
+    page.mockImplementation(real);
+    await fireEvent.press(within(screen.getByTestId('chat-older-error')).getByRole('button', { name: 'Retry' }));
+    await waitFor(() => expect(screen.queryByTestId('chat-older-error')).toBeNull());
+    expect(page).toHaveBeenLastCalledWith(app.source.world.plant.id, 50, expect.objectContaining({ id: expect.any(Number) }));
+  });
+
+  it('does not jump back to the newest message once the reader has scrolled away', async () => {
+    const app = await openChat();
+    await screen.findAllByText(app.source.world.chat.at(-1)!.content, {}, { timeout: 5000 });
+    const toEnd = jest.spyOn(ScrollView.prototype as unknown as { scrollToEnd: () => void }, 'scrollToEnd');
+    afterThis(() => toEnd.mockRestore());
+    await act(async () => scrollToTop());
+    toEnd.mockClear();
+    await act(async () => {
+      fireEvent(screen.getByTestId('chat-scroll'), 'contentSizeChange', 402, 4200);
+    });
+    expect(toEnd).not.toHaveBeenCalled();
   });
 });

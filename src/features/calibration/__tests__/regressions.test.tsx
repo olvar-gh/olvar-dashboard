@@ -72,6 +72,30 @@ describe('initial load errors', () => {
   });
 });
 
+describe('retry after the first readings request failed', () => {
+  it('pins the baseline from the retried fetch instead of staying on loading', async () => {
+    const source = createFixtureSource({ days: 1 });
+    const real = source.getLatestReadings.bind(source);
+    let fail = true;
+    source.getLatestReadings = jest.fn(async (...args: Parameters<typeof real>) => {
+      if (fail) throw new Error('network');
+      return real(...args);
+    });
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    await render(
+      <DataProvider source={source} queryClient={queryClient}>
+        <IosSheet />
+      </DataProvider>,
+    );
+    expect(await screen.findByText(/Couldn’t load the soil sensor/, {}, WAIT)).toBeTruthy();
+    fail = false;
+    await fireEvent.press(screen.getByRole('button', { name: /Try Again|Retry/ }));
+    expect(await screen.findByText(/Waiting for fresh readings · 0 of 3/, {}, WAIT)).toBeTruthy();
+    expect(screen.queryByRole('progressbar')).toBeNull();
+    source.stop();
+  });
+});
+
 describe('reopening with the production query client', () => {
   it('fetches on open and shows the live reading although the cache is still fresh', async () => {
     const source = createFixtureSource({ days: 1 });

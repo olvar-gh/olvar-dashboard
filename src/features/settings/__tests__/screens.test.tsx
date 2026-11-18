@@ -156,10 +156,10 @@ describe('Care targets', () => {
     const app = await open('/settings/care-targets');
     await fireEvent(await screen.findByLabelText('Use preset'), 'valueChange', false);
     const low = await screen.findByTestId('target-soil_pct-low');
-    await fireEvent.changeText(low, '30');
+    await fireEvent.changeText(low, '38');
     await fireEvent.press(screen.getByTestId('care-save'));
-    await waitFor(() => expect(app.source.world.plant.threshold_overrides).toEqual({ soil_pct: { ok_low: 30 } }));
-    expect(await screen.findByText('30–85%')).toBeTruthy();
+    await waitFor(() => expect(app.source.world.plant.threshold_overrides).toEqual({ soil_pct: { ok_low: 38 } }));
+    expect(await screen.findByText('38–85%')).toBeTruthy();
   });
 
   it('opened from the Settings switch, leaves edit mode after a save', async () => {
@@ -190,7 +190,7 @@ describe('Care targets', () => {
     const update = jest.spyOn(app.source, 'updatePlant');
     await fireEvent.changeText(await screen.findByTestId('target-humidity_pct-low'), '80');
     await fireEvent.press(screen.getByTestId('care-save'));
-    expect(await screen.findByText('The low end must be below the high end.')).toBeTruthy();
+    expect(await screen.findByText('The low end can’t be above the high end.')).toBeTruthy();
     expect(update).not.toHaveBeenCalled();
   });
 

@@ -119,7 +119,7 @@ export function ChatScreen() {
       <Skeleton width="75%" height={84} radius={20} />
       <Skeleton width="45%" height={40} radius={20} style={styles.right} />
     </View>
-  ) : chat.messages.length === 0 && !chat.pending && !chat.sending ? (
+  ) : chat.messages.length === 0 && !chat.pending && !chat.sending && !chat.failed.length ? (
     <EmptyState title={`Say hello to ${chat.plantName}`} body={emptyText(chat.plantName)} testID="chat-empty" />
   ) : null;
 
@@ -143,6 +143,9 @@ export function ChatScreen() {
         onScrollBeginDrag={() => {
           dragged.current = true;
           followingUntil.current = 0;
+          // The reader took over: no settling jump or pending follow may pull them back to the end.
+          follow.current = 'none';
+          jumpUntil.current = 0;
         }}
         onContentSizeChange={onContentSizeChange}
         onLayout={() => {

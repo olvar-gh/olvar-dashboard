@@ -57,7 +57,7 @@ export function ChatCard({ chat, minHeight }: { chat: ChatModel; minHeight: numb
             <Skeleton width="35%" height={36} radius={18} style={styles.right} />
             <Skeleton width="55%" height={48} radius={16} />
           </View>
-        ) : chat.messages.length === 0 && !chat.pending && !chat.sending ? (
+        ) : chat.messages.length === 0 && !chat.pending && !chat.sending && !chat.failed.length ? (
           <EmptyState title={`Say hello to ${chat.plantName}`} body={emptyText(chat.plantName)} testID="chat-empty" />
         ) : (
           <Messages chat={chat} />

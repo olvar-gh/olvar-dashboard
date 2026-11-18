@@ -37,7 +37,7 @@ export function Messages({ chat }: { chat: ChatModel }) {
       {days.map((day) => (
         <Day key={day.date} day={day} chat={chat} all={messages} timeZone={timeZone} />
       ))}
-      {chat.pending || chat.sending || chat.sendError ? <Pending chat={chat} /> : null}
+      {chat.pending || chat.sending || chat.failed.length ? <Pending chat={chat} /> : null}
     </View>
   );
 }
@@ -107,22 +107,22 @@ function PlantMessage({ message, timeZone, onRetry }: { message: ChatRow; timeZo
 }
 
 function Pending({ chat }: { chat: ChatModel }) {
-  const { pending, sendError } = chat;
   return (
     <View style={styles.day}>
-      {pending ? (
-        <UserMessage text={pending.text} meta={pending.failed ? 'Not sent' : 'Sending…'} faded={!pending.failed} />
-      ) : null}
-      {sendError ? (
-        <View style={styles.sendError} testID="chat-send-error">
-          <Icon name="alert" size={14} color={colors.status.warn} />
-          <Text accessibilityRole="alert" style={styles.sendErrorText}>
-            {sendError.text}
-          </Text>
-          {sendError.retry ? <Button variant="secondary" label="Retry" onPress={chat.retrySend} /> : null}
-          <Button variant="plain" label="Dismiss" onPress={chat.dismissSendError} />
+      {chat.failed.map((f) => (
+        <View key={f.id} style={styles.day}>
+          <UserMessage text={f.text} meta="Not sent" />
+          <View style={styles.sendError} testID="chat-send-error">
+            <Icon name="alert" size={14} color={colors.status.warn} />
+            <Text accessibilityRole="alert" style={styles.sendErrorText}>
+              {f.error}
+            </Text>
+            {f.retry ? <Button variant="secondary" label="Retry" onPress={() => chat.retryFailed(f.id)} /> : null}
+            <Button variant="plain" label="Dismiss" onPress={() => chat.dismissFailed(f.id)} />
+          </View>
         </View>
-      ) : null}
+      ))}
+      {chat.pending ? <UserMessage text={chat.pending.text} meta="Sending…" faded /> : null}
       {chat.sending ? (
         <View style={styles.plant} testID="chat-typing">
           <PlantAvatar size={30} />

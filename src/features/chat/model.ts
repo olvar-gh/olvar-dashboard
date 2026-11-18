@@ -46,6 +46,9 @@ export function sendErrorText(error: ChatError): string {
   }
 }
 
+/** A send refused because the device is offline; the message stays in the composer. */
+export const OFFLINE_TEXT = 'You’re offline, so your message wasn’t sent. It’s still in the box; send it when you’re back online.';
+
 /** Under a reply stored with `error` set: the server answered with its fallback text. */
 export const ERROR_ROW_TEXT = 'Sparks couldn’t think this through, so this is a basic answer.';
 

@@ -1,10 +1,13 @@
-import { useCallback, useMemo, useState } from 'react';
+import { onlineManager } from '@tanstack/react-query';
+import { useCallback, useMemo, useRef, useState } from 'react';
 
 import { useChatHistory, useDevice, useGateway, useLatest, useNow, usePlant, usePlantStatus, useSendChat, type ChatError } from '@/data';
 import { groupChatDays } from '@/domain/chat-days';
 import { formatAge, formatTime, secondsSince } from '@/domain/format';
 
-import { canRetry, contextRows, isChatRow, MAX_MESSAGE_CHARS, optimisticVisible, rateLimitText, sendErrorText } from './model';
+import { canRetry, contextRows, isChatRow, MAX_MESSAGE_CHARS, OFFLINE_TEXT, optimisticVisible, rateLimitText, sendErrorText } from './model';
+
+type FailedSend = { id: number; text: string; lastIdAtSend: number; error: ChatError };
 
 /** Everything the Chat screen shows, shared by the desktop and iPhone layouts. */
 export function useChat() {
@@ -20,6 +23,9 @@ export function useChat() {
   const [draft, setDraft] = useState('');
   const [retryUntil, setRetryUntil] = useState<number | null>(null);
   const [lastIdAtSend, setLastIdAtSend] = useState(0);
+  const [failures, setFailures] = useState<FailedSend[]>([]);
+  const [notice, setNotice] = useState<string | null>(null);
+  const failureId = useRef(0);
   const now = useNow(retryUntil ? 1000 : 15_000);
 
   const all = history.messages;
@@ -28,34 +34,52 @@ export function useChat() {
 
   const secondsLeft = retryUntil ? (retryUntil - now.getTime()) / 1000 : 0;
   const rateLimited = secondsLeft > 0;
+  // A send before the history is in would put its bubble nowhere and race the first page.
+  const ready = messages !== undefined;
 
   /** Sends `text`; only a send from the composer (`fromDraft`) clears it, so a chip or retry keeps the draft. */
   const deliver = useCallback(
     (text: string, fromDraft: boolean) => {
       const message = text.trim();
-      if (!message || message.length > MAX_MESSAGE_CHARS || send.isPending || rateLimited) return false;
-      setLastIdAtSend(Math.max(0, ...(messages ?? []).map((m) => m.id)));
+      if (!ready || !message || message.length > MAX_MESSAGE_CHARS || send.isPending || rateLimited) return false;
+      if (!onlineManager.isOnline()) {
+        setNotice(OFFLINE_TEXT);
+        return false;
+      }
+      setNotice(null);
+      const lastId = Math.max(0, ...(messages ?? []).map((m) => m.id));
+      setLastIdAtSend(lastId);
       send.mutate(message, {
         onError: (error: ChatError) => {
           if (error.kind === 'rate_limited') {
             setRetryUntil(Date.now() + (error.retryAfterS ?? 60) * 1000);
             setDraft((d) => d || message);
-            send.reset();
+          } else {
+            setFailures((f) => [...f, { id: ++failureId.current, text: message, lastIdAtSend: lastId, error }]);
           }
+          send.reset();
         },
       });
       if (fromDraft) setDraft('');
       return true;
     },
-    [messages, rateLimited, send],
+    [messages, rateLimited, ready, send],
   );
   const submit = useCallback((text: string) => deliver(text, false), [deliver]);
   const sendDraft = useCallback(() => deliver(draft, true), [deliver, draft]);
 
-  const pendingText = send.variables;
-  const showPending =
-    pendingText != null && (send.isPending || send.isError) && optimisticVisible(messages ?? [], pendingText, lastIdAtSend);
-  const sendError = send.isError && send.error.kind !== 'rate_limited' ? send.error : null;
+  const retryFailed = (id: number) => {
+    const failure = failures.find((f) => f.id === id);
+    if (failure && submit(failure.text)) setFailures((f) => f.filter((x) => x.id !== id));
+  };
+  const dismissFailed = (id: number) => setFailures((f) => f.filter((x) => x.id !== id));
+
+  const pendingText = send.isPending ? send.variables : undefined;
+  const showPending = pendingText != null && optimisticVisible(messages ?? [], pendingText, lastIdAtSend);
+  // A send that timed out may still have been stored; its row replaces the failed bubble.
+  const failed = failures
+    .filter((f) => optimisticVisible(messages ?? [], f.text, f.lastIdAtSend))
+    .map((f) => ({ id: f.id, text: f.text, error: sendErrorText(f.error), retry: canRetry(f.error) }));
 
   const display = status.display;
   const reading = latest.data;
@@ -85,17 +109,16 @@ export function useChat() {
     setDraft,
     submit,
     sendDraft,
-    canSend: draft.trim().length > 0 && draft.trim().length <= MAX_MESSAGE_CHARS && !send.isPending && !rateLimited,
+    ready,
+    canSend: ready && draft.trim().length > 0 && draft.trim().length <= MAX_MESSAGE_CHARS && !send.isPending && !rateLimited,
     sending: send.isPending,
-    pending: showPending ? { text: pendingText!, failed: send.isError } : null,
-    sendError: sendError ? { text: sendErrorText(sendError), retry: canRetry(sendError) } : null,
-    retrySend: () => {
-      if (pendingText) {
-        send.reset();
-        submit(pendingText);
-      }
-    },
-    dismissSendError: () => send.reset(),
+    pending: showPending ? { text: pendingText } : null,
+    failed,
+    retryFailed,
+    dismissFailed,
+    /** A send refused before it left (offline); the draft is kept. */
+    notice,
+    dismissNotice: () => setNotice(null),
     rateLimit: rateLimited ? rateLimitText(secondsLeft) : null,
     display,
     presence,

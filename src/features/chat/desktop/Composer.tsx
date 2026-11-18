@@ -1,9 +1,9 @@
-import { useState } from 'react';
+import { useLayoutEffect, useRef, useState, type ComponentRef } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View, type NativeSyntheticEvent } from 'react-native';
 
 import { Icon } from '@/components/icons';
 import { BOTTOM_BAR_CLEARANCE } from '@/components/shell';
-import { Notice } from '@/components/ui';
+import { Button, Notice } from '@/components/ui';
 import { formatNumber } from '@/domain/format';
 import { colors, typography, useBreakpoint } from '@/theme';
 
@@ -14,11 +14,35 @@ const COUNTER_FROM = MAX_MESSAGE_CHARS - 200;
 const INPUT_MIN = 36;
 const INPUT_MAX = 160;
 
+type Measurable = { style: { height: string }; scrollHeight: number };
+
+/**
+ * The textarea height for its current text. `scrollHeight` never reports less than the box it
+ * is measured in, so the box is collapsed to one line first; otherwise a shorter draft would
+ * keep the height of the longest one.
+ */
+export function fitInputHeight(node: Measurable): number {
+  const prev = node.style.height;
+  node.style.height = `${INPUT_MIN}px`;
+  const content = node.scrollHeight;
+  node.style.height = prev;
+  return Math.min(INPUT_MAX, Math.max(INPUT_MIN, content));
+}
+
+function isMeasurable(node: unknown): node is Measurable {
+  const n = node as Partial<Measurable> | null;
+  return typeof n?.scrollHeight === 'number' && typeof n.style === 'object';
+}
+
 /** Suggestion chips, the message field and the disclaimer; sticks to the bottom of the viewport, above the compact bottom bar. */
 export function Composer({ chat }: { chat: ChatModel }) {
   const length = chat.draft.trim().length;
   const compact = useBreakpoint().tier === 'compact';
   const [height, setHeight] = useState(INPUT_MIN);
+  const input = useRef<ComponentRef<typeof TextInput>>(null);
+  useLayoutEffect(() => {
+    if (isMeasurable(input.current)) setHeight(fitInputHeight(input.current));
+  }, [chat.draft]);
   const onKeyPress = (e: NativeSyntheticEvent<ComposerKey>) => {
     if (isSendKey(e.nativeEvent)) {
       e.preventDefault();
@@ -32,12 +56,17 @@ export function Composer({ chat }: { chat: ChatModel }) {
           {`${chat.rateLimit} ${RATE_LIMIT_RULE}`}
         </Notice>
       ) : null}
+      {chat.notice ? (
+        <Notice tone="warn" icon="wifiOff" testID="chat-offline" action={<Button variant="plain" label="Dismiss" onPress={chat.dismissNotice} />}>
+          {chat.notice}
+        </Notice>
+      ) : null}
       <View style={styles.chips}>
         {suggestions(chat.reading?.temperature_c).map((s) => (
           <Pressable
             key={s}
             accessibilityRole="button"
-            disabled={!!chat.rateLimit || chat.sending}
+            disabled={!!chat.rateLimit || chat.sending || !chat.ready}
             onPress={() => chat.submit(s)}
             style={({ pressed, hovered }: { pressed: boolean; hovered?: boolean }) => [styles.chip, (pressed || hovered) && styles.chipHover]}
           >
@@ -48,6 +77,7 @@ export function Composer({ chat }: { chat: ChatModel }) {
       </View>
       <View style={styles.field}>
         <TextInput
+          ref={input}
           testID="chat-input"
           accessibilityLabel={`Message ${chat.plantName}`}
           placeholder={`Ask ${chat.plantName} anything…`}
@@ -58,7 +88,6 @@ export function Composer({ chat }: { chat: ChatModel }) {
           multiline
           numberOfLines={1}
           maxLength={MAX_MESSAGE_CHARS + 200}
-          onContentSizeChange={(e) => setHeight(Math.min(INPUT_MAX, Math.max(INPUT_MIN, e.nativeEvent.contentSize.height)))}
           style={[styles.input, { height: chat.draft ? height : INPUT_MIN }]}
         />
         <Pressable

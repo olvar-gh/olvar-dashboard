@@ -10,8 +10,9 @@ export const CHAT_PAGE_SIZE = 50;
 
 const NO_ROWS: ChatMessageRow[] = [];
 
-function byTime(a: ChatMessageRow, b: ChatMessageRow) {
-  return a.created_at.localeCompare(b.created_at) || a.id - b.id;
+/** Oldest first by the instant, then id: the same instant can be written as "…+00:00" or "…Z". */
+export function compareMessages(a: ChatMessageRow, b: ChatMessageRow) {
+  return Date.parse(a.created_at) - Date.parse(b.created_at) || a.id - b.id;
 }
 
 /**
@@ -42,7 +43,7 @@ export function useChatHistory() {
   if (query.data) {
     const loaded = query.data.pages.flat();
     const ids = new Set(loaded.map((m) => m.id));
-    messages = [...loaded, ...live.filter((m) => !ids.has(m.id))].sort(byTime);
+    messages = [...loaded, ...live.filter((m) => !ids.has(m.id))].sort(compareMessages);
   }
   return { ...query, messages };
 }
@@ -67,6 +68,8 @@ export function useSendChat() {
   const qc = useQueryClient();
   const plantId = usePlant().data?.id;
   return useMutation<ChatMessageRow, ChatError, string>({
+    // Never queue a question silently while offline; the caller checks `onlineManager` first.
+    networkMode: 'always',
     mutationFn: (message) => source.sendChat(plantId!, message),
     onSuccess: (reply) => {
       addChatMessage(qc, reply);

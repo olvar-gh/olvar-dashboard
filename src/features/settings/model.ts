@@ -7,6 +7,8 @@ import { formatAge, formatLocalDate, formatNumber, formatTime } from '@/domain/f
 import { localDate, tzOffsetMs } from '@/domain/time';
 import { colors, iosColors } from '@/theme';
 
+import { IANA_TIME_ZONES } from './zones';
+
 export const NICKNAME_MAX = 40;
 export const LOCATION_MAX = 60;
 export const PASSWORD_MIN = 8;
@@ -159,34 +161,60 @@ export function usesPreset(overrides: Json | null | undefined): boolean {
 
 export type RangeDraft = Record<ThresholdMetric, { low: string; high: string }>;
 
-export function draftFrom(thresholds: Thresholds | null | undefined): RangeDraft {
+export function draftFrom(thresholds: Thresholds | null | undefined, locale?: string): RangeDraft {
   const out = {} as RangeDraft;
   for (const cfg of METRICS) {
     const r = okRange(thresholds, cfg.metric);
-    out[cfg.metric] = { low: r ? String(r.low) : '', high: r ? String(r.high) : '' };
+    out[cfg.metric] = { low: r ? formatInput(r.low, locale) : '', high: r ? formatInput(r.high, locale) : '' };
   }
   return out;
 }
 
-function localeDecimal(): string {
+/** A value as the owner would type it: the locale's decimal mark, no grouping. */
+export function formatInput(v: number, locale?: string): string {
+  return new Intl.NumberFormat(locale, { useGrouping: false, maximumFractionDigits: 6 }).format(v);
+}
+
+function separators(locale?: string): { decimal: string; group: string } {
   try {
-    return new Intl.NumberFormat().formatToParts(1.5).find((p) => p.type === 'decimal')?.value ?? '.';
+    const parts = new Intl.NumberFormat(locale).formatToParts(12345.5);
+    return {
+      decimal: parts.find((p) => p.type === 'decimal')?.value ?? '.',
+      group: parts.find((p) => p.type === 'group')?.value ?? ',',
+    };
   } catch {
-    return '.';
+    return { decimal: '.', group: ',' };
   }
 }
 
+const escape = (c: string) => c.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
 /**
- * Reads a typed number. A comma is a decimal separator ("18,5" is 18.5), except where it groups
- * thousands in a locale whose decimal is a dot ("1,500" lux).
+ * Reads a typed number by the device locale (or `locale`). Its grouping is dropped only where it
+ * groups thousands ("1.500" is 1500 in de-DE, "1,500" in en-US). The other mark is read as a
+ * decimal when it cannot be a thousands group ("18,5" in en-US), and rejected when it could
+ * ("1.500" in fr-FR). Returns null for empty, malformed or ambiguous input.
  */
-export function parseNumber(s: string, decimal = localeDecimal()): number | null {
-  let t = s.trim();
+export function parseNumber(s: string, locale?: string): number | null {
+  const { decimal, group } = separators(locale);
+  const spaceGroup = /\s/.test(group);
+  let t = s.trim().replace(/[\u2212\u2012\u2013]/g, '-');
   if (t === '') return null;
-  if (decimal === ',') t = t.includes(',') ? t.replace(/\./g, '').replace(',', '.') : t;
-  else if (/^-?\d{1,3}(,\d{3})+(\.\d+)?$/.test(t)) t = t.replace(/,/g, '');
-  else if (/^-?\d*,\d+$/.test(t)) t = t.replace(',', '.');
-  const n = Number(t);
+  if (spaceGroup) t = t.replace(/\s/g, ' ');
+  const g = spaceGroup ? ' ' : group;
+  const grouped = new RegExp(`^-?\\d{1,3}(${escape(g)}\\d{3})+(${escape(decimal)}\\d+)?$`);
+  if (t.includes(g) && grouped.test(t)) t = t.split(g).join('');
+  if (t.includes(g)) {
+    if (t.split(g).length !== 2 || t.includes(decimal)) return null;
+    t = t.replace(g, decimal);
+  }
+  const foreign = ['.', ','].find((c) => c !== decimal && c !== g && t.includes(c));
+  if (foreign) {
+    if (t.includes(decimal) || t.split(foreign).length !== 2 || new RegExp(`${escape(foreign)}\\d{3}$`).test(t)) return null;
+    t = t.replace(foreign, decimal);
+  }
+  if (!/^-?(\d+|\d*[^\d-]\d+)$/.test(t) || (t.match(/[^\d-]/g) ?? []).some((c) => c !== decimal)) return null;
+  const n = Number(t.replace(decimal, '.'));
   return Number.isFinite(n) ? n : null;
 }
 
@@ -194,23 +222,43 @@ export type DraftCheck = { ranges: Partial<Record<ThresholdMetric, Range>>; erro
 
 const KEY_ORDER: ThresholdKey[] = ['critical_low', 'low', 'ok_low', 'ok_high', 'high', 'critical_high'];
 
+/** Metrics whose inputs differ from `base` (the effective ranges the editor opened with). */
+export function editedMetrics(draft: RangeDraft, base: RangeDraft): ThresholdMetric[] {
+  return METRICS.filter(({ metric }) => draft[metric].low !== base[metric].low || draft[metric].high !== base[metric].high).map(
+    (c) => c.metric,
+  );
+}
+
 /**
- * Checks a draft the way the server's constraint does (numbers, low below high), only to word a
- * message next to the row; the server stays authoritative.
+ * Checks the edited metrics the way the server's constraint does (numbers, low not above high,
+ * inside the effective warning bounds), only to word a message next to the row; the server stays
+ * authoritative. Untouched metrics are neither checked nor saved.
  */
-export function checkDraft(draft: RangeDraft): DraftCheck {
+export function checkDraft(
+  draft: RangeDraft,
+  edited: readonly ThresholdMetric[],
+  thresholds?: Thresholds | null,
+  locale?: string,
+): DraftCheck {
   const ranges: DraftCheck['ranges'] = {};
   const errors: DraftCheck['errors'] = {};
   for (const cfg of METRICS) {
+    if (!edited.includes(cfg.metric)) continue;
     const d = draft[cfg.metric];
-    const low = parseNumber(d.low);
-    const high = parseNumber(d.high);
-    if (low === null || high === null) {
+    const low = parseNumber(d.low, locale);
+    const high = parseNumber(d.high, locale);
+    const t = thresholds?.[cfg.metric];
+    const floor = Math.max(cfg.limits.min, t?.low ?? -Infinity);
+    const ceiling = Math.min(cfg.limits.max, t?.high ?? Infinity);
+    if (d.low.trim() === '' || d.high.trim() === '') {
       errors[cfg.metric] = 'Enter both ends of the range.';
-    } else if (low < cfg.limits.min || high > cfg.limits.max) {
-      errors[cfg.metric] = `Keep it between ${trimNumber(cfg.limits.min, 0)} and ${trimNumber(cfg.limits.max, 0)} ${cfg.unit}.`;
-    } else if (low >= high) {
-      errors[cfg.metric] = 'The low end must be below the high end.';
+    } else if (low === null || high === null) {
+      errors[cfg.metric] = `Enter plain numbers, like ${formatInput(18.5, locale)}.`;
+    } else if (low > high) {
+      errors[cfg.metric] = 'The low end can’t be above the high end.';
+    } else if (low < floor || high > ceiling) {
+      const bounds = `${trimNumber(floor, cfg.decimals)} and ${trimNumber(ceiling, cfg.decimals)} ${cfg.unit}`;
+      errors[cfg.metric] = t?.low != null || t?.high != null ? `Keep it within the warning bounds, ${bounds}.` : `Keep it between ${bounds}.`;
     } else {
       ranges[cfg.metric] = { low, high };
     }
@@ -219,8 +267,8 @@ export function checkDraft(draft: RangeDraft): DraftCheck {
 }
 
 /**
- * The `threshold_overrides` to save: each metric's `ok_low`/`ok_high` where it differs from the
- * profile, keeping any other override keys the plant already has. Equal to the profile → `{}`.
+ * The `threshold_overrides` to save: each edited metric's `ok_low`/`ok_high` where it differs from
+ * the profile; every other override the plant already has is kept. Equal to the profile → `{}`.
  */
 export function buildOverrides(
   profile: Json,
@@ -232,11 +280,11 @@ export function buildOverrides(
   const out: Record<string, Record<string, number>> = {};
   for (const cfg of METRICS) {
     const prev = asObject(existing[cfg.metric]);
+    const r = ranges[cfg.metric];
     const kept: Record<string, number> = {};
     for (const key of KEY_ORDER) {
-      if (key !== 'ok_low' && key !== 'ok_high' && typeof prev[key] === 'number') kept[key] = prev[key];
+      if ((!r || (key !== 'ok_low' && key !== 'ok_high')) && typeof prev[key] === 'number') kept[key] = prev[key];
     }
-    const r = ranges[cfg.metric];
     const p = asObject(base[cfg.metric]);
     if (r && r.low !== p.ok_low) kept.ok_low = r.low;
     if (r && r.high !== p.ok_high) kept.ok_high = r.high;
@@ -262,37 +310,14 @@ export function saveErrorMessage(err: unknown, context: 'ranges' | 'plant' | 'ti
 // ---------------------------------------------------------------------------------------------
 // Time zones
 
-const FALLBACK_ZONES = [
-  'UTC',
-  'Asia/Seoul',
-  'Asia/Tokyo',
-  'Asia/Shanghai',
-  'Asia/Singapore',
-  'Asia/Kolkata',
-  'Asia/Dubai',
-  'Australia/Sydney',
-  'Pacific/Auckland',
-  'Europe/London',
-  'Europe/Berlin',
-  'Europe/Paris',
-  'Europe/Madrid',
-  'Africa/Johannesburg',
-  'America/Sao_Paulo',
-  'America/New_York',
-  'America/Chicago',
-  'America/Denver',
-  'America/Los_Angeles',
-  'Pacific/Honolulu',
-];
-
-/** IANA zones the runtime knows; Hermes builds without `supportedValuesOf` get a short list. */
+/** IANA zones the runtime knows; Hermes, without `supportedValuesOf`, gets the bundled list. */
 export function timeZones(current?: string | null): string[] {
   const intl = Intl as unknown as { supportedValuesOf?: (key: 'timeZone') => string[] };
   let zones: string[];
   try {
-    zones = intl.supportedValuesOf?.('timeZone') ?? FALLBACK_ZONES;
+    zones = intl.supportedValuesOf?.('timeZone') ?? [...IANA_TIME_ZONES];
   } catch {
-    zones = FALLBACK_ZONES;
+    zones = [...IANA_TIME_ZONES];
   }
   if (!zones.includes('UTC')) zones = ['UTC', ...zones];
   return current && !zones.includes(current) ? [current, ...zones] : zones;

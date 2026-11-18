@@ -129,6 +129,28 @@ describe('Supabase source', () => {
     expect(signOut).toHaveBeenCalledWith({ scope: 'local' });
   });
 
+  it('signs out of this device when only revoking the token fails offline', async () => {
+    const { client } = fakeClient(() => ({ data: [], error: null }));
+    let session: object | null = { user: { email: 'dev@olvar.local' } };
+    Object.assign(client.auth as Record<string, unknown>, {
+      signOut: jest.fn(async () => {
+        session = null;
+        return { error: { message: 'Failed to fetch', name: 'AuthRetryableFetchError' } };
+      }),
+      getSession: jest.fn(async () => ({ data: { session } })),
+    });
+    await expect(createSupabaseSource(client as never).auth.signOut()).resolves.toBeUndefined();
+  });
+
+  it('still reports a sign-out that left the session in place', async () => {
+    const { client } = fakeClient(() => ({ data: [], error: null }));
+    Object.assign(client.auth as Record<string, unknown>, {
+      signOut: jest.fn(async () => ({ error: { message: 'storage failed' } })),
+      getSession: jest.fn(async () => ({ data: { session: { user: {} } } })),
+    });
+    await expect(createSupabaseSource(client as never).auth.signOut()).rejects.toMatchObject({ message: 'storage failed' });
+  });
+
   describe('password change and sign-out', () => {
     function authClient() {
       const { client } = fakeClient(() => ({ data: [], error: null }));
