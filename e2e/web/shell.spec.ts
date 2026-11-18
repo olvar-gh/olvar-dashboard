@@ -47,13 +47,15 @@ test.describe('session gate', () => {
     await expect(page).toHaveURL(/\/$/);
   });
 
+  const settingsPage: Record<string, string> = { '/settings': 'settings-plant', '/settings/account': 'settings-account' };
   for (const path of ['/timeline', '/chat', '/settings', '/settings/account']) {
     test(`deep link ${path} survives a reload`, async ({ page }) => {
       await page.goto(path);
-      await expect(page.getByRole('heading', { level: 1 }).first()).toBeVisible();
+      const ready = () => (settingsPage[path] ? page.getByTestId(settingsPage[path]) : page.getByRole('heading', { level: 1 }).first());
+      await expect(ready()).toBeVisible();
       await page.reload();
       await expect(page).toHaveURL(new RegExp(`${path}$`));
-      await expect(page.getByRole('heading', { level: 1 }).first()).toBeVisible();
+      await expect(ready()).toBeVisible();
     });
   }
 });

@@ -55,6 +55,14 @@ async function chatError(error: unknown): Promise<ChatError> {
 }
 
 export function createSupabaseSource(client: Client): DataSource {
+  // Re-authenticating for a password change installs a fresh session, so it must never overlap a
+  // sign-out: one waits for the other, and a sign-out from elsewhere voids a late re-authentication.
+  let authBusy: 'signOut' | 'changePassword' | null = null;
+  const claimAuth = (op: 'signOut' | 'changePassword') => {
+    if (authBusy) throw new DataError(authBusy === 'signOut' ? 'Signing out…' : 'Your password change is still in progress.', 'auth_busy');
+    authBusy = op;
+  };
+
   const readings = () => client.from('readings_v').select('*');
 
   return {
@@ -75,8 +83,13 @@ export function createSupabaseSource(client: Client): DataSource {
         return toSession(data.user)!;
       },
       async signOut() {
-        const { error } = await client.auth.signOut();
-        if (error) throw new DataError(error.message, error.code);
+        claimAuth('signOut');
+        try {
+          const { error } = await client.auth.signOut({ scope: 'local' });
+          if (error) throw new DataError(error.message, error.code);
+        } finally {
+          authBusy = null;
+        }
       },
       async updateName(name) {
         const { data, error } = await client.auth.updateUser({ data: { name } });
@@ -84,13 +97,27 @@ export function createSupabaseSource(client: Client): DataSource {
         return toSession(data.user)!;
       },
       async changePassword(currentPassword, newPassword) {
-        const { data } = await client.auth.getSession();
-        const email = data.session?.user.email;
-        if (!email) throw new DataError('Not signed in');
-        const reauth = await client.auth.signInWithPassword({ email, password: currentPassword });
-        if (reauth.error) throw new DataError('Current password is incorrect', reauth.error.code);
-        const { error } = await client.auth.updateUser({ password: newPassword });
-        if (error) throw new DataError(error.message, error.code);
+        claimAuth('changePassword');
+        let signedOut = false;
+        const { data: listener } = client.auth.onAuthStateChange((event) => {
+          if (event === 'SIGNED_OUT') signedOut = true;
+        });
+        try {
+          const { data } = await client.auth.getSession();
+          const email = data.session?.user.email;
+          if (!email) throw new DataError('Not signed in');
+          const reauth = await client.auth.signInWithPassword({ email, password: currentPassword });
+          if (signedOut) {
+            if (!reauth.error) await client.auth.signOut({ scope: 'local' });
+            throw new DataError('You were signed out before the password could be changed.', 'signed_out');
+          }
+          if (reauth.error) throw new DataError('Current password is incorrect', reauth.error.code);
+          const { error } = await client.auth.updateUser({ password: newPassword });
+          if (error) throw new DataError(error.message, error.code);
+        } finally {
+          listener.subscription.unsubscribe();
+          authBusy = null;
+        }
       },
     },
 

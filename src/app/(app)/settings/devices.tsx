@@ -1,5 +1,5 @@
-import { ScreenPlaceholder } from '@/components/shell';
+import { DevicesScreen } from '@/features/settings';
 
-export default function DevicesScreen() {
-  return <ScreenPlaceholder title="Devices & calibration" body="Settings and account (T12)." />;
+export default function DevicesRoute() {
+  return <DevicesScreen />;
 }

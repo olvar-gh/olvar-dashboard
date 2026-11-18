@@ -59,6 +59,10 @@ function fakeClient(respond: (calls: Call[]) => { data: unknown; error: unknown 
   return { client, log, channels };
 }
 
+async function waitForCall(fn: jest.Mock) {
+  while (fn.mock.calls.length === 0) await new Promise((r) => setImmediate(r));
+}
+
 const range = (calls: Call[]) => calls.find((c) => c[0] === 'range') as [string, number, number] | undefined;
 
 describe('Supabase source', () => {
@@ -115,6 +119,80 @@ describe('Supabase source', () => {
     client.functions.invoke.mockResolvedValue({ data: { reply: { id: 3, role: 'plant' } }, error: null });
     await expect(createSupabaseSource(client as never).sendChat('p', 'hi')).resolves.toEqual({ id: 3, role: 'plant' });
     expect(client.functions.invoke).toHaveBeenCalledWith('chat', { body: { plant_id: 'p', message: 'hi' } });
+  });
+
+  it('signs out only this browser’s session', async () => {
+    const { client } = fakeClient(() => ({ data: [], error: null }));
+    const signOut = jest.fn(async () => ({ error: null }));
+    (client.auth as Record<string, unknown>).signOut = signOut;
+    await createSupabaseSource(client as never).auth.signOut();
+    expect(signOut).toHaveBeenCalledWith({ scope: 'local' });
+  });
+
+  describe('password change and sign-out', () => {
+    function authClient() {
+      const { client } = fakeClient(() => ({ data: [], error: null }));
+      let signedIn = true;
+      const listeners = new Set<(event: string) => void>();
+      let verify!: () => void;
+      const auth = {
+        getSession: jest.fn(async () => ({ data: { session: signedIn ? { user: { email: 'dev@olvar.local' } } : null } })),
+        onAuthStateChange: jest.fn((cb: (event: string) => void) => {
+          listeners.add(cb);
+          return { data: { subscription: { unsubscribe: () => listeners.delete(cb) } } };
+        }),
+        signInWithPassword: jest.fn(
+          () =>
+            new Promise((resolve) => {
+              verify = () => {
+                signedIn = true;
+                resolve({ data: { user: { id: 'u' } }, error: null });
+              };
+            }),
+        ),
+        signOut: jest.fn(async () => {
+          signedIn = false;
+          listeners.forEach((l) => l('SIGNED_OUT'));
+          return { error: null };
+        }),
+        updateUser: jest.fn(async () => ({ data: {}, error: null })),
+      };
+      (client as { auth: unknown }).auth = auth;
+      return { source: createSupabaseSource(client as never), auth, verify: () => verify(), isSignedIn: () => signedIn };
+    }
+
+    it('refuses to sign out while the current password is being verified', async () => {
+      const { source, auth, verify } = authClient();
+      const change = source.auth.changePassword('old-password', 'new-password-1');
+      await waitForCall(auth.signInWithPassword);
+      await expect(source.auth.signOut()).rejects.toMatchObject({ code: 'auth_busy' });
+      expect(auth.signOut).not.toHaveBeenCalled();
+      verify();
+      await expect(change).resolves.toBeUndefined();
+      await expect(source.auth.signOut()).resolves.toBeUndefined();
+    });
+
+    it('refuses a password change while signing out', async () => {
+      const { source, auth } = authClient();
+      let finish!: () => void;
+      auth.signOut.mockImplementationOnce(() => new Promise((r) => (finish = () => r({ error: null }))));
+      const out = source.auth.signOut();
+      await expect(source.auth.changePassword('old-password', 'new-password-1')).rejects.toMatchObject({ code: 'auth_busy' });
+      expect(auth.signInWithPassword).not.toHaveBeenCalled();
+      finish();
+      await out;
+    });
+
+    it('does not keep a session that re-authentication installs after a sign-out from elsewhere', async () => {
+      const { source, auth, verify, isSignedIn } = authClient();
+      const change = source.auth.changePassword('old-password', 'new-password-1');
+      await waitForCall(auth.signInWithPassword);
+      auth.onAuthStateChange.mock.calls.forEach(([cb]) => cb('SIGNED_OUT'));
+      verify();
+      await expect(change).rejects.toMatchObject({ code: 'signed_out' });
+      expect(isSignedIn()).toBe(false);
+      expect(auth.updateUser).not.toHaveBeenCalled();
+    });
   });
 
   it('surfaces PostgREST errors with their code', async () => {

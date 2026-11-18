@@ -1,5 +1,5 @@
-import { ScreenPlaceholder } from '@/components/shell';
+import { CareTargetsScreen } from '@/features/settings';
 
-export default function CareTargetsScreen() {
-  return <ScreenPlaceholder title="Care targets" body="Settings and account (T12)." />;
+export default function CareTargetsRoute() {
+  return <CareTargetsScreen />;
 }

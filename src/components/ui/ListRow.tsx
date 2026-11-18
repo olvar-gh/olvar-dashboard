@@ -1,3 +1,5 @@
+import { View } from 'react-native';
+
 import { colors } from '@/theme';
 
 import { IosListRow } from './IosListRow';
@@ -7,8 +9,8 @@ export type { ListRowProps, ListRowStatus } from './ListRow.types';
 export { IosListRow, type IosListAccessory, type IosListRowProps } from './IosListRow';
 
 /** On iOS a list row is the grouped iPhone row: icon tile, title, status as the value. Put it in a ListSection. */
-export function ListRow({ title, subtitle, icon = 'leaf', status, action, divider = false, onPress, testID }: ListRowProps) {
-  return (
+export function ListRow({ title, subtitle, icon = 'leaf', status, action, divider = false, onPress, style, testID }: ListRowProps) {
+  const row = (
     <IosListRow
       label={title}
       subtitle={subtitle}
@@ -23,4 +25,5 @@ export function ListRow({ title, subtitle, icon = 'leaf', status, action, divide
       testID={testID}
     />
   );
+  return style ? <View style={style}>{row}</View> : row;
 }
