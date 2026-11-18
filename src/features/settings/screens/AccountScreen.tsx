@@ -7,13 +7,15 @@ import { colors, iosColors, typography } from '@/theme';
 
 import { useAccountForm } from '../hooks';
 import { timeZoneLabel } from '../model';
+import { useBackIfFocused } from './useBackIfFocused';
 
 /** iPhone Edit Profile (Figma 147:1862): name, read-only email, time zone, Change Password, Save. */
 export function AccountScreen() {
   const router = useRouter();
+  const back = useBackIfFocused();
   const a = useAccountForm();
   const onSave = async () => {
-    if (await a.save()) router.back();
+    if (await a.save()) back();
   };
   return (
     <PageScroll testID="account-screen" keyboardDismissMode="interactive" contentContainerStyle={styles.page}>
@@ -26,7 +28,7 @@ export function AccountScreen() {
       ) : (
         <>
           <ListSection header="Profile" footer={a.errors.name ?? a.saveError ?? a.plantError ?? undefined}>
-            <Field label="Name" value={a.name} onChangeText={a.setName} error={!!a.errors.name} textContentType="name" testID="account-name" />
+            <Field label="Name" value={a.name} onChangeText={a.setName} editable={!a.saving} error={!!a.errors.name} textContentType="name" testID="account-name" />
             <Field label="Email" value={a.email} editable={false} separator testID="account-email" />
             <SelectField
               label="Time Zone"

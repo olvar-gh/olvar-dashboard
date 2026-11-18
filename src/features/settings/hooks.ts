@@ -28,7 +28,7 @@ import {
   usesPreset,
   type RangeDraft,
 } from './model';
-import { useDraft } from './drafts';
+import { isSaving, useDraft, useSaving } from './drafts';
 
 /** `keep`: hold unsaved edits across the web Settings sections (see drafts.ts). */
 export type FormOptions = { keep?: boolean };
@@ -40,6 +40,7 @@ export function usePlantForm({ keep = false }: FormOptions = {}) {
   // null = untouched, so the field follows the stored value (a save, or a change from another device).
   const [nicknameDraft, setNickname, getNickname] = useDraft<string | null>('plant.nickname', keep, null);
   const [locationDraft, setLocation, getLocation] = useDraft<string | null>('plant.location', keep, null);
+  const [busy, track] = useSaving('plant');
   const [submitted, setSubmitted] = useState(false);
   const p = plant.data;
   const nickname = nicknameDraft ?? p?.nickname ?? '';
@@ -57,9 +58,9 @@ export function usePlantForm({ keep = false }: FormOptions = {}) {
 
   const save = async () => {
     setSubmitted(true);
-    if (!p || errors.nickname || errors.location) return false;
+    if (!p || errors.nickname || errors.location || isSaving('plant')) return false;
     try {
-      await update.mutateAsync({ plantId: p.id, patch: { nickname: nickname.trim(), location: location.trim() || null } });
+      await track(() => update.mutateAsync({ plantId: p.id, patch: { nickname: nickname.trim(), location: location.trim() || null } }));
       // Edits typed while the request was in flight stay as the next draft.
       if (getNickname() === nicknameDraft) setNickname(null);
       if (getLocation() === locationDraft) setLocation(null);
@@ -80,7 +81,7 @@ export function usePlantForm({ keep = false }: FormOptions = {}) {
     dirty,
     save,
     reset,
-    saving: update.isPending,
+    saving: busy || update.isPending,
     saveError: update.error ? saveErrorMessage(update.error, 'plant') : null,
   };
 }
@@ -100,6 +101,7 @@ export function useCareTargets({ keep = false }: FormOptions = {}) {
   const [editing, setEditing] = useDraft('care.editing', keep, false);
   // The editor's values; null until the owner types, so it shows the effective ranges.
   const [edits, setEdits, getEdits] = useDraft<RangeDraft | null>('care.edits', keep, null);
+  const [busy, track] = useSaving('care');
   const [submitted, setSubmitted] = useState(false);
   const draft = useMemo(() => edits ?? draftFrom(thresholds.data), [edits, thresholds.data]);
 
@@ -122,10 +124,10 @@ export function useCareTargets({ keep = false }: FormOptions = {}) {
 
   const save = async () => {
     setSubmitted(true);
-    if (!p || Object.keys(check.errors).length) return false;
+    if (!p || Object.keys(check.errors).length || isSaving('care')) return false;
     try {
       const overrides = buildOverrides(p.profile.thresholds, p.threshold_overrides, check.ranges);
-      await update.mutateAsync({ plantId: p.id, patch: { threshold_overrides: overrides } });
+      await track(() => update.mutateAsync({ plantId: p.id, patch: { threshold_overrides: overrides } }));
       if (getEdits() === edits) {
         setEdits(null);
         setEditing(false);
@@ -140,8 +142,9 @@ export function useCareTargets({ keep = false }: FormOptions = {}) {
   /** Resolves null on success, else the message to show (the switch springs back on failure). */
   const applyPreset = async (): Promise<string | null> => {
     if (!p) return saveErrorMessage(plant.error);
+    if (isSaving('care')) return 'Your last change is still saving. Try again in a moment.';
     try {
-      await update.mutateAsync({ plantId: p.id, patch: { threshold_overrides: {} } });
+      await track(() => update.mutateAsync({ plantId: p.id, patch: { threshold_overrides: {} } }));
       setEdits(null);
       setEditing(false);
       return null;
@@ -165,7 +168,7 @@ export function useCareTargets({ keep = false }: FormOptions = {}) {
     cancel,
     save,
     applyPreset,
-    saving: update.isPending,
+    saving: busy || update.isPending,
     saveError: update.error ? saveErrorMessage(update.error, 'ranges') : null,
   };
 }
@@ -222,6 +225,7 @@ export function useAccountForm({ keep = false }: FormOptions = {}) {
   const updatePlant = useUpdatePlant();
   const [nameDraft, setName, getName] = useDraft<string | null>('account.name', keep, null);
   const [zoneDraft, setTimeZone, getZone] = useDraft<string | null>('account.timezone', keep, null);
+  const [busy, track] = useSaving('account');
   const [submitted, setSubmitted] = useState(false);
   const [blocked, setBlocked] = useState<string | null>(null);
   const storedName = session?.name ?? '';
@@ -245,21 +249,24 @@ export function useAccountForm({ keep = false }: FormOptions = {}) {
   const save = async () => {
     setSubmitted(true);
     setBlocked(null);
-    if (errors.name) return false;
+    if (errors.name || isSaving('account')) return false;
     // The time zone lives on the plant row; without it there is nothing to save it to.
     if (zoneDirty && !plant.data) {
       setBlocked('Your plant couldn’t be loaded, so the time zone wasn’t saved. Retry, then save again.');
       return false;
     }
+    const plantId = plant.data?.id;
     try {
-      if (name.trim() !== storedName) {
-        await updateName.mutateAsync(name.trim());
-      }
-      if (getName() === nameDraft) setName(null);
-      if (plant.data && zoneDirty) {
-        await updatePlant.mutateAsync({ plantId: plant.data.id, patch: { timezone: timeZone } });
-      }
-      if (getZone() === zoneDraft) setTimeZone(null);
+      await track(async () => {
+        if (name.trim() !== storedName) {
+          await updateName.mutateAsync(name.trim());
+        }
+        if (getName() === nameDraft) setName(null);
+        if (plantId && zoneDirty) {
+          await updatePlant.mutateAsync({ plantId, patch: { timezone: timeZone } });
+        }
+        if (getZone() === zoneDraft) setTimeZone(null);
+      });
       setSubmitted(false);
       return true;
     } catch {
@@ -278,7 +285,7 @@ export function useAccountForm({ keep = false }: FormOptions = {}) {
     dirty,
     save,
     reset,
-    saving: updateName.isPending || updatePlant.isPending,
+    saving: busy || updateName.isPending || updatePlant.isPending,
     saveError: blocked ?? (failure ? saveErrorMessage(failure, updatePlant.error ? 'timezone' : 'account') : null),
     plantPending: plant.isPending,
     plantError: plant.error ? saveErrorMessage(plant.error) : null,
@@ -294,15 +301,16 @@ export function usePasswordForm({ confirm: withConfirm = false } = {}) {
   const [confirm, setConfirm] = useState('');
   const [submitted, setSubmitted] = useState(false);
   const [done, setDone] = useState(false);
+  const [busy, track] = useSaving('password');
 
   const error = passwordError({ current, next, confirm: withConfirm ? confirm : undefined });
 
   const submit = async () => {
     setSubmitted(true);
     setDone(false);
-    if (error) return false;
+    if (error || isSaving('password')) return false;
     try {
-      await change.mutateAsync({ currentPassword: current, newPassword: next });
+      await track(() => change.mutateAsync({ currentPassword: current, newPassword: next }));
       setCurrent('');
       setNext('');
       setConfirm('');
@@ -323,7 +331,7 @@ export function usePasswordForm({ confirm: withConfirm = false } = {}) {
     setConfirm,
     error: submitted ? error : null,
     submit,
-    saving: change.isPending,
+    saving: busy || change.isPending,
     saveError: change.error ? saveErrorMessage(change.error, 'account') : null,
     done,
   };

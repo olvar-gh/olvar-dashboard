@@ -92,6 +92,7 @@ export function CareTargetsScreen() {
                       value={draft.low}
                       onChangeText={(v) => c.setRange(cfg.metric, 'low', v)}
                       keyboardType="decimal-pad"
+                      editable={!c.saving}
                       error={!!error}
                       testID={`target-${cfg.metric}-low`}
                     />
@@ -100,6 +101,7 @@ export function CareTargetsScreen() {
                       value={draft.high}
                       onChangeText={(v) => c.setRange(cfg.metric, 'high', v)}
                       keyboardType="decimal-pad"
+                      editable={!c.saving}
                       error={!!error}
                       separator
                       testID={`target-${cfg.metric}-high`}

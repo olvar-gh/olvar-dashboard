@@ -221,3 +221,42 @@ describe('edits typed while a save is in flight', () => {
     expect(result.current.dirty).toBe(true);
   });
 });
+
+describe('one save per form at a time', () => {
+  it('still reports the save after the card remounts, and refuses a second one', async () => {
+    const { wrapper, source } = setup();
+    const real = source.updatePlant.bind(source);
+    let release!: () => void;
+    const gate = new Promise<void>((r) => (release = r));
+    source.updatePlant = jest.fn(async (...args: Parameters<typeof real>) => {
+      await gate;
+      return real(...args);
+    });
+    const first = await renderHook(() => usePlantForm({ keep: true }), { wrapper });
+    await waitFor(() => expect(first.result.current.nickname).toBe('Sparks'));
+    await act(() => first.result.current.setNickname('Leafy'));
+    let saving!: Promise<boolean>;
+    await act(async () => {
+      saving = first.result.current.save();
+    });
+    await first.unmount();
+
+    const second = await renderHook(() => usePlantForm({ keep: true }), { wrapper });
+    expect(second.result.current.saving).toBe(true);
+    await act(() => second.result.current.setNickname('Fern'));
+    let again: boolean | undefined;
+    await act(async () => {
+      again = await second.result.current.save();
+    });
+    expect(again).toBe(false);
+    expect(source.updatePlant).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      release();
+      await saving;
+    });
+    await waitFor(() => expect(second.result.current.saving).toBe(false));
+    expect(source.world.plant.nickname).toBe('Leafy');
+    expect(second.result.current.nickname).toBe('Fern');
+  });
+});

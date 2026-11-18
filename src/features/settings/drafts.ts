@@ -55,6 +55,40 @@ export function useDraft<T>(key: string, keep: boolean, initial: T): [T, (value:
   return [(drafts.has(key) ? (stored as T) : initial), setStored, getStored];
 }
 
+const saving = new Set<string>();
+
+/** Whether a save of `form` is in flight, from any mount of it. */
+export function isSaving(form: string): boolean {
+  return saving.has(form);
+}
+
+/**
+ * Tracks a form's in-flight save outside the component, so a screen that remounts mid-save (another
+ * Settings section and back, or a pushed route re-entered) still sees it and cannot start a second,
+ * older-or-newer write to the same fields.
+ */
+export function useSaving(form: string): [boolean, <R>(run: () => Promise<R>) => Promise<R>] {
+  const busy = useSyncExternalStore(
+    subscribe,
+    () => saving.has(form),
+    () => saving.has(form),
+  );
+  const track = useCallback(
+    async <R,>(run: () => Promise<R>) => {
+      saving.add(form);
+      emit();
+      try {
+        return await run();
+      } finally {
+        saving.delete(form);
+        emit();
+      }
+    },
+    [form],
+  );
+  return [busy, track];
+}
+
 /** Paths that count as staying in Settings: its sections and the calibration overlay over them. */
 export function isSettingsPath(pathname: string): boolean {
   return /^\/(settings|calibrate)(\/|$)/.test(pathname);

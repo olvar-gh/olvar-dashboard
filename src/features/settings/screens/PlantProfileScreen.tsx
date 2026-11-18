@@ -1,4 +1,3 @@
-import { useRouter } from 'expo-router';
 import { StyleSheet, View } from 'react-native';
 
 import { PageScroll } from '@/components/shell';
@@ -8,15 +7,16 @@ import { colors } from '@/theme';
 
 import { usePlantForm } from '../hooks';
 import { addedDate, LOCATION_MAX, NICKNAME_MAX, speciesName } from '../model';
+import { useBackIfFocused } from './useBackIfFocused';
 
 /** iPhone plant profile: grouped name and location rows, read-only species and added date, Save. */
 export function PlantProfileScreen() {
-  const router = useRouter();
+  const back = useBackIfFocused();
   const f = usePlantForm();
   const p = f.plant.data;
 
   const onSave = async () => {
-    if (await f.save()) router.back();
+    if (await f.save()) back();
   };
 
   return (
@@ -39,6 +39,7 @@ export function PlantProfileScreen() {
               label="Name"
               value={f.nickname}
               onChangeText={f.setNickname}
+              editable={!f.saving}
               error={!!f.errors.nickname}
               returnKeyType="next"
               testID="plant-nickname"
@@ -47,6 +48,7 @@ export function PlantProfileScreen() {
               label="Location"
               value={f.location}
               onChangeText={f.setLocation}
+              editable={!f.saving}
               placeholder="Living room"
               maxLength={LOCATION_MAX + 10}
               error={!!f.errors.location}

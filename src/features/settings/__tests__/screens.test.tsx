@@ -6,6 +6,8 @@ import { Alert, type AlertButton } from 'react-native';
 import { renderApp } from '@/components/shell/testing/render-app';
 import { DataError } from '@/data';
 
+import { isSaving } from '../drafts';
+
 // Each test renders the whole route tree; the first render of a file can take over a second.
 configure({ asyncUtilTimeout: 5000 });
 jest.setTimeout(20_000);
@@ -104,7 +106,30 @@ describe('Settings (iPhone)', () => {
   });
 });
 
+/** Holds `updatePlant` until the returned release is called. */
+function holdUpdates(app: Awaited<ReturnType<typeof renderApp>>) {
+  const real = app.source.updatePlant.bind(app.source);
+  let release!: () => void;
+  const gate = new Promise<void>((r) => (release = r));
+  app.source.updatePlant = jest.fn(async (...args: Parameters<typeof real>) => {
+    await gate;
+    return real(...args);
+  });
+  return () => release();
+}
+
 describe('Plant profile', () => {
+  it('locks the fields while the save is in flight', async () => {
+    const app = await open('/settings/plant');
+    const release = holdUpdates(app);
+    await fireEvent.changeText(await screen.findByTestId('plant-nickname'), 'Leafy');
+    await fireEvent.press(screen.getByTestId('plant-save'));
+    await waitFor(() => expect(screen.getByTestId('plant-nickname').props.editable).toBe(false));
+    expect(screen.getByTestId('plant-location').props.editable).toBe(false);
+    await act(async () => release());
+    await waitFor(() => expect(app.source.world.plant.nickname).toBe('Leafy'));
+  });
+
   it('rejects an empty nickname and saves a valid one with the location', async () => {
     const app = await open('/settings/plant');
     const name = await screen.findByTestId('plant-nickname');
@@ -202,6 +227,21 @@ describe('Account', () => {
     const app = await open('/settings/timezone');
     await fireEvent.press(await screen.findByTestId('zone-Europe/Berlin'));
     await waitFor(() => expect(app.source.world.plant.timezone).toBe('Europe/Berlin'));
+  });
+
+  it('does not go back a second time when the pick finishes after the owner left', async () => {
+    const app = await open('/settings/account');
+    await fireEvent.press(await screen.findByTestId('account-timezone'));
+    await waitFor(() => expect(app.getPathname()).toBe('/settings/timezone'));
+    const release = holdUpdates(app);
+    await fireEvent.press(await screen.findByTestId('zone-Europe/Berlin'));
+    await act(() => router.back());
+    await waitFor(() => expect(app.getPathname()).toBe('/settings/account'));
+    await act(async () => release());
+    await waitFor(() => expect(app.source.world.plant.timezone).toBe('Europe/Berlin'));
+    await waitFor(() => expect(isSaving('timezone')).toBe(false));
+    await act(async () => {});
+    expect(app.getPathname()).toBe('/settings/account');
   });
 
   it('reports an unknown time zone (22023)', async () => {

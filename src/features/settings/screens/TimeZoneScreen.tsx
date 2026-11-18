@@ -6,23 +6,29 @@ import { PageScroll } from '@/components/shell';
 import { ErrorState, IosListRow, ListSection, NavBar, SkeletonCard } from '@/components/ui';
 import { usePlant, useUpdatePlant } from '@/data';
 
+import { isSaving, useSaving } from '../drafts';
 import { filterZones, saveErrorMessage, timeZoneLabel, timeZones } from '../model';
+import { useBackIfFocused } from './useBackIfFocused';
 
 /** iPhone time zone picker: native header search, a checkmark on the plant's zone, saved on tap. */
 export function TimeZoneScreen() {
   const router = useRouter();
+  const back = useBackIfFocused();
   const plant = usePlant();
   const update = useUpdatePlant();
+  const [saving, track] = useSaving('timezone');
   const [query, setQuery] = useState('');
   const current = plant.data?.timezone ?? '';
   const zones = useMemo(() => timeZones(current), [current]);
   const shown = filterZones(zones, query);
 
   const pick = async (zone: string) => {
+    if (isSaving('timezone')) return;
     if (!plant.data || zone === current) return router.back();
+    const plantId = plant.data.id;
     try {
-      await update.mutateAsync({ plantId: plant.data.id, patch: { timezone: zone } });
-      router.back();
+      await track(() => update.mutateAsync({ plantId, patch: { timezone: zone } }));
+      back();
     } catch (err) {
       Alert.alert('Couldn’t change the time zone', saveErrorMessage(err, 'timezone'));
     }
@@ -48,7 +54,7 @@ export function TimeZoneScreen() {
               label={timeZoneLabel(z)}
               accessory={z === current ? 'check' : 'none'}
               onPress={() => void pick(z)}
-              disabled={update.isPending}
+              disabled={saving || update.isPending}
               separator={i > 0}
               testID={`zone-${z}`}
             />
