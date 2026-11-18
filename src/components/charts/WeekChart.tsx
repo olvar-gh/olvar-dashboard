@@ -6,7 +6,7 @@ import { colors } from '@/theme';
 
 import { ChartFrame } from './ChartFrame';
 import type { Threshold } from './LineArea';
-import { DashedLine, EndMarker, Label, YGrid } from './parts';
+import { DashedLine, EndMarker, Label, YGrid, textWidth } from './parts';
 import {
   definedValues,
   formatTick,
@@ -18,6 +18,7 @@ import {
   weekDays,
   type DefinedPoint,
   type SeriesPoint,
+  type WeekDay,
 } from './scales';
 
 export type WeekChartProps = {
@@ -161,20 +162,21 @@ export function WeekChart({
               ),
             )}
             {latest && <EndMarker x={x(latest.t)} y={ySoil(latest.v)} color={colors.data.water} />}
-            {days.map((d) => {
+            {dayLabels(days, (right - left) / 7).map((label, i) => {
+              const d = days[i];
               const isToday = d.date === today;
               return (
                 <Label
                   key={d.date}
                   x={(x(d.start) + x(d.end)) / 2}
                   top={bottom + INSET.labelGap}
-                  size={11}
+                  size={DAY_LABEL_SIZE}
                   anchor="middle"
                   weight={isToday ? 600 : 400}
                   color={isToday ? colors.text.primary : colors.text.tertiary}
                   testID={isToday ? 'day-today' : undefined}
                 >
-                  {d.label}
+                  {label}
                 </Label>
               );
             })}
@@ -183,6 +185,23 @@ export function WeekChart({
       }}
     </ChartFrame>
   );
+}
+
+const DAY_LABEL_SIZE = 11;
+const DAY_LABEL_GAP = 6;
+
+/**
+ * Day labels that fit their slot: "Mon 10", then "Mon", then "10" on narrow
+ * charts (an iPhone Timeline card), so neighbours never overlap.
+ */
+export function dayLabels(days: readonly WeekDay[], slot: number): string[] {
+  const variants = [
+    days.map((d) => d.label),
+    days.map((d) => d.label.split(' ')[0]),
+    days.map((d) => d.label.split(' ')[1]),
+  ];
+  const fits = (labels: string[]) => labels.every((l) => textWidth(l, DAY_LABEL_SIZE) + DAY_LABEL_GAP <= slot);
+  return variants.find(fits) ?? variants[variants.length - 1];
 }
 
 /** Temperature has no axis; padding keeps its curve in the middle band like the design. */

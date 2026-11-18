@@ -212,6 +212,23 @@ describe('dayTicks and timeTicks', () => {
     expect(month.length).toBeLessThanOrEqual(6);
   });
 
+  it('labels 7 d and 30 d with dates on a phone-width plot', () => {
+    const end = Date.parse('2026-11-17T05:00:00Z');
+    for (const days of [7, 30]) {
+      const domain = [end - days * 24 * HOUR, end] as const;
+      const ticks = timeTicks(domain, 'Asia/Seoul', 279);
+      expect(ticks.length).toBeGreaterThanOrEqual(2);
+      const x = (t: number) => ((t - domain[0]) / (domain[1] - domain[0])) * 279;
+      for (let i = 1; i < ticks.length; i++) expect(x(ticks[i].t) - x(ticks[i - 1].t)).toBeGreaterThanOrEqual(72);
+    }
+  });
+
+  it('starts sparse day ticks at the first midnight in the window', () => {
+    const end = Date.parse('2026-11-17T05:00:00Z');
+    const ticks = dayTicks([end - 7 * 24 * HOUR, end], 'UTC', 7);
+    expect(ticks.map((t) => t.label)).toEqual(['Nov 11']);
+  });
+
   it('returns nothing for an empty window', () => {
     expect(timeTicks([5, 5], 'UTC', 500)).toEqual([]);
     expect(timeTicks([0, HOUR], 'UTC', 0)).toEqual([]);
