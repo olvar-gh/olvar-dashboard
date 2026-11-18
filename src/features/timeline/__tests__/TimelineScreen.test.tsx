@@ -18,8 +18,10 @@ describe('Timeline (iPhone)', () => {
     await renderApp('/timeline', { now: NOW });
     expect(await screen.findByText('Nov 15 – 21, 2026')).toBeTruthy();
     expect(await screen.findByTestId('day-2026-11-17')).toBeTruthy();
-    expect(within(screen.getByTestId('timeline')).getByText('Today')).toBeTruthy();
-    expect(screen.getByText('Yesterday')).toBeTruthy();
+    // Native tabs keep Home and Sensors mounted too, so text is looked up inside Timeline.
+    const timeline = within(screen.getByTestId('timeline'));
+    expect(timeline.getByText('Today')).toBeTruthy();
+    expect(timeline.getByText('Yesterday')).toBeTruthy();
     expect(await screen.findByText('Device restarted, offline 4 min')).toBeTruthy();
     expect(screen.getByText('14:00 · The ESP32 rebooted and reconnected to the gateway')).toBeTruthy();
     expect(screen.getByTestId('strip-2026-11-18').props.accessibilityState).toMatchObject({ disabled: true });

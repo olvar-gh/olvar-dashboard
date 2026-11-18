@@ -16,6 +16,9 @@ const routes: [url: string, title: string, testID?: string][] = [
   ['/settings/timezone', 'Asia/Seoul (GMT+9)', 'timezone-screen'],
 ];
 
+// A built screen puts its title in the native header, which Jest does not draw, so it is found by testID.
+const screenTestIds: Record<string, string> = { '/sensors': 'sensors-screen' };
+
 type JsonNode = { type: string; props: Record<string, unknown>; children: (JsonNode | string)[] | null };
 
 function hasHeaderTitle(node: unknown, title: string): boolean {
@@ -34,12 +37,14 @@ describe('route skeleton', () => {
   });
 
   it.each(routes)('resolves %s inside the shell', async (url, title, testID = 'screen-placeholder') => {
+    const screenTestId = screenTestIds[url];
     const app = await renderApp(url);
     expect(app.getPathname()).toBe(url);
     // Native tabs keep every tab mounted, so the other tabs' placeholders render too.
     expect((await screen.findAllByTestId(testID)).length).toBeGreaterThan(0);
+    if (screenTestId) expect(await screen.findByTestId(screenTestId)).toBeTruthy();
     // A built iOS screen puts its title in the native header config instead of a Text.
-    await waitFor(() => expect(screen.queryAllByText(title).length > 0 || hasHeaderTitle(screen.toJSON(), title)).toBe(true));
+    else await waitFor(() => expect(screen.queryAllByText(title).length > 0 || hasHeaderTitle(screen.toJSON(), title)).toBe(true));
   });
 
   it('resolves /calibrate to the calibration sheet', async () => {

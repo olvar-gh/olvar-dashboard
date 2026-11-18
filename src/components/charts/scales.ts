@@ -164,20 +164,26 @@ export function hourTicks(domain: TimeDomain, timeZone: string, everyHours: numb
   return out;
 }
 
-/** Local midnights inside `domain`, every `everyDays` days, labelled "Nov 5". */
+/**
+ * Local midnights inside `domain`, every `everyDays` days from the first one,
+ * labelled "Nov 5".
+ */
 export function dayTicks(domain: TimeDomain, timeZone: string, everyDays = 1): Tick[] {
   const out: Tick[] = [];
   const last = localDate(timeZone, domain[1]);
-  for (let d: LocalDate = localDate(timeZone, domain[0]), i = 0; d <= last; d = addDays(d, 1), i++) {
+  let i = 0;
+  for (let d: LocalDate = localDate(timeZone, domain[0]); d <= last; d = addDays(d, 1)) {
     const t = startOfLocalDay(timeZone, d).getTime();
-    if (t < domain[0] || i % everyDays !== 0) continue;
-    out.push({ t, label: formatLocalDate(d) });
+    if (t < domain[0]) continue;
+    if (i++ % everyDays === 0) out.push({ t, label: formatLocalDate(d) });
   }
   return out;
 }
 
 const HOUR_STEPS = [1, 2, 3, 6, 12];
 const DAY_STEPS = [1, 2, 7, 14];
+// "Nov 12" is about 34 px wide, so date labels need far less room than the hour default.
+const DAY_MIN_SPACING = 72;
 
 /**
  * Time-axis ticks for a plot `width` pixels wide: hours for spans up to 36 h,
@@ -191,7 +197,8 @@ export function timeTicks(domain: TimeDomain, timeZone: string, width: number, m
     const every = HOUR_STEPS.find((h) => h * HOUR_MS * pxPerMs >= minSpacing) ?? 24;
     return every === 24 ? dayTicks(domain, timeZone) : hourTicks(domain, timeZone, every);
   }
-  const every = DAY_STEPS.find((d) => d * 24 * HOUR_MS * pxPerMs >= minSpacing) ?? 28;
+  const spacing = Math.min(minSpacing, DAY_MIN_SPACING);
+  const every = DAY_STEPS.find((d) => d * 24 * HOUR_MS * pxPerMs >= spacing) ?? 28;
   return dayTicks(domain, timeZone, every);
 }
 
@@ -260,10 +267,50 @@ export function downsample(points: readonly Point[], maxPoints: number): Point[]
 }
 
 /**
- * Splits on real gaps first, then thins each run to its share of `maxPoints`
- * by time span, so resizing never invents or hides an outage.
+ * Thins a run drawn as a step line without moving its jumps: each time bin keeps
+ * its first reading, the reading that changed most from the one before it (a
+ * watering) and its last reading, all exactly as read. Averaging would turn a
+ * jump into a ramp and move it to the bin's mean time.
  */
-export function drawableSegments(points: readonly Point[], maxPoints: number, maxGapMs?: number): DefinedPoint[][] {
+export function downsampleStep(points: readonly DefinedPoint[], maxPoints: number): DefinedPoint[] {
+  if (points.length <= maxPoints || points.length < 3) return [...points];
+  const bins = Math.max(1, Math.floor((maxPoints - 1) / 3));
+  const last = points[points.length - 1];
+  const t0 = points[0].t;
+  const span = Math.max(1, last.t - t0);
+  const out: DefinedPoint[] = [];
+  let start = 0;
+  for (let b = 0; b < bins && start < points.length - 1; b++) {
+    const binEnd = t0 + (span * (b + 1)) / bins;
+    let end = start;
+    while (end + 1 < points.length - 1 && (b === bins - 1 || points[end + 1].t < binEnd)) end++;
+    let jump = start;
+    let biggest = -1;
+    for (let i = Math.max(1, start); i <= end; i++) {
+      const delta = Math.abs(points[i].v - points[i - 1].v);
+      if (delta > biggest) {
+        biggest = delta;
+        jump = i;
+      }
+    }
+    for (const i of new Set([start, jump, end])) out.push(points[i]);
+    start = end + 1;
+  }
+  out.push(last);
+  return out;
+}
+
+/**
+ * Splits on real gaps first, then thins each run to its share of `maxPoints`
+ * by time span, so resizing never invents or hides an outage. Step runs keep
+ * their jumps (downsampleStep).
+ */
+export function drawableSegments(
+  points: readonly Point[],
+  maxPoints: number,
+  maxGapMs?: number,
+  step = false,
+): DefinedPoint[][] {
   const segments = splitSegments(points, maxGapMs);
   const first = segments[0]?.[0]?.t;
   const lastSeg = segments[segments.length - 1];
@@ -271,6 +318,6 @@ export function drawableSegments(points: readonly Point[], maxPoints: number, ma
   return segments.map((seg) => {
     const span = seg[seg.length - 1].t - seg[0].t;
     const budget = total > 0 ? Math.max(2, Math.ceil((maxPoints * span) / total)) : maxPoints;
-    return downsample(seg, budget) as DefinedPoint[];
+    return step ? downsampleStep(seg, budget) : (downsample(seg, budget) as DefinedPoint[]);
   });
 }

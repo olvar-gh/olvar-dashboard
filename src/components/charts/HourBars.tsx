@@ -67,6 +67,28 @@ export function barPath(x: number, y: number, w: number, h: number, r: number, r
   ].join('');
 }
 
+type MiniLabel = { start: number; text: string; cx: number; current: boolean };
+
+/**
+ * Labels for the mini bars: the current bucket first, then the window's first
+ * and last, each dropped when it would touch one already placed.
+ */
+export function miniLabels(buckets: readonly Bucket[], timeZone: string, slot: number, width: number): MiniLabel[] {
+  const current = buckets.findIndex((b) => b.current);
+  const order = [current, 0, buckets.length - 1].filter((i, k, all) => i >= 0 && all.indexOf(i) === k);
+  const placed: (MiniLabel & { half: number })[] = [];
+  for (const i of order) {
+    const text = formatTime(new Date(buckets[i].start), timeZone);
+    const half = textWidth(text) / 2;
+    const cx = clamp(slot * i + slot / 2, half, width - half);
+    if (placed.some((p) => Math.abs(p.cx - cx) < p.half + half + MINI_LABEL_GAP)) continue;
+    placed.push({ start: buckets[i].start, text, cx, current: i === current, half });
+  }
+  return placed.map(({ start, text, cx, current }) => ({ start, text, cx, current })).sort((a, b) => a.cx - b.cx);
+}
+
+const MINI_LABEL_GAP = 6;
+
 // Sensors light chart (Figma 227:7928) and Home light card (226:7588).
 const FULL = { left: 45, right: 6, top: 6, bottom: 23.5, labelGap: 8.4, barRatio: 0.847, radius: 4, zeroHeight: 2 };
 const MINI = { plot: 64, labelGap: 2, barRatio: 0.615, radius: 6, stubWidth: 16, stubHeight: 6 };
@@ -94,10 +116,11 @@ export function HourBars({
     <ChartFrame height={height} width={width} accessibilityLabel={accessibilityLabel} testID={testID}>
       {(w) => {
         if (mini) {
+          if (!buckets.length) return <G testID="bars-empty" />;
           const plot = Math.min(MINI.plot, height - 14);
-          const slot = w / Math.max(1, buckets.length);
+          const slot = w / buckets.length;
           const y = linear([0, Math.max(1, ...values)], [plot, 0]);
-          const labelled = new Set([0, buckets.length - 1, buckets.findIndex((b) => b.current)]);
+          const labels = miniLabels(buckets, timeZone, slot, w);
           return (
             <G>
               {buckets.map((b, i) => {
@@ -117,24 +140,18 @@ export function HourBars({
                   />
                 );
               })}
-              {[...labelled]
-                .filter((i) => i >= 0)
-                .map((i) => {
-                  const text = formatTime(new Date(buckets[i].start), timeZone);
-                  const half = textWidth(text) / 2;
-                  return (
-                    <Label
-                      key={i}
-                      x={clamp(slot * i + slot / 2, half, w - half)}
-                      top={plot + MINI.labelGap}
-                      anchor="middle"
-                      weight={buckets[i].current ? 600 : 400}
-                      color={buckets[i].current ? colors.text.secondary : colors.text.tertiary}
-                    >
-                      {text}
-                    </Label>
-                  );
-                })}
+              {labels.map((l) => (
+                <Label
+                  key={l.start}
+                  x={l.cx}
+                  top={plot + MINI.labelGap}
+                  anchor="middle"
+                  weight={l.current ? 600 : 400}
+                  color={l.current ? colors.text.secondary : colors.text.tertiary}
+                >
+                  {l.text}
+                </Label>
+              ))}
             </G>
           );
         }

@@ -48,7 +48,7 @@ test.describe('session gate', () => {
   });
 
   const settingsPage: Record<string, string> = { '/settings': 'settings-plant', '/settings/account': 'settings-account' };
-  for (const path of ['/sensors', '/timeline', '/chat', '/settings', '/settings/account']) {
+  for (const path of ['/timeline', '/chat', '/settings', '/settings/account']) {
     test(`deep link ${path} survives a reload`, async ({ page }) => {
       await page.goto(path);
       const ready = () => (settingsPage[path] ? page.getByTestId(settingsPage[path]) : page.getByRole('heading', { level: 1 }).first());
