@@ -9,6 +9,7 @@ import { IOS_GROUP_RADIUS } from '@/components/ui/color';
 import { useSession, useSignOut } from '@/data';
 import { colors, iosColors, typography } from '@/theme';
 
+import { useSaving } from '../drafts';
 import { useCareTargets, useDeviceRows } from '../hooks';
 import { formatRange, METRICS, okRange, speciesName } from '../model';
 
@@ -19,6 +20,8 @@ export function SettingsHome() {
   const d = useDeviceRows();
   const { session } = useSession();
   const signOut = useSignOut();
+  const [signingOut, track] = useSaving('signout');
+  const [changingPassword] = useSaving('password');
   const p = c.plant.data;
 
   const onPreset = async (on: boolean) => {
@@ -43,7 +46,7 @@ export function SettingsHome() {
       confirmLabel: 'Sign Out',
       destructive: true,
     });
-    if (ok) signOut.mutate();
+    if (ok) await track(() => signOut.mutateAsync()).catch(() => {});
   };
 
   const gateway = d.rows.find((r) => r.key === 'gateway');
@@ -165,7 +168,7 @@ export function SettingsHome() {
         />
       </ListSection>
 
-      <Button variant="destructive" size="large" label="Sign Out" onPress={() => void onSignOut()} loading={signOut.isPending} testID="sign-out" />
+      <Button variant="destructive" size="large" label="Sign Out" onPress={() => void onSignOut()} loading={signingOut || signOut.isPending} disabled={changingPassword} testID="sign-out" />
     </PageScroll>
   );
 }

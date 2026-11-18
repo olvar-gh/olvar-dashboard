@@ -24,7 +24,7 @@ export function PasswordScreen() {
         <Field label="New" value={f.next} onChangeText={f.setNext} editable={!f.saving} secureTextEntry textContentType="newPassword" placeholder={`${PASSWORD_MIN}+ characters`} separator testID="password-new" />
         <Field label="Confirm" value={f.confirm} onChangeText={f.setConfirm} editable={!f.saving} secureTextEntry textContentType="newPassword" placeholder="Repeat" separator testID="password-confirm" />
       </ListSection>
-      <Button size="large" label="Update Password" onPress={() => void onSave()} loading={f.saving} style={styles.save} testID="password-submit" />
+      <Button size="large" label="Update Password" onPress={() => void onSave()} loading={f.saving} disabled={f.signingOut} style={styles.save} testID="password-submit" />
     </PageScroll>
   );
 }

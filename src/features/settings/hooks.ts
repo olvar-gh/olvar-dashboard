@@ -302,13 +302,14 @@ export function usePasswordForm({ confirm: withConfirm = false } = {}) {
   const [submitted, setSubmitted] = useState(false);
   const [done, setDone] = useState(false);
   const [busy, track] = useSaving('password');
+  const [signingOut] = useSaving('signout');
 
   const error = passwordError({ current, next, confirm: withConfirm ? confirm : undefined });
 
   const submit = async () => {
     setSubmitted(true);
     setDone(false);
-    if (error || isSaving('password')) return false;
+    if (error || isSaving('password') || isSaving('signout')) return false;
     try {
       await track(() => change.mutateAsync({ currentPassword: current, newPassword: next }));
       setCurrent('');
@@ -332,6 +333,8 @@ export function usePasswordForm({ confirm: withConfirm = false } = {}) {
     error: submitted ? error : null,
     submit,
     saving: busy || change.isPending,
+    /** Sign-out and a password change never run together (see the Supabase source). */
+    signingOut,
     saveError: change.error ? saveErrorMessage(change.error, 'account') : null,
     done,
   };

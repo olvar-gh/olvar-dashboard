@@ -5,8 +5,8 @@ import type { ReactNode } from 'react';
 import { DataProvider } from '@/data';
 import { createFixtureSource, type FixtureSource } from '@/data/source/fixtures';
 
-import { clearDrafts, isSettingsPath, useDraftScope } from '../drafts';
-import { useAccountForm, useCareTargets, useDeviceRows, usePlantForm } from '../hooks';
+import { clearDrafts, isSettingsPath, useDraftScope, useSaving } from '../drafts';
+import { useAccountForm, useCareTargets, useDeviceRows, usePasswordForm, usePlantForm } from '../hooks';
 
 const cleanups: (() => void)[] = [];
 
@@ -258,5 +258,29 @@ describe('one save per form at a time', () => {
     await waitFor(() => expect(second.result.current.saving).toBe(false));
     expect(source.world.plant.nickname).toBe('Leafy');
     expect(second.result.current.nickname).toBe('Fern');
+  });
+});
+
+it('does not start a password change while signing out', async () => {
+  const { wrapper, source } = setup();
+  const change = jest.spyOn(source.auth, 'changePassword');
+  const { result } = await renderHook(() => ({ out: useSaving('signout'), form: usePasswordForm() }), { wrapper });
+  let finish!: () => void;
+  let signingOut!: Promise<void>;
+  await act(async () => {
+    signingOut = result.current.out[1](() => new Promise<void>((r) => (finish = r)));
+  });
+  expect(result.current.form.signingOut).toBe(true);
+  await act(() => result.current.form.setCurrent('olvar-dev-password'));
+  await act(() => result.current.form.setNext('new-password-1'));
+  let ok: boolean | undefined;
+  await act(async () => {
+    ok = await result.current.form.submit();
+  });
+  expect(ok).toBe(false);
+  expect(change).not.toHaveBeenCalled();
+  await act(async () => {
+    finish();
+    await signingOut;
   });
 });

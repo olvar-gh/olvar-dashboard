@@ -6,6 +6,7 @@ import { Button, Card, confirmAlert, Field, Modal, Notice, SelectField, Skeleton
 import { useSignOut } from '@/data';
 import { colors, typography } from '@/theme';
 
+import { useSaving } from '../drafts';
 import { useAccountForm, usePasswordForm } from '../hooks';
 import { filterZones, PASSWORD_MIN, timeZoneLabel, timeZones } from '../model';
 
@@ -106,7 +107,9 @@ function PasswordCard() {
       title="Password"
       subtitle={`Use at least ${PASSWORD_MIN} characters. You’ll stay signed in on this device.`}
       testID="account-password"
-      actions={<Button variant="secondary" label="Update password" onPress={() => void f.submit()} loading={f.saving} testID="password-submit" />}
+      actions={
+        <Button variant="secondary" label="Update password" onPress={() => void f.submit()} loading={f.saving} disabled={f.signingOut} testID="password-submit" />
+      }
     >
       <View style={styles.content}>
         <View style={styles.fields}>
@@ -143,16 +146,18 @@ function PasswordCard() {
 
 function SignOutCard() {
   const signOut = useSignOut();
+  const [signingOut, track] = useSaving('signout');
+  const [changingPassword] = useSaving('password');
   const onPress = async () => {
     const ok = await confirmAlert({ title: 'Sign out?', message: 'You can sign in again with your email and password.', confirmLabel: 'Sign out', destructive: true });
-    if (ok) signOut.mutate();
+    if (ok) await track(() => signOut.mutateAsync()).catch(() => {});
   };
   return (
     <Card
       title="Sign out"
       subtitle="Sign out of the dashboard on this browser. Your plant keeps reporting to the gateway."
       testID="account-sign-out"
-      actions={<Button variant="destructive" label="Sign out" onPress={() => void onPress()} loading={signOut.isPending} testID="sign-out" />}
+      actions={<Button variant="destructive" label="Sign out" onPress={() => void onPress()} loading={signingOut || signOut.isPending} disabled={changingPassword} testID="sign-out" />}
     />
   );
 }
