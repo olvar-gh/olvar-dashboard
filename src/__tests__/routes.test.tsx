@@ -7,7 +7,6 @@ const routes: [url: string, title: string, testID?: string][] = [
   ['/sensors', 'Sensors'],
   ['/timeline', 'Timeline'],
   ['/chat', 'Chat'],
-  ['/calibrate', 'Soil calibration'],
   ['/settings', 'Care targets', 'settings-home'],
   ['/settings/plant', 'Location', 'settings-plant-screen'],
   ['/settings/care-targets', 'Use preset', 'care-targets-screen'],
@@ -41,6 +40,12 @@ describe('route skeleton', () => {
     expect((await screen.findAllByTestId(testID)).length).toBeGreaterThan(0);
     // A built iOS screen puts its title in the native header config instead of a Text.
     await waitFor(() => expect(screen.queryAllByText(title).length > 0 || hasHeaderTitle(screen.toJSON(), title)).toBe(true));
+  });
+
+  it('resolves /calibrate to the calibration sheet', async () => {
+    const app = await renderApp('/calibrate');
+    expect(app.getPathname()).toBe('/calibrate');
+    expect(await screen.findByTestId('calibration')).toBeTruthy();
   });
 
   it('resolves the sign-in page when signed out', async () => {

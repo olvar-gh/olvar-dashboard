@@ -1,5 +1,5 @@
-import { ScreenPlaceholder } from '@/components/shell';
+import { CalibrationScreen } from '@/features/calibration';
 
 export default function CalibrateScreen() {
-  return <ScreenPlaceholder title="Soil calibration" body="Dry and wet capture wizard (T11)." />;
+  return <CalibrationScreen />;
 }

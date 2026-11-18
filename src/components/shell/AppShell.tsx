@@ -1,6 +1,7 @@
 import { Stack } from 'expo-router';
 
 import { NoPlant } from './NoPlant';
+import { nativeStackOptions } from './stackOptions';
 
 export type AppShellProps = {
   /** The gateway setup has not created a plant row yet. */
@@ -19,8 +20,12 @@ export function AppShell({ noPlant = false }: AppShellProps) {
       <Stack.Screen name="settings" />
       <Stack.Screen
         name="calibrate"
+        // A modal remounts its screen when header visibility changes, so the sheet declares its
+        // header here instead of letting the screen's NavBar turn it on.
         options={{
-          title: 'Soil calibration',
+          ...nativeStackOptions,
+          headerShown: true,
+          title: 'Soil Calibration',
           presentation: 'formSheet',
           sheetGrabberVisible: true,
           sheetAllowedDetents: [0.75, 1],

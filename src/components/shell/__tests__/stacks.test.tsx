@@ -35,7 +35,7 @@ describe('pushed stacks', () => {
 
   it.each(['/calibrate', '/settings/account'])('a deep link to %s opens over the tabs', async (url) => {
     const app = await renderApp(url);
-    expect((await screen.findAllByTestId(url === '/calibrate' ? 'screen-placeholder' : 'account-screen')).length).toBeGreaterThan(0);
+    expect((await screen.findAllByTestId(url === '/calibrate' ? 'calibration' : 'account-screen')).length).toBeGreaterThan(0);
     const names = routeNames(appStack(app.getRouterState() as State));
     expect(names[0]).toBe('(tabs)');
     expect(names[names.length - 1]).toBe(url === '/calibrate' ? 'calibrate' : 'settings');
