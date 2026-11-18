@@ -15,8 +15,8 @@ Every step below runs under your own accounts. The repository holds no credentia
 | --- | --- | --- |
 | CI | `.github/workflows/ci.yml` | On every PR and push to `main`: lint, typecheck and Jest. Then it exports the web build with fixtures, runs `scripts/check-web-export.js` and `scripts/smoke-pages.sh`, and uploads `dist/` as the `web-dist` artifact. |
 | SPA fallback | none needed | Cloudflare Pages serves `index.html` for any unknown path as long as the output has no top-level `404.html`, so deep links like `/settings/devices` work. Do not add a `_redirects` rule like `/* /index.html 200`: Pages flags it as an infinite loop and ignores it. |
-| Response headers | `public/_headers` | Expo copies this file to `dist/_headers`. Hashed bundles under `/_expo/static/*` are cached as immutable. HTML keeps Pages' default `max-age=0, must-revalidate`, so a new deploy shows up right away. |
-| Export check | `scripts/check-web-export.js` | Fails if the export has no `index.html`, has a `404.html`, has an `index.html` rewrite rule, is missing `_headers`, or contains an `sb_secret_` key. |
+| Response headers | `public/_headers` | Expo copies this file to `dist/_headers`. It sets security headers only. Caching stays at Pages' default (`max-age=0, must-revalidate`, with ETags), so a new deploy shows up right away. When a later deploy removes a bundle URL, Pages answers it with the SPA fallback `index.html`. Under a long-lived cache rule, a browser would keep that HTML in place of the script, even after a rollback restores the bundle. |
+| Export check | `scripts/check-web-export.js` | Part of the Pages build command, so a failing check stops the publish. It reads the build env the way the production export does (process env, then `.env.production.local`, `.env.local`, `.env.production`, `.env`). It fails if `EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY` is set but does not start with `sb_publishable_` (this catches secret and legacy JWT keys), or if a `supabase` build lacks the URL or key. It also fails if the export has no `index.html`, has a `404.html`, has an `index.html` rewrite rule, is missing `_headers`, or contains an `sb_secret_` key. |
 | Node version | `.node-version` | Node 24, read by both CI and the Cloudflare Pages build image. |
 | Export compliance | `app.json` → `ios.config.usesNonExemptEncryption: false` | TestFlight does not ask the encryption question for every build. The app only uses standard HTTPS. |
 
@@ -51,7 +51,7 @@ Use the Git integration, so each push builds and deploys automatically.
    | Project name | `olvar-dashboard` (this gives you `https://olvar-dashboard.pages.dev`) |
    | Production branch | `main` |
    | Framework preset | None |
-   | Build command | `npx expo export -p web` |
+   | Build command | `npx expo export -p web && node scripts/check-web-export.js dist` |
    | Build output directory | `dist` |
    | Root directory | *(leave empty)* |
 
@@ -108,8 +108,7 @@ This applies only if you chose Direct Upload instead of the Git integration:
 npx wrangler@4 login
 npx wrangler@4 pages project create olvar-dashboard --production-branch main
 # Uses the EXPO_PUBLIC_* values in .env.local
-npx expo export -p web
-node scripts/check-web-export.js dist
+npx expo export -p web && node scripts/check-web-export.js dist
 npx wrangler@4 pages deploy dist --project-name olvar-dashboard --branch main
 ```
 
@@ -196,5 +195,5 @@ These commands need no accounts:
 npm run lint && npm run typecheck && npm test
 EXPO_PUBLIC_DATA_SOURCE=fixtures npx expo export -p web
 node scripts/check-web-export.js dist
-scripts/smoke-pages.sh dist   # Cloudflare's local Pages server (wrangler pages dev); checks deep links and cache headers
+scripts/smoke-pages.sh dist   # Cloudflare's local Pages server (wrangler pages dev); checks deep links and that the fallback is not cached long-term; fails if the port is taken
 ```

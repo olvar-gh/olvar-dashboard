@@ -1,5 +1,6 @@
 #!/usr/bin/env node
-// Checks an `expo export -p web` output before it goes to Cloudflare Pages (docs/DEPLOY.md).
+// Checks an `expo export -p web` output and the env it was built with, before it goes to
+// Cloudflare Pages (docs/DEPLOY.md). Reads the same .env files as the production export.
 //
 //   node scripts/check-web-export.js [dist]
 const fs = require('node:fs');
@@ -14,6 +15,22 @@ function* files(dir) {
     if (entry.isDirectory()) yield* files(full);
     else yield full;
   }
+}
+
+function checkBuildEnv(env) {
+  const problems = [];
+  const value = (name) => (env[name] === '' ? undefined : env[name]);
+  const source = value('EXPO_PUBLIC_DATA_SOURCE') ?? 'supabase';
+  const key = value('EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY');
+  // src/env.ts reads the key statically, so Expo inlines it even into a fixtures build.
+  if (key !== undefined && !key.startsWith('sb_publishable_')) {
+    problems.push('EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY is not a publishable key (sb_publishable_...)');
+  }
+  if (source === 'supabase') {
+    if (key === undefined) problems.push('EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY is not set');
+    if (value('EXPO_PUBLIC_SUPABASE_URL') === undefined) problems.push('EXPO_PUBLIC_SUPABASE_URL is not set');
+  }
+  return problems;
 }
 
 function checkWebExport(dir) {
@@ -38,11 +55,12 @@ function checkWebExport(dir) {
   return problems;
 }
 
-module.exports = { checkWebExport };
+module.exports = { checkBuildEnv, checkWebExport };
 
 if (require.main === module) {
   const dir = path.resolve(process.argv[2] ?? 'dist');
-  const problems = checkWebExport(dir);
+  require('@expo/env').loadProjectEnv(process.cwd(), { mode: 'production', silent: true });
+  const problems = [...checkBuildEnv(process.env), ...checkWebExport(dir)];
   for (const p of problems) console.error(`✗ ${p}`);
   if (problems.length) process.exit(1);
   console.log(`✓ ${path.relative(process.cwd(), dir) || dir} is ready for Cloudflare Pages`);

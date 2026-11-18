@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
-import { checkWebExport } from '../check-web-export';
+import { checkBuildEnv, checkWebExport } from '../check-web-export';
 
 const root = path.resolve(__dirname, '../..');
 const readJson = (file: string) => JSON.parse(fs.readFileSync(path.join(root, file), 'utf8'));
@@ -45,11 +45,52 @@ describe('eas.json', () => {
 });
 
 describe('public/_headers', () => {
-  const headers = fs.readFileSync(path.join(root, 'public/_headers'), 'utf8');
+  const rules = fs
+    .readFileSync(path.join(root, 'public/_headers'), 'utf8')
+    .split('\n')
+    .filter((line) => !line.startsWith('#'));
 
-  it('caches hashed bundles forever and nothing else', () => {
-    expect(headers).toMatch(/^\/_expo\/static\/\*\n {2}Cache-Control: public, max-age=31536000, immutable$/m);
-    expect(headers.match(/Cache-Control/g)).toHaveLength(1);
+  it('leaves caching to Pages, so the SPA fallback is never cached as a bundle', () => {
+    expect(rules.filter((line) => /cache-control/i.test(line))).toEqual([]);
+  });
+});
+
+describe('checkBuildEnv', () => {
+  const url = 'https://ref.supabase.co';
+
+  it('accepts a Supabase build with a publishable key', () => {
+    expect(
+      checkBuildEnv({ EXPO_PUBLIC_SUPABASE_URL: url, EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY: 'sb_publishable_abc' }),
+    ).toEqual([]);
+  });
+
+  it('rejects a secret key', () => {
+    expect(
+      checkBuildEnv({ EXPO_PUBLIC_SUPABASE_URL: url, EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY: 'sb_secret_abc' }),
+    ).toEqual(['EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY is not a publishable key (sb_publishable_...)']);
+  });
+
+  it('rejects a legacy JWT key', () => {
+    expect(
+      checkBuildEnv({ EXPO_PUBLIC_SUPABASE_URL: url, EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY: 'eyJhbGciOiJIUzI1NiJ9.x.y' }),
+    ).toEqual(['EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY is not a publishable key (sb_publishable_...)']);
+  });
+
+  it('requires both Supabase values when the data source defaults to supabase', () => {
+    expect(checkBuildEnv({ EXPO_PUBLIC_SUPABASE_URL: '' })).toEqual([
+      'EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY is not set',
+      'EXPO_PUBLIC_SUPABASE_URL is not set',
+    ]);
+  });
+
+  it('needs no Supabase values for a fixtures build', () => {
+    expect(checkBuildEnv({ EXPO_PUBLIC_DATA_SOURCE: 'fixtures' })).toEqual([]);
+  });
+
+  it('still rejects a non-publishable key in a fixtures build, since it is inlined anyway', () => {
+    expect(
+      checkBuildEnv({ EXPO_PUBLIC_DATA_SOURCE: 'fixtures', EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY: 'sb_secret_abc' }),
+    ).toEqual(['EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY is not a publishable key (sb_publishable_...)']);
   });
 });
 
