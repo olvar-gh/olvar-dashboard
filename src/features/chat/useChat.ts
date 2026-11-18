@@ -43,10 +43,10 @@ export function useChat() {
           }
         },
       });
-      setDraft('');
+      if (text === draft) setDraft('');
       return true;
     },
-    [messages, rateLimited, send],
+    [draft, messages, rateLimited, send],
   );
 
   const pendingText = send.variables;

@@ -1,6 +1,9 @@
 // Jest resolves the iOS files, so the desktop parts are rendered directly around the shared model.
 import { fireEvent, screen, waitFor } from '@testing-library/react-native';
 
+import { StyleSheet } from 'react-native';
+
+import { BOTTOM_BAR_CLEARANCE } from '@/components/shell';
 import { renderWithFixtures } from '@/components/shell/testing/render-app';
 import { ChatError } from '@/data';
 
@@ -54,6 +57,37 @@ describe('desktop chat', () => {
     expect(await screen.findByText('Sparks is checking its sensors…')).toBeTruthy();
     expect(await screen.findByText(/Thanks for asking!/, {}, { timeout: 3000 })).toBeTruthy();
     expect(screen.queryByTestId('chat-typing')).toBeNull();
+  });
+
+  it('keeps an unsent draft when a suggestion chip is sent', async () => {
+    const { source } = await renderWithFixtures(<DesktopChat />);
+    await screen.findByTestId('chat-messages');
+    const send = jest.spyOn(source, 'sendChat');
+    await fireEvent.changeText(screen.getByTestId('chat-input'), '내일 물 줄까?');
+    await fireEvent.press(screen.getByRole('button', { name: 'How am I doing this week?' }));
+    expect(send).toHaveBeenCalledWith(source.world.plant.id, 'How am I doing this week?');
+    expect(screen.getByTestId('chat-input').props.value).toBe('내일 물 줄까?');
+  });
+
+  it('keeps an unsent draft when a failed message is retried', async () => {
+    const { source } = await renderWithFixtures(<DesktopChat />);
+    await screen.findByTestId('chat-messages');
+    const send = jest.spyOn(source, 'sendChat').mockRejectedValueOnce(new ChatError('failed', '500'));
+    await fireEvent.changeText(screen.getByTestId('chat-input'), 'Still there?');
+    await fireEvent.press(screen.getByTestId('chat-send'));
+    expect(screen.getByTestId('chat-input').props.value).toBe('');
+    await screen.findByTestId('chat-send-error');
+    await fireEvent.changeText(screen.getByTestId('chat-input'), 'And tomorrow?');
+    await fireEvent.press(screen.getByRole('button', { name: 'Retry' }));
+    await waitFor(() => expect(send).toHaveBeenCalledTimes(2));
+    expect(send).toHaveBeenLastCalledWith(source.world.plant.id, 'Still there?');
+    expect(screen.getByTestId('chat-input').props.value).toBe('And tomorrow?');
+  });
+
+  it('keeps the composer above the bottom bar on compact web', async () => {
+    await renderWithFixtures(<DesktopChat />);
+    const composer = await screen.findByTestId('chat-composer');
+    expect(StyleSheet.flatten(composer.props.style).bottom).toBe(BOTTOM_BAR_CLEARANCE);
   });
 
   it('offers Retry after an upstream failure and resends the same text', async () => {

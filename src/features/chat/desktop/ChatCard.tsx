@@ -11,6 +11,8 @@ import type { ChatModel } from '../useChat';
 import { Composer } from './Composer';
 import { Messages } from './Messages';
 
+export const CHAT_END_ID = 'chat-end';
+
 /** The conversation card: plant header, messages and the sticky composer. */
 export function ChatCard({ chat, minHeight }: { chat: ChatModel; minHeight: number }) {
   const { history } = chat;
@@ -62,6 +64,7 @@ export function ChatCard({ chat, minHeight }: { chat: ChatModel; minHeight: numb
         )}
       </View>
       <Composer chat={chat} />
+      <View nativeID={CHAT_END_ID} />
     </View>
   );
 }

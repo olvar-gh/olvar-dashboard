@@ -9,6 +9,7 @@ import { iosGroupedBackground } from '@/components/ui/color';
 import { iosColors, typography } from '@/theme';
 
 import { IosComposer, Suggestions } from './ios/Composer';
+import { hideKeyboard } from './ios/keyboard';
 import { IosMessages } from './ios/Messages';
 import { ReadingChips } from './ios/ReadingChips';
 import { bottomPadding, offsetAfterPrepend, type OlderAnchor } from './ios/scroll';
@@ -95,6 +96,7 @@ export function ChatScreen() {
   const pickDay = async () => {
     const days = [...(chat.days ?? [])].reverse();
     if (!days.length) return;
+    await hideKeyboard();
     const i = await showActionSheet({
       title: 'Past conversations',
       options: days.map((d) => `${d.label} · ${d.preview}`),

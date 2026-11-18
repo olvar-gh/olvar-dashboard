@@ -2,11 +2,10 @@ import { StyleSheet, View } from 'react-native';
 
 import { colors, useBreakpoint } from '@/theme';
 
+import { BOTTOM_BAR_CLEARANCE } from './navigation';
 import type { PageScrollProps } from './PageScroll';
 
 export type { PageScrollProps } from './PageScroll';
-
-const BOTTOM_BAR_CLEARANCE = 96;
 
 /**
  * Screen container. On web the page is part of the document, which the browser scrolls: it never

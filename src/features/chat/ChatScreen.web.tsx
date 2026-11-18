@@ -1,15 +1,15 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
-import { PageScroll, useAccountButton } from '@/components/shell';
+import { BOTTOM_BAR_CLEARANCE, PageScroll, useAccountButton } from '@/components/shell';
 import { PageHeader } from '@/components/ui';
 import { useBreakpoint } from '@/theme';
 
-import { ChatCard } from './desktop/ChatCard';
+import { CHAT_END_ID, ChatCard } from './desktop/ChatCard';
 import { CONTEXT_CARD_HEIGHT, ContextCard } from './desktop/ContextCard';
 import { Conversations } from './desktop/Conversations';
 import { dayAnchorId } from './desktop/Messages';
-import { useFollowLatest } from './desktop/useFollowLatest';
+import { anchorPage, useFollowLatest } from './desktop/useFollowLatest';
 import { useChat } from './useChat';
 
 const STICKY_TOP = 24;
@@ -22,7 +22,8 @@ export function ChatScreen() {
   const layout = bp.screens.chat;
 
   const last = chat.messages?.at(-1);
-  useFollowLatest(chat.messages ? `${last?.id ?? 'none'}:${chat.pending?.text ?? ''}:${chat.sending}` : null);
+  const page = useMemo(() => anchorPage(CHAT_END_ID, bp.tier === 'compact' ? BOTTOM_BAR_CLEARANCE : 0), [bp.tier]);
+  useFollowLatest(chat.messages ? `${last?.id ?? 'none'}:${chat.pending?.text ?? ''}:${chat.sending}` : null, page);
 
   const select = (date: string) => {
     setActiveDay(date);

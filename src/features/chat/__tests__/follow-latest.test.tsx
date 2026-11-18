@@ -1,6 +1,6 @@
 import { renderHook } from '@testing-library/react-native';
 
-import { NEAR_BOTTOM_PX, useFollowLatest, type FollowPage } from '../desktop/useFollowLatest';
+import { anchorPage, NEAR_BOTTOM_PX, useFollowLatest, type FollowPage } from '../desktop/useFollowLatest';
 
 function fakePage() {
   const page = {
@@ -55,3 +55,24 @@ describe('desktop follow-latest', () => {
     expect(page.scrolled).toEqual(['auto', 'smooth']);
   });
 });
+
+describe('the end of the chat card', () => {
+  const g = globalThis as unknown as { document?: unknown; window: Record<string, unknown> };
+  const saved = { document: g.document, innerHeight: g.window.innerHeight, scrollY: g.window.scrollY, scrollTo: g.window.scrollTo };
+  afterEach(() => {
+    g.document = saved.document;
+    Object.assign(g.window, { innerHeight: saved.innerHeight, scrollY: saved.scrollY, scrollTo: saved.scrollTo });
+  });
+
+  it('measures and scrolls to the anchor, not the end of the document, above the bottom bar', () => {
+    // At 402 x 450 the card ends at 1,300 px in the viewport, with Past conversations below it.
+    g.document = { getElementById: (id: string) => (id === 'chat-end' ? { getBoundingClientRect: () => ({ bottom: 1300 }) } : null) };
+    const scrollTo = jest.fn();
+    Object.assign(g.window, { innerHeight: 450, scrollY: 200, scrollTo });
+    const page = anchorPage('chat-end', 96);
+    expect(page.distanceToEnd()).toBe(1300 - (450 - 96));
+    page.scrollToEnd('auto');
+    expect(scrollTo).toHaveBeenCalledWith({ top: 200 + 946, behavior: 'auto' });
+  });
+});
+

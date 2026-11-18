@@ -2,9 +2,10 @@ import { useState } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View, type NativeSyntheticEvent } from 'react-native';
 
 import { Icon } from '@/components/icons';
+import { BOTTOM_BAR_CLEARANCE } from '@/components/shell';
 import { Notice } from '@/components/ui';
 import { formatNumber } from '@/domain/format';
-import { colors, typography } from '@/theme';
+import { colors, typography, useBreakpoint } from '@/theme';
 
 import { DISCLAIMER, isSendKey, MAX_MESSAGE_CHARS, RATE_LIMIT_RULE, suggestions, type ComposerKey } from '../model';
 import type { ChatModel } from '../useChat';
@@ -13,9 +14,10 @@ const COUNTER_FROM = MAX_MESSAGE_CHARS - 200;
 const INPUT_MIN = 36;
 const INPUT_MAX = 160;
 
-/** Suggestion chips, the message field and the disclaimer; sticks to the bottom of the viewport. */
+/** Suggestion chips, the message field and the disclaimer; sticks to the bottom of the viewport, above the compact bottom bar. */
 export function Composer({ chat }: { chat: ChatModel }) {
   const length = chat.draft.trim().length;
+  const compact = useBreakpoint().tier === 'compact';
   const [height, setHeight] = useState(INPUT_MIN);
   const onKeyPress = (e: NativeSyntheticEvent<ComposerKey>) => {
     if (isSendKey(e.nativeEvent)) {
@@ -24,7 +26,7 @@ export function Composer({ chat }: { chat: ChatModel }) {
     }
   };
   return (
-    <View style={styles.root}>
+    <View testID="chat-composer" style={[styles.root, { bottom: compact ? BOTTOM_BAR_CLEARANCE : 0 }]}>
       {chat.rateLimit ? (
         <Notice tone="warn" icon="clock" testID="chat-rate-limit">
           {`${chat.rateLimit} ${RATE_LIMIT_RULE}`}
@@ -89,7 +91,6 @@ export function Composer({ chat }: { chat: ChatModel }) {
 const styles = StyleSheet.create({
   root: {
     position: 'sticky' as 'relative',
-    bottom: 0,
     backgroundColor: colors.surface.card,
     borderBottomLeftRadius: 20,
     borderBottomRightRadius: 20,
