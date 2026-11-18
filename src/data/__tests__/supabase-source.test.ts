@@ -117,6 +117,14 @@ describe('Supabase source', () => {
     expect(client.functions.invoke).toHaveBeenCalledWith('chat', { body: { plant_id: 'p', message: 'hi' } });
   });
 
+  it('signs out only this browser’s session', async () => {
+    const { client } = fakeClient(() => ({ data: [], error: null }));
+    const signOut = jest.fn(async () => ({ error: null }));
+    (client.auth as Record<string, unknown>).signOut = signOut;
+    await createSupabaseSource(client as never).auth.signOut();
+    expect(signOut).toHaveBeenCalledWith({ scope: 'local' });
+  });
+
   it('surfaces PostgREST errors with their code', async () => {
     const { client } = fakeClient(() => ({ data: null, error: { message: 'unknown time zone', code: '22023' } }));
     await expect(

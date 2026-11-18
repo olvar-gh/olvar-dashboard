@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, useSyncExternalStore } from 'react';
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
 
 // Unsaved Settings edits on web. Each Settings section is its own route, so moving between them
 // remounts the cards; keeping drafts here lets an edit survive that. They are dropped when the
@@ -26,10 +26,12 @@ export function clearDrafts() {
 
 /**
  * A draft value: kept in the shared store under `key` when `keep` is set (web Settings), else
- * local state that ends with the screen (iOS: going back discards the edit).
+ * local state that ends with the screen (iOS: going back discards the edit). The getter reads the
+ * latest value, so a save that resolves later can tell whether the owner kept typing.
  */
-export function useDraft<T>(key: string, keep: boolean, initial: T): [T, (value: T) => void] {
+export function useDraft<T>(key: string, keep: boolean, initial: T): [T, (value: T) => void, () => T] {
   const [local, setLocal] = useState<T>(initial);
+  const latest = useRef(initial);
   const stored = useSyncExternalStore(
     subscribe,
     () => drafts.get(key),
@@ -43,8 +45,14 @@ export function useDraft<T>(key: string, keep: boolean, initial: T): [T, (value:
     },
     [key, initial],
   );
-  if (!keep) return [local, setLocal];
-  return [(drafts.has(key) ? (stored as T) : initial), setStored];
+  const setLocalLatest = useCallback((value: T) => {
+    latest.current = value;
+    setLocal(value);
+  }, []);
+  const getStored = useCallback(() => (drafts.has(key) ? (drafts.get(key) as T) : initial), [key, initial]);
+  const getLocal = useCallback(() => latest.current, []);
+  if (!keep) return [local, setLocalLatest, getLocal];
+  return [(drafts.has(key) ? (stored as T) : initial), setStored, getStored];
 }
 
 /** Paths that count as staying in Settings: its sections and the calibration overlay over them. */

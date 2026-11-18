@@ -13,6 +13,7 @@ import {
   METRICS,
   nicknameError,
   okRange,
+  parseNumber,
   scaleFor,
   passwordError,
   saveErrorMessage,
@@ -71,6 +72,25 @@ describe('care targets', () => {
     expect(usesPreset({})).toBe(true);
     expect(usesPreset(null)).toBe(true);
     expect(usesPreset({ soil_pct: { ok_low: 30 } })).toBe(false);
+  });
+
+  it('reads a decimal comma as a decimal point, never as a dropped separator', () => {
+    expect(parseNumber('18,5', ',')).toBe(18.5);
+    expect(parseNumber('2,1', ',')).toBe(2.1);
+    expect(parseNumber('1.500,5', ',')).toBe(1500.5);
+    expect(parseNumber('2,1', '.')).toBe(2.1);
+    expect(parseNumber('18,5', '.')).toBe(18.5);
+    expect(parseNumber('1,500', '.')).toBe(1500);
+    expect(parseNumber('18.5', ',')).toBe(18.5);
+    expect(parseNumber('1,2,3', '.')).toBeNull();
+  });
+
+  it('saves a comma-decimal temperature as typed', () => {
+    const draft = draftFrom(SPATHIPHYLLUM_THRESHOLDS);
+    draft.temperature_c = { low: '2,1', high: '18,5' };
+    const { errors, ranges } = checkDraft(draft);
+    expect(errors.temperature_c).toBeUndefined();
+    expect(ranges.temperature_c).toEqual({ low: 2.1, high: 18.5 });
   });
 
   it('rejects a range whose low end is not below its high end', () => {
@@ -165,6 +185,12 @@ describe('device rows', () => {
     expect(rows[2]).toMatchObject({ subtitle: 'Capacitive · GPIO34 · dry 2,910 · wet 1,350', status: { label: 'Calibrated Nov 5' }, recalibrate: true });
     expect(rows[3].status).toEqual({ label: 'Read OK', live: true });
     expect(rows[2].short).toEqual({ title: 'Soil Moisture Sensor', subtitle: 'Capacitive · GPIO34', value: 'Nov 5' });
+  });
+
+  it('shows a node the gateway has not reported on yet as waiting, not connected', () => {
+    const rows = deviceRows({ ...base, nodeUnknown: true, latest: null });
+    expect(rows[1].status).toEqual({ label: 'Waiting for data', live: false });
+    expect(deviceRows({ ...base, nodeUnknown: true }).find((r) => r.key === 'node')!.status).toEqual({ label: 'Connected', live: true });
   });
 
   it('shows offline nodes, a stale gateway, an uncalibrated probe and failed reads', () => {

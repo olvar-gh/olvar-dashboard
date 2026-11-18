@@ -75,7 +75,7 @@ export function createSupabaseSource(client: Client): DataSource {
         return toSession(data.user)!;
       },
       async signOut() {
-        const { error } = await client.auth.signOut();
+        const { error } = await client.auth.signOut({ scope: 'local' });
         if (error) throw new DataError(error.message, error.code);
       },
       async updateName(name) {

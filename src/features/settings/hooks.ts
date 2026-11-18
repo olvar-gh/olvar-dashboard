@@ -38,8 +38,8 @@ export function usePlantForm({ keep = false }: FormOptions = {}) {
   const plant = usePlant();
   const update = useUpdatePlant();
   // null = untouched, so the field follows the stored value (a save, or a change from another device).
-  const [nicknameDraft, setNickname] = useDraft<string | null>('plant.nickname', keep, null);
-  const [locationDraft, setLocation] = useDraft<string | null>('plant.location', keep, null);
+  const [nicknameDraft, setNickname, getNickname] = useDraft<string | null>('plant.nickname', keep, null);
+  const [locationDraft, setLocation, getLocation] = useDraft<string | null>('plant.location', keep, null);
   const [submitted, setSubmitted] = useState(false);
   const p = plant.data;
   const nickname = nicknameDraft ?? p?.nickname ?? '';
@@ -60,8 +60,9 @@ export function usePlantForm({ keep = false }: FormOptions = {}) {
     if (!p || errors.nickname || errors.location) return false;
     try {
       await update.mutateAsync({ plantId: p.id, patch: { nickname: nickname.trim(), location: location.trim() || null } });
-      setNickname(null);
-      setLocation(null);
+      // Edits typed while the request was in flight stay as the next draft.
+      if (getNickname() === nicknameDraft) setNickname(null);
+      if (getLocation() === locationDraft) setLocation(null);
       setSubmitted(false);
       return true;
     } catch {
@@ -98,7 +99,7 @@ export function useCareTargets({ keep = false }: FormOptions = {}) {
   const preset = usesPreset(p?.threshold_overrides);
   const [editing, setEditing] = useDraft('care.editing', keep, false);
   // The editor's values; null until the owner types, so it shows the effective ranges.
-  const [edits, setEdits] = useDraft<RangeDraft | null>('care.edits', keep, null);
+  const [edits, setEdits, getEdits] = useDraft<RangeDraft | null>('care.edits', keep, null);
   const [submitted, setSubmitted] = useState(false);
   const draft = useMemo(() => edits ?? draftFrom(thresholds.data), [edits, thresholds.data]);
 
@@ -125,8 +126,10 @@ export function useCareTargets({ keep = false }: FormOptions = {}) {
     try {
       const overrides = buildOverrides(p.profile.thresholds, p.threshold_overrides, check.ranges);
       await update.mutateAsync({ plantId: p.id, patch: { threshold_overrides: overrides } });
-      setEdits(null);
-      setEditing(false);
+      if (getEdits() === edits) {
+        setEdits(null);
+        setEditing(false);
+      }
       setSubmitted(false);
       return true;
     } catch {
@@ -181,6 +184,7 @@ export function useDeviceRows() {
     gatewayStale: gateway.stale,
     device: device.data,
     nodeOffline: status.display?.offline ?? device.data?.status === 'offline',
+    nodeUnknown: device.data?.status === 'unknown',
     nodeOfflineSince: status.display?.offlineSince ?? null,
     latest: latest.data,
     timeZone,
@@ -216,8 +220,8 @@ export function useAccountForm({ keep = false }: FormOptions = {}) {
   const plant = usePlant();
   const updateName = useUpdateName();
   const updatePlant = useUpdatePlant();
-  const [nameDraft, setName] = useDraft<string | null>('account.name', keep, null);
-  const [zoneDraft, setTimeZone] = useDraft<string | null>('account.timezone', keep, null);
+  const [nameDraft, setName, getName] = useDraft<string | null>('account.name', keep, null);
+  const [zoneDraft, setTimeZone, getZone] = useDraft<string | null>('account.timezone', keep, null);
   const [submitted, setSubmitted] = useState(false);
   const [blocked, setBlocked] = useState<string | null>(null);
   const storedName = session?.name ?? '';
@@ -250,13 +254,12 @@ export function useAccountForm({ keep = false }: FormOptions = {}) {
     try {
       if (name.trim() !== storedName) {
         await updateName.mutateAsync(name.trim());
-        setName(null);
       }
+      if (getName() === nameDraft) setName(null);
       if (plant.data && zoneDirty) {
         await updatePlant.mutateAsync({ plantId: plant.data.id, patch: { timezone: timeZone } });
       }
-      setName(null);
-      setTimeZone(null);
+      if (getZone() === zoneDraft) setTimeZone(null);
       setSubmitted(false);
       return true;
     } catch {

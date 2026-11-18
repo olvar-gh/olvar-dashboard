@@ -142,3 +142,82 @@ it('reports a failed preset restoration to the caller', async () => {
   expect(error).toMatch(/connection/);
   expect(result.current.presetOn).toBe(false);
 });
+
+describe('edits typed while a save is in flight', () => {
+  function holdUpdates(source: FixtureSource) {
+    const real = source.updatePlant.bind(source);
+    let release!: () => void;
+    const gate = new Promise<void>((r) => (release = r));
+    source.updatePlant = jest.fn(async (...args: Parameters<typeof real>) => {
+      await gate;
+      return real(...args);
+    });
+    return () => release();
+  }
+
+  it('keeps a nickname typed after Save was pressed', async () => {
+    const { wrapper, source } = setup();
+    const release = holdUpdates(source);
+    const { result } = await renderHook(() => usePlantForm({ keep: true }), { wrapper });
+    await waitFor(() => expect(result.current.nickname).toBe('Sparks'));
+    await act(() => result.current.setNickname('Leafy'));
+    let saving!: Promise<boolean>;
+    await act(async () => {
+      saving = result.current.save();
+    });
+    await act(() => result.current.setNickname('Fern'));
+    await act(async () => {
+      release();
+      await saving;
+    });
+    expect(source.world.plant.nickname).toBe('Leafy');
+    await waitFor(() => expect(result.current.nickname).toBe('Fern'));
+    expect(result.current.dirty).toBe(true);
+  });
+
+  it('keeps range edits and the open editor when they changed during the save', async () => {
+    const { wrapper, source } = setup();
+    const release = holdUpdates(source);
+    const { result } = await renderHook(() => useCareTargets(), { wrapper });
+    await waitFor(() => expect(result.current.thresholds.data).toBeTruthy());
+    await act(() => result.current.startEditing());
+    await act(() => result.current.setRange('soil_pct', 'low', '30'));
+    let saving!: Promise<boolean>;
+    await act(async () => {
+      saving = result.current.save();
+    });
+    await act(() => result.current.setRange('soil_pct', 'low', '32'));
+    await act(async () => {
+      release();
+      await saving;
+    });
+    expect(source.world.plant.threshold_overrides).toEqual({ soil_pct: { ok_low: 30 } });
+    expect(result.current.open).toBe(true);
+    expect(result.current.draft.soil_pct.low).toBe('32');
+  });
+
+  it('keeps a name typed while the previous one was saving', async () => {
+    const { wrapper, source } = setup();
+    let release!: () => void;
+    const gate = new Promise<void>((r) => (release = r));
+    const realName = source.auth.updateName.bind(source.auth);
+    source.auth.updateName = jest.fn(async (n: string) => {
+      await gate;
+      return realName(n);
+    });
+    const { result } = await renderHook(() => useAccountForm(), { wrapper });
+    await waitFor(() => expect(result.current.timeZone).toBe('Asia/Seoul'));
+    await act(() => result.current.setName('Min'));
+    let saving!: Promise<boolean>;
+    await act(async () => {
+      saving = result.current.save();
+    });
+    await act(() => result.current.setName('Min L'));
+    await act(async () => {
+      release();
+      await saving;
+    });
+    expect(result.current.name).toBe('Min L');
+    expect(result.current.dirty).toBe(true);
+  });
+});

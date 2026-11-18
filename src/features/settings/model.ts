@@ -168,9 +168,24 @@ export function draftFrom(thresholds: Thresholds | null | undefined): RangeDraft
   return out;
 }
 
-function parseNumber(s: string): number | null {
-  const t = s.trim().replace(/,/g, '');
+function localeDecimal(): string {
+  try {
+    return new Intl.NumberFormat().formatToParts(1.5).find((p) => p.type === 'decimal')?.value ?? '.';
+  } catch {
+    return '.';
+  }
+}
+
+/**
+ * Reads a typed number. A comma is a decimal separator ("18,5" is 18.5), except where it groups
+ * thousands in a locale whose decimal is a dot ("1,500" lux).
+ */
+export function parseNumber(s: string, decimal = localeDecimal()): number | null {
+  let t = s.trim();
   if (t === '') return null;
+  if (decimal === ',') t = t.includes(',') ? t.replace(/\./g, '').replace(',', '.') : t;
+  else if (/^-?\d{1,3}(,\d{3})+(\.\d+)?$/.test(t)) t = t.replace(/,/g, '');
+  else if (/^-?\d*,\d+$/.test(t)) t = t.replace(',', '.');
   const n = Number(t);
   return Number.isFinite(n) ? n : null;
 }
@@ -335,6 +350,8 @@ export type DeviceInputs = {
     | undefined;
   /** Display status says the node is offline (180 s rule or LWT). */
   nodeOffline: boolean;
+  /** The gateway has not yet recorded a status for the node (`devices.status = 'unknown'`). */
+  nodeUnknown?: boolean;
   nodeOfflineSince: Date | null;
   latest: Reading | null | undefined;
   timeZone: string;
@@ -352,9 +369,11 @@ export function deviceRows(i: DeviceInputs): DeviceRowModel[] {
   const d = i.device;
   const nodeStatus = !d
     ? { label: 'Not paired', live: false }
-    : i.nodeOffline
-      ? { label: i.nodeOfflineSince ? `Offline since ${formatTime(i.nodeOfflineSince, i.timeZone)}` : 'Offline', live: false }
-      : { label: 'Connected', live: true };
+    : i.nodeUnknown && !i.latest
+      ? { label: 'Waiting for data', live: false }
+      : i.nodeOffline
+        ? { label: i.nodeOfflineSince ? `Offline since ${formatTime(i.nodeOfflineSince, i.timeZone)}` : 'Offline', live: false }
+        : { label: 'Connected', live: true };
 
   const calibrated = d?.soil_dry_raw != null && d.soil_wet_raw != null;
   const soilSub = calibrated
