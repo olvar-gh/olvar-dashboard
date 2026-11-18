@@ -135,6 +135,18 @@ describe('iPhone Sensors tab', () => {
     expect(within(screen.getByTestId('sensor-card-soil')).getByText('raw')).toBeTruthy();
     expect(within(screen.getByTestId('sensors-screen')).getByRole('button', { name: 'Calibrate' })).toBeTruthy();
   });
+
+  it('keeps Calibrate a VoiceOver element of its own, next to the Timeline action', async () => {
+    const app = await renderApp('/sensors', { scenario: 'uncalibrated' });
+    await screen.findByTestId('soil-not-calibrated');
+    const calibrate = within(screen.getByTestId('sensor-card-soil')).getByRole('button', { name: 'Calibrate' });
+    for (let n = calibrate.parent; n; n = n.parent) expect(n.props.accessible).not.toBe(true);
+    const summary = screen.getByTestId('sensor-summary-soil');
+    expect(summary.props.accessible).toBe(true);
+    expect(summary.props.accessibilityHint).toBe('Opens Timeline');
+    await fireEvent(summary, 'accessibilityAction', { nativeEvent: { actionName: 'activate' } });
+    await waitFor(() => expect(app.getPathname()).toBe('/timeline'));
+  });
 });
 
 describe('desktop Sensors page', () => {

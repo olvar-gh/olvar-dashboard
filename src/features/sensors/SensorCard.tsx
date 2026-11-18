@@ -34,37 +34,49 @@ export function SensorCard({ spec, range, domain, data, value, latest, status, b
   const router = useRouter();
   const uncalibratedSoil = spec.key === 'soil' && !calibrated;
   const failedAt = value == null && latest ? `Read failed at ${formatTime(latest.recorded_at, timeZone)}` : null;
+  const openTimeline = () => router.push('/timeline');
 
   return (
+    // VoiceOver hides elements nested in an accessible element, so the card itself is not one;
+    // the header and value carry the Timeline action and Calibrate stays reachable beside them.
     <Pressable
-      accessibilityRole="button"
-      accessibilityHint="Opens Timeline"
-      onPress={() => router.push('/timeline')}
+      accessible={false}
+      onPress={openTimeline}
       style={({ pressed }) => [styles.card, pressed && styles.pressed]}
       testID={`sensor-card-${spec.key}`}
     >
-      <View style={styles.header}>
-        <Icon name={spec.icon} size={16} color={spec.iosColor} />
-        <Text numberOfLines={1} style={[styles.title, { color: spec.iosColor }]}>
-          {spec.title}
-        </Text>
-        {status.label ? (
-          <Text numberOfLines={1} style={[styles.status, { color: statusColor(metricStatusStyle(status.key).color) }]}>
-            {status.label}
+      <View
+        accessible
+        accessibilityRole="button"
+        accessibilityHint="Opens Timeline"
+        accessibilityActions={[{ name: 'activate' }]}
+        onAccessibilityAction={(e) => e.nativeEvent.actionName === 'activate' && openTimeline()}
+        style={styles.summaryGroup}
+        testID={`sensor-summary-${spec.key}`}
+      >
+        <View style={styles.header}>
+          <Icon name={spec.icon} size={16} color={spec.iosColor} />
+          <Text numberOfLines={1} style={[styles.title, { color: spec.iosColor }]}>
+            {spec.title}
           </Text>
-        ) : null}
-        <Icon name="chevRight" size={14} color={iosColors.labelTertiary} />
-      </View>
+          {status.label ? (
+            <Text numberOfLines={1} style={[styles.status, { color: statusColor(metricStatusStyle(status.key).color) }]}>
+              {status.label}
+            </Text>
+          ) : null}
+          <Icon name="chevRight" size={14} color={iosColors.labelTertiary} />
+        </View>
 
-      <View style={styles.valueRow}>
-        <Text style={styles.value} testID={`sensor-value-${spec.key}`}>
-          {valueText(spec, value, calibrated)}
-        </Text>
-        {value != null ? <Text style={styles.unit}>{unitText(spec, calibrated)}</Text> : null}
-        <View style={styles.spacer} />
-        <Text numberOfLines={1} style={[styles.summary, failedAt && styles.failed]}>
-          {failedAt ?? rangeSummary(spec, data.stats, range, calibrated)}
-        </Text>
+        <View style={styles.valueRow}>
+          <Text style={styles.value} testID={`sensor-value-${spec.key}`}>
+            {valueText(spec, value, calibrated)}
+          </Text>
+          {value != null ? <Text style={styles.unit}>{unitText(spec, calibrated)}</Text> : null}
+          <View style={styles.spacer} />
+          <Text numberOfLines={1} style={[styles.summary, failedAt && styles.failed]}>
+            {failedAt ?? rangeSummary(spec, data.stats, range, calibrated)}
+          </Text>
+        </View>
       </View>
 
       {uncalibratedSoil ? (
@@ -101,6 +113,7 @@ const styles = StyleSheet.create({
     borderCurve: 'continuous',
   },
   pressed: { opacity: 0.7 },
+  summaryGroup: { gap: 8 },
   header: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   title: { ...typography.iosSubheadlineEmphasized, flex: 1, minWidth: 0 },
   status: { ...typography.iosFootnoteEmphasized, flexShrink: 1 },

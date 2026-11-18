@@ -70,6 +70,19 @@ test.describe('Sensors', () => {
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width);
   });
 
+  test('card titles show in full at 320 px', async ({ page }) => {
+    await page.setViewportSize({ width: 320, height: 874 });
+    for (const fixture of ['', '?fixture=uncalibrated']) {
+      await open(page, fixture);
+      for (const m of METRICS) {
+        const title = page.getByTestId(`sensor-card-${m}`).getByRole('heading');
+        const clipped = await title.evaluate((el) => el.scrollWidth > el.clientWidth || el.scrollHeight > el.clientHeight);
+        expect(clipped, `${m} title clipped`).toBe(false);
+      }
+    }
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(320);
+  });
+
   test('offline fixture shows what to try and the last known readings', async ({ page }) => {
     await open(page, '?fixture=offline');
     await expect(page.getByTestId('sensors-offline')).toBeVisible();

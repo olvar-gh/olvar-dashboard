@@ -59,7 +59,7 @@ export function SensorCard({
         <View style={[styles.iconChip, { backgroundColor: spec.tint }]}>
           <Icon name={spec.icon} size={17} color={spec.color} />
         </View>
-        <Text accessibilityRole="header" numberOfLines={1} style={styles.title}>
+        <Text accessibilityRole="header" style={styles.title}>
           {spec.title}
         </Text>
         {status.label ? <StatusPill kind="metric" status={status.key} label={status.label} style={styles.pill} /> : null}
@@ -124,9 +124,9 @@ function Stat({ label, value }: { label: string; value: string }) {
 
 const styles = StyleSheet.create({
   card: { flexGrow: 1, paddingTop: 18, paddingBottom: 14, paddingHorizontal: 20, gap: 14 },
-  header: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  header: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 10 },
   iconChip: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
-  title: { ...typography.cardTitle, color: colors.text.primary, flex: 1, minWidth: 0 },
+  title: { ...typography.cardTitle, color: colors.text.primary, flexGrow: 1, flexShrink: 1 },
   pill: { alignSelf: 'center' },
   arrow: { width: 16, height: 16 },
   valueRow: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' },
