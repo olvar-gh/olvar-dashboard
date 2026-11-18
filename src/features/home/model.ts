@@ -1,7 +1,7 @@
 // Home view model: pure functions from server rows to display text. Status words come only from
 // the server labels (`overall_label`, `<metric>_label`, `summary`); nothing here judges a value.
 
-import type { SeriesPoint } from '@/components/charts';
+import { localHourStart, type SeriesPoint } from '@/components/charts';
 import type { ChatMessageRow, Reading, ThresholdMetric, Thresholds } from '@/data';
 import { soilCardState } from '@/domain/calibration';
 import { EMPTY_VALUE, formatNumber, formatTime } from '@/domain/format';
@@ -12,7 +12,6 @@ export type MetricKey = 'soil' | 'light' | 'temperature' | 'humidity';
 
 export const METRICS: readonly MetricKey[] = ['soil', 'light', 'temperature', 'humidity'];
 
-const HOUR_MS = 3_600_000;
 
 type MetricSpec = {
   column: 'soil_pct' | 'lux' | 'temperature_c' | 'humidity_pct';
@@ -87,13 +86,13 @@ export function todayStats(rows: readonly Reading[] | undefined, dayStart: Date)
   return stats;
 }
 
-/** Mean lux per clock hour from raw readings in `[from, to)`, for the Home light bars. */
-export function hourlyMeans(rows: readonly Reading[] | undefined, from: Date, to: Date): SeriesPoint[] {
+/** Mean lux per plant-local clock hour from raw readings in `[from, to)`, for the Home light bars. */
+export function hourlyMeans(rows: readonly Reading[] | undefined, from: Date, to: Date, timeZone: string): SeriesPoint[] {
   const sums = new Map<number, { sum: number; n: number }>();
   for (const r of rows ?? []) {
     const t = new Date(r.recorded_at).getTime();
     if (r.lux == null || t < from.getTime() || t >= to.getTime()) continue;
-    const bucket = Math.floor(t / HOUR_MS) * HOUR_MS;
+    const bucket = localHourStart(t, timeZone);
     const s = sums.get(bucket) ?? { sum: 0, n: 0 };
     s.sum += r.lux;
     s.n += 1;

@@ -1,6 +1,19 @@
 import { HourBars, LineArea, StepLine, type Band } from '@/components/charts';
+import { DEVICE_OFFLINE_S } from '@/domain/status-freshness';
 
 import type { MetricSeries, MetricSpec, Range } from './model';
+
+const HOUR_MS = 3_600_000;
+
+/**
+ * The line breaks where the device was offline (no reading for more than 180 s, the server's
+ * offline rule) and, on rollup ranges, where an hourly bucket is missing.
+ */
+export const MAX_GAP_MS: Record<Range, number> = {
+  '24h': DEVICE_OFFLINE_S * 1000,
+  '7d': 1.5 * HOUR_MS,
+  '30d': 1.5 * HOUR_MS,
+};
 
 export type ChartProps = {
   spec: MetricSpec;
@@ -38,6 +51,7 @@ export function Chart({ spec, range, domain, data, band, calibrated, timeZone, h
     color: spec.color,
     height,
     yTicks,
+    maxGapMs: MAX_GAP_MS[range],
     accessibilityLabel: label,
     testID: `chart-${spec.key}`,
   };

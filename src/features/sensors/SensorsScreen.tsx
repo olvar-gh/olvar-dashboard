@@ -8,7 +8,8 @@ import { formatAge, formatMetric, formatSoilRaw, secondsSince, type Metric } fro
 import { iosColors } from '@/theme';
 
 import { SensorCard } from './SensorCard';
-import { METRICS, formatWhen, latestValue, metricStatus, silentFor, type Range } from './model';
+import { METRICS, formatWhen, gatewayState, latestValue, metricStatus, silentFor, type GatewayState, type Range } from './model';
+import { RefreshError } from './RefreshError';
 import { useRange24h, useRangeHourly, useSensorsScreen, type RangeQuery, type SensorsScreenState } from './useSensors';
 import { useRangeParam } from './useRangeParam';
 
@@ -55,11 +56,20 @@ function subtitle(state: SensorsScreenState, now: Date): string | undefined {
 }
 
 function Body({ state }: { state: SensorsScreenState }) {
-  const now = useNow(15_000);
   if (state.error) {
     return <ErrorState message="Couldn’t load the sensor readings. Pull down or tap Retry." onRetry={() => void state.refresh()} />;
   }
   if (state.pending) return <Loading />;
+  return (
+    <>
+      {state.refreshError ? <RefreshError onRetry={() => void state.refresh()} /> : null}
+      <Content state={state} />
+    </>
+  );
+}
+
+function Content({ state }: { state: SensorsScreenState }) {
+  const now = useNow(15_000);
   if (state.display?.offline) return <Offline state={state} now={now} />;
   if (!state.latest || state.display?.overall === 'no_data') {
     return (
@@ -90,7 +100,7 @@ function Live({ state }: { state: SensorsScreenState }) {
 }
 
 function Range24h({ state }: { state: SensorsScreenState }) {
-  return <Cards query={useRange24h(state.calibrated)} range="24h" state={state} />;
+  return <Cards query={useRange24h(state.calibrated, state.timeZone)} range="24h" state={state} />;
 }
 
 function RangeHourly({ days, state }: { days: 7 | 30; state: SensorsScreenState }) {
@@ -98,7 +108,7 @@ function RangeHourly({ days, state }: { days: 7 | 30; state: SensorsScreenState 
 }
 
 function Cards({ query, range, state }: { query: RangeQuery; range: Range; state: SensorsScreenState }) {
-  if (query.error) return <ErrorState message="Couldn’t load the chart data." onRetry={query.refetch} />;
+  if (query.error && !query.data) return <ErrorState message="Couldn’t load the chart data." onRetry={query.refetch} />;
   if (!query.data) return <Loading />;
   const data = query.data;
   return (
@@ -132,13 +142,19 @@ function Loading() {
   );
 }
 
+const GATEWAY_ROW: Record<GatewayState, { label: string; value: string; accessory: 'check' | 'none' }> = {
+  online: { label: 'Gateway Is Online', value: 'Online', accessory: 'check' },
+  offline: { label: 'Gateway Is Offline', value: 'Offline', accessory: 'none' },
+  checking: { label: 'Checking the Gateway…', value: 'Checking', accessory: 'none' },
+  unavailable: { label: 'Gateway Status Unavailable', value: 'Unknown', accessory: 'none' },
+};
+
 const METRIC_FORMAT: Record<string, Metric> = { soil: 'soil', light: 'light', temperature: 'temperature', humidity: 'humidity' };
 
 function Offline({ state, now }: { state: SensorsScreenState; now: Date }) {
-  const { device, latest, display, gateway, calibrated } = state;
-  const since = display?.offlineSince ?? (latest ? new Date(latest.recorded_at) : null);
-  const silent = since ? silentFor((now.getTime() - since.getTime()) / 1000) : null;
-  const gatewayOnline = gateway.data != null && !gateway.stale;
+  const { device, latest, gateway, calibrated } = state;
+  const silent = latest ? silentFor((now.getTime() - Date.parse(latest.recorded_at)) / 1000) : null;
+  const gatewayRow = GATEWAY_ROW[gatewayState(gateway)];
   const nodeId = device?.id ?? 'olvar-node';
 
   return (
@@ -152,12 +168,7 @@ function Offline({ state, now }: { state: SensorsScreenState; now: Date }) {
         />
       </ListSection>
       <ListSection header="Try This">
-        <IosListRow
-          icon="wifi"
-          label={gatewayOnline ? 'Gateway Is Online' : 'Gateway Is Offline'}
-          value={gatewayOnline ? 'Online' : 'Offline'}
-          accessory={gatewayOnline ? 'check' : 'none'}
-        />
+        <IosListRow icon="wifi" label={gatewayRow.label} value={gatewayRow.value} accessory={gatewayRow.accessory} testID="gateway-row" />
         <IosListRow
           separator
           icon="cpu"

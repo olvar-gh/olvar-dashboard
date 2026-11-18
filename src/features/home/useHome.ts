@@ -5,6 +5,7 @@ import {
   targetBand,
   useChatHistory,
   useDayEvents,
+  useDayReadings,
   useDevice,
   useHourly,
   useLatest,
@@ -12,7 +13,6 @@ import {
   useOfflinePeriods,
   usePlant,
   usePlantStatus,
-  useReadings24h,
   useSession,
   useThresholds,
 } from '@/data';
@@ -64,6 +64,8 @@ export type HomeData = {
   message: { text: string; time: string } | null;
   sensors: SensorCardModel[];
   charts: SensorCharts;
+  /** A background refresh failed; the cached screen stays up with this inline. */
+  refreshError: Error | null;
   today: {
     rows: EventRow[] | undefined;
     track: DayTrackModel | null;
@@ -76,7 +78,7 @@ export type HomeData = {
 export type HomeState =
   | { kind: 'loading' }
   | { kind: 'error'; error: Error; retry: () => void; retrying: boolean }
-  | { kind: 'ready'; data: HomeData; refresh: () => Promise<void> };
+  | { kind: 'ready'; data: HomeData; refresh: () => Promise<void>; retry: () => void; retrying: boolean };
 
 const TICK_MS = 15_000;
 
@@ -88,7 +90,6 @@ export function useHome(): HomeState {
   const status = usePlantStatus();
   const latest = useLatest();
   const thresholds = useThresholds();
-  const day24 = useReadings24h();
   const week = useHourly(7);
   const chat = useChatHistory();
   const now = useNow(TICK_MS);
@@ -97,29 +98,26 @@ export function useHome(): HomeState {
   const today = todayWindow(timeZone, now);
   const events = useDayEvents(today.date);
   const offlinePeriods = useOfflinePeriods(today.date);
+  const todayReadings = useDayReadings(today.date);
 
-  const rows24 = day24.data?.rows;
+  const todayRows = todayReadings.data?.rows;
   const weekRows = week.data;
   const startMs = today.start.getTime();
-  const stats = useMemo(() => todayStats(rows24, new Date(startMs)), [rows24, startMs]);
+  const stats = useMemo(() => todayStats(todayRows, new Date(startMs)), [todayRows, startMs]);
   const bounds = useMemo(() => localDayBounds(timeZone, today.date), [timeZone, today.date]);
-  const lightToday = useMemo(() => hourlyMeans(rows24, bounds.start, bounds.end), [rows24, bounds]);
+  const lightToday = useMemo(() => hourlyMeans(todayRows, bounds.start, bounds.end, timeZone), [todayRows, bounds, timeZone]);
   const soilWeek = useMemo(
     () => weekRows && { data: weekRows.rows.map((r) => ({ t: r.bucket, v: r.soil_pct_avg })), domain: [weekRows.from, weekRows.to] as const },
     [weekRows],
   );
 
   const core = [plant, device, status, latest];
-  const error = core.find((q) => q.error)?.error;
-  if (error) {
-    return {
-      kind: 'error',
-      error,
-      retry: () => core.forEach((q) => void q.refetch()),
-      retrying: core.some((q) => q.isFetching),
-    };
-  }
-  if (!plant.data || device.isPending || status.isPending || latest.isPending) return { kind: 'loading' };
+  const retry = () => core.forEach((q) => void q.refetch());
+  const retrying = core.some((q) => q.isFetching);
+  const error = core.find((q) => q.error && q.data === undefined)?.error;
+  if (error) return { kind: 'error', error, retry, retrying };
+  // Without a device the latest query never runs, so only wait for it when there is one.
+  if (!plant.data || device.isPending || status.isPending || (device.data && latest.isPending)) return { kind: 'loading' };
 
   const p = plant.data;
   const row = status.data ?? null;
@@ -176,18 +174,22 @@ export function useHome(): HomeState {
         humidity: targetBand(t, 'humidity_pct'),
       },
     },
+    refreshError: core.find((q) => q.error)?.error ?? null,
     today: {
-      rows: events.events && eventRows(events.events, timeZone),
-      track: events.events ? dayTrack(events.events, offlinePeriods.data ?? [], bounds, now, timeZone) : null,
-      pending: events.isPending,
+      rows: device.data == null ? [] : events.events && eventRows(events.events, timeZone),
+      track:
+        device.data == null || events.events
+          ? dayTrack(events.events ?? [], offlinePeriods.data ?? [], bounds, now, timeZone)
+          : null,
+      pending: events.isPending && device.data != null,
       error: events.error,
       refetch: events.refetch,
     },
   };
 
   const refresh = async () => {
-    await Promise.all([status, latest, day24, week, chat, device].map((q) => q.refetch()));
+    await Promise.all([status, latest, todayReadings, week, chat, device].map((q) => q.refetch()));
     events.refetch();
   };
-  return { kind: 'ready', data, refresh };
+  return { kind: 'ready', data, refresh, retry, retrying };
 }

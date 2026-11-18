@@ -142,6 +142,16 @@ function wallMs(timeZone: string, t: number): number {
 }
 
 /**
+ * Start of the plant-local clock hour holding `t`. Unlike flooring to UTC hours this
+ * matches the local clock in :30/:45 zones, and the repeated hour of a fall-back
+ * day stays two separate hours.
+ */
+export function localHourStart(t: number, timeZone: string): number {
+  const wall = wallMs(timeZone, t);
+  return t - (((wall % HOUR_MS) + HOUR_MS) % HOUR_MS);
+}
+
+/**
  * Instants inside `domain` where the plant-local clock shows a whole hour that
  * is a multiple of `everyHours`. Works for :30/:45 offsets and DST days; a
  * repeated hour on the fall-back day is labelled once.
@@ -268,13 +278,13 @@ export function downsample(points: readonly Point[], maxPoints: number): Point[]
 
 /**
  * Thins a run drawn as a step line without moving its jumps: each time bin keeps
- * its first reading, the reading that changed most from the one before it (a
+ * its first reading, both readings either side of the biggest change (a
  * watering) and its last reading, all exactly as read. Averaging would turn a
  * jump into a ramp and move it to the bin's mean time.
  */
 export function downsampleStep(points: readonly DefinedPoint[], maxPoints: number): DefinedPoint[] {
   if (points.length <= maxPoints || points.length < 3) return [...points];
-  const bins = Math.max(1, Math.floor((maxPoints - 1) / 3));
+  const bins = Math.max(1, Math.floor((maxPoints - 1) / 4));
   const last = points[points.length - 1];
   const t0 = points[0].t;
   const span = Math.max(1, last.t - t0);
@@ -293,7 +303,7 @@ export function downsampleStep(points: readonly DefinedPoint[], maxPoints: numbe
         jump = i;
       }
     }
-    for (const i of new Set([start, jump, end])) out.push(points[i]);
+    for (const i of new Set([start, Math.max(start, jump - 1), jump, end])) out.push(points[i]);
     start = end + 1;
   }
   out.push(last);

@@ -4,7 +4,7 @@ import { StyleSheet, View } from 'react-native';
 import { Button, ButtonRow, Card, ListRow } from '@/components/ui';
 import { formatAge, formatMetric, formatSoilRaw, type Metric } from '@/domain/format';
 
-import { METRICS, formatWhen, latestValue, silentFor } from './model';
+import { METRICS, formatWhen, gatewayState, latestValue, silentFor } from './model';
 import type { SensorsScreenState } from './useSensors';
 
 const METRIC_FORMAT: Record<string, Metric> = { soil: 'soil', light: 'light', temperature: 'temperature', humidity: 'humidity' };
@@ -12,23 +12,20 @@ const METRIC_FORMAT: Record<string, Metric> = { soil: 'soil', light: 'light', te
 /** Desktop sensor-offline state (Figma 145:1322): what to try, then the last known readings. */
 export function OfflineSensors({ state, now }: { state: SensorsScreenState; now: Date }) {
   const router = useRouter();
-  const { plant, device, latest, display, gateway, calibrated, timeZone, refresh } = state;
+  const { plant, device, latest, gateway, calibrated, timeZone, refresh } = state;
   const name = plant?.nickname ?? 'Your plant';
   const nodeId = device?.id ?? 'olvar-node';
-  const since = display?.offlineSince ?? (latest ? new Date(latest.recorded_at) : null);
-  const sinceText = since ? formatWhen(since.toISOString(), timeZone) : null;
-  const silentS = since ? (now.getTime() - since.getTime()) / 1000 : null;
   const readingAgeS = latest ? (now.getTime() - Date.parse(latest.recorded_at)) / 1000 : null;
   const gatewayName = gateway.data?.id ?? 'olvar-gateway';
-  const gatewayOnline = gateway.data != null && !gateway.stale;
+  const gatewayNow = gatewayState(gateway);
 
   return (
     <View style={styles.root} testID="sensors-offline">
       <Card
         title={`${name}’s sensor node is offline`}
         subtitle={
-          sinceText
-            ? `ESP32 · ${nodeId} hasn’t reported since ${sinceText} (${silentFor(silentS ?? 0)} ago).`
+          latest
+            ? `ESP32 · ${nodeId} hasn’t reported since ${formatWhen(latest.recorded_at, timeZone)} (${silentFor(readingAgeS ?? 0)} ago).`
             : `ESP32 · ${nodeId} hasn’t reported yet.`
         }
         actions={
@@ -39,15 +36,31 @@ export function OfflineSensors({ state, now }: { state: SensorsScreenState; now:
         }
       >
         <View>
-          {gatewayOnline ? (
+          {gatewayNow === 'checking' ? (
+            <ListRow
+              icon="wifi"
+              title="Checking the gateway…"
+              subtitle={`Asking for ${gatewayName}’s last heartbeat.`}
+              testID="gateway-row"
+            />
+          ) : gatewayNow === 'unavailable' ? (
+            <ListRow
+              icon="wifi"
+              title="Gateway status unavailable"
+              subtitle={`Couldn’t check ${gatewayName} right now. Retry in a moment.`}
+              testID="gateway-row"
+            />
+          ) : gatewayNow === 'online' ? (
             <ListRow
               icon="wifi"
               title="Gateway is online"
               subtitle={`${gatewayName} answered ${formatAge(gateway.ageS ?? 0)}, so the problem is between the gateway and the node.`}
               status={{ label: 'Online', live: true }}
+              testID="gateway-row"
             />
           ) : (
             <ListRow
+              testID="gateway-row"
               icon="wifiOff"
               title="Gateway is offline too"
               subtitle={

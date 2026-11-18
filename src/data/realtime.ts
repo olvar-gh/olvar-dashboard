@@ -61,6 +61,7 @@ export function useLiveUpdates(): void {
     const onSignal = () => {
       void qc.invalidateQueries({ queryKey: ['latest', deviceId] });
       void qc.invalidateQueries({ queryKey: keys.readings24h(deviceId) });
+      void qc.invalidateQueries({ queryKey: ['readings', 'day', deviceId] });
       refreshRef.current();
     };
     const unsubscribe = source.subscribe(

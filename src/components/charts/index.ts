@@ -5,4 +5,4 @@ export { LineArea, type Curve, type LineAreaProps, type Threshold } from './Line
 export { RangeBar } from './RangeBar';
 export { StepLine } from './StepLine';
 export { WeekChart } from './WeekChart';
-export type { Band, SeriesPoint } from './scales';
+export { localHourStart, type Band, type SeriesPoint } from './scales';

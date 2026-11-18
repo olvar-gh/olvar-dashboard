@@ -7,6 +7,7 @@ import { hrefs, PageScroll, useAccountButton } from '@/components/shell';
 import { colors, iosColors, typography } from '@/theme';
 
 import { PlantCard } from './ios/PlantCard';
+import { RefreshError } from './RefreshError';
 import { SensorCard } from './ios/SensorCard';
 import { TodayCard } from './ios/TodayCard';
 import { useHome } from './useHome';
@@ -70,6 +71,7 @@ export function HomeScreen() {
     <PageScroll testID="home-screen" refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}>
       {header}
       {d.plant.subtitle ? <Text style={styles.subtitle}>{d.plant.subtitle}</Text> : null}
+      {d.refreshError ? <RefreshError onRetry={home.retry} retrying={home.retrying} /> : null}
       {d.status.offline ? (
         <OfflineBanner testID="home-offline" since={d.status.offlineSince} detail="No reading for over 3 min. Check the sensor's power and Wi-Fi." />
       ) : null}

@@ -4,7 +4,7 @@ import { HourBars, miniLabels, toBuckets } from '../HourBars';
 import { StepLine } from '../StepLine';
 import { WeekChart, dayLabels } from '../WeekChart';
 import { textWidth } from '../parts';
-import { downsampleStep, drawableSegments, weekDays, type DefinedPoint } from '../scales';
+import { downsampleStep, drawableSegments, localHourStart, weekDays, type DefinedPoint } from '../scales';
 
 const HOUR = 3_600_000;
 const MIN = 60_000;
@@ -28,6 +28,14 @@ describe('downsampleStep', () => {
     expect(out[i].v).toBe(70);
     expect(out[i - 1].v).toBeLessThan(40);
     expect(out.every((p) => points.some((q) => q.t === p.t && q.v === p.v))).toBe(true);
+  });
+
+  it('keeps the reading just before the jump as well as the jump', () => {
+    const jumpAt = t0 + 1000 * MIN;
+    const points = soilDay(jumpAt);
+    const out = downsampleStep(points, 100);
+    const i = out.findIndex((p) => p.t === jumpAt);
+    expect(out[i - 1]).toEqual(points[999]);
   });
 
   it('keeps the first and the newest reading', () => {
@@ -95,5 +103,21 @@ describe('mini HourBars', () => {
   it('keeps first, current and last when there is room', () => {
     const buckets = toBuckets([], [t0, t0 + 24 * HOUR], HOUR, t0 + 12 * HOUR + MIN);
     expect(miniLabels(buckets, 'UTC', 300 / 24, 300).map((l) => l.text)).toEqual(['00:00', '12:00', '23:00']);
+  });
+});
+
+describe('local hour buckets', () => {
+  it('aligns hour bars to the plant clock in a half-hour time zone', () => {
+    const start = Date.parse('2026-11-05T18:30:00Z');
+    const buckets = toBuckets([{ t: start + 10 * MIN, v: 5 }], [start, start + 3 * HOUR], HOUR, start + 3 * HOUR, 'Asia/Kolkata');
+    expect(buckets.map((b) => b.start)).toEqual([start, start + HOUR, start + 2 * HOUR]);
+    expect(buckets[0].v).toBe(5);
+  });
+
+  it('gives a 25-hour fall-back day 25 distinct hours', () => {
+    const start = Date.parse('2026-11-01T04:00:00Z');
+    const buckets = toBuckets([], [start, start + 25 * HOUR], HOUR, start, 'America/New_York');
+    expect(new Set(buckets.map((b) => b.start)).size).toBe(25);
+    expect(localHourStart(Date.parse('2026-11-01T06:20:00Z'), 'America/New_York')).toBe(Date.parse('2026-11-01T06:00:00Z'));
   });
 });

@@ -26,6 +26,7 @@ import { CATEGORY_DOT, eventStyle } from './eventStyle';
 import { JumpToDate } from './JumpToDate';
 import {
   useDayActivity,
+  useLazyDays,
   useOfflineState,
   usePlantTimeZone,
   useWeekChart,
@@ -35,6 +36,8 @@ import {
 import { daySectionTitle, stripDay, weekDates, weekLabel, type EventCategory, type EventRow } from './week';
 
 const CHART_HEIGHT = 132;
+/** Start loading a day this far before it scrolls into view. */
+const REVEAL_MARGIN = 400;
 
 const ROW_LINKS: Partial<Record<TimelineEventKind, Href>> = {
   temperature_max: '/sensors',
@@ -46,7 +49,15 @@ const ROW_LINKS: Partial<Record<TimelineEventKind, Href>> = {
 };
 
 export function TimelineScreen() {
-  const { plant, timeZone } = usePlantTimeZone();
+  const { plant, timeZone, query, failed } = usePlantTimeZone();
+  if (failed) {
+    return (
+      <PageScroll testID="timeline">
+        <NavBar title="Timeline" />
+        <ErrorState message="Couldn’t load your plant." onRetry={() => void query.refetch()} retrying={query.isFetching} />
+      </PageScroll>
+    );
+  }
   if (!plant || !timeZone) {
     return (
       <PageScroll testID="timeline">
@@ -69,7 +80,15 @@ function Timeline({ timeZone, plantName }: { timeZone: string; plantName: string
   const [refreshing, setRefreshing] = useState(false);
   const [categories, setCategories] = useState<Record<LocalDate, EventCategory[]>>({});
   const scrollRef = useRef<ScrollViewInstance>(null);
-  const sectionY = useRef<Record<LocalDate, number>>({});
+  const [sectionY, setSectionY] = useState<Record<LocalDate, number>>({});
+  const [reach, setReach] = useState(0);
+  const ordered = [...nav.days].reverse();
+  const lazy = useLazyDays(ordered);
+  const { reveal } = lazy;
+
+  useEffect(() => {
+    for (const [date, y] of Object.entries(sectionY)) if (y < reach + REVEAL_MARGIN) reveal(date);
+  }, [sectionY, reach, reveal]);
 
   const onCategories = useCallback(
     (date: LocalDate, cats: EventCategory[]) =>
@@ -92,17 +111,22 @@ function Timeline({ timeZone, plantName }: { timeZone: string; plantName: string
   };
 
   const scrollTo = (date: LocalDate) => {
-    const y = sectionY.current[date];
+    reveal(date);
+    const y = sectionY[date];
     if (y !== undefined) scrollRef.current?.scrollTo({ y: Math.max(0, y - 120), animated: true });
   };
-
-  const ordered = [...nav.days].reverse();
 
   return (
     <PageScroll
       testID="timeline"
       {...({ ref: scrollRef } as object)}
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} />}
+      onLayout={(e) => setReach((r) => Math.max(r, e.nativeEvent.layout.height))}
+      onScroll={(e) => {
+        const bottom = e.nativeEvent.contentOffset.y + e.nativeEvent.layoutMeasurement.height;
+        setReach((r) => Math.max(r, bottom));
+      }}
+      scrollEventThrottle={100}
     >
       <NavBar
         title="Timeline"
@@ -130,10 +154,15 @@ function Timeline({ timeZone, plantName }: { timeZone: string; plantName: string
         <View
           key={date}
           onLayout={(e) => {
-            sectionY.current[date] = e.nativeEvent.layout.y;
+            const y = e.nativeEvent.layout.y;
+            setSectionY((all) => (all[date] === y ? all : { ...all, [date]: y }));
           }}
         >
-          <DaySection date={date} today={today} timeZone={timeZone} onCategories={onCategories} />
+          {lazy.isActive(date) ? (
+            <DaySection date={date} today={today} timeZone={timeZone} onCategories={onCategories} />
+          ) : (
+            <DayPlaceholder date={date} today={today} />
+          )}
         </View>
       ))}
       <WeekSummarySection weekStart={nav.weekStart} />
@@ -241,6 +270,17 @@ function SoilChartCard({ weekStart, timeZone, today, isCurrent }: { weekStart: L
         />
       )}
     </Card>
+  );
+}
+
+function DayPlaceholder({ date, today }: { date: LocalDate; today: LocalDate }) {
+  return (
+    <View style={styles.section} testID={`day-${date}`}>
+      <Text accessibilityRole="header" style={styles.sectionTitle}>
+        {daySectionTitle(date, today)}
+      </Text>
+      <SkeletonCard lines={2} />
+    </View>
   );
 }
 

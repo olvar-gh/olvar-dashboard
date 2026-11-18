@@ -13,7 +13,7 @@ export { usePlantStatus } from './queries/status';
 export { useDevice } from './queries/device';
 export { useGateway } from './queries/gateway';
 export { useLatest, useLatestReadings } from './queries/latest';
-export { useReadings24h } from './queries/readings-24h';
+export { useDayReadings, useReadings24h } from './queries/readings-24h';
 export { useHourly, useHourlyBetween, useDaily } from './queries/hourly';
 export { useOfflinePeriods, useDayExtrema, useFirstUserMessage, useDayEvents } from './queries/offline-periods';
 export { useChatHistory, useSendChat, CHAT_PAGE_SIZE } from './queries/chat';

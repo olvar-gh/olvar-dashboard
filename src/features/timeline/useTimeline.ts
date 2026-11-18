@@ -1,10 +1,10 @@
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 
 import { targetBand, useDaily, useDayEvents, useHourlyBetween, useNow, usePlant, usePlantStatus, useThresholds } from '@/data';
 import { formatTime } from '@/domain/format';
 import { addDays, localDate, type LocalDate } from '@/domain/time';
 
-import { clampWeek, eventRow, weekBounds, weekNav, weekSeries, weekStartOf, weekSummary, type EventRow } from './week';
+import { clampWeek, eventRow, hourlyWindow, weekNav, weekSeries, weekStartOf, weekSummary, type EventRow } from './week';
 
 const CLOCK_MS = 60_000;
 
@@ -28,7 +28,7 @@ export function useWeekSelection(timeZone: string) {
 
 /** "This week" chart data from `readings_hourly_v`, clipped to the local week. */
 export function useWeekChart(weekStart: LocalDate, timeZone: string) {
-  const { from, to } = useMemo(() => weekBounds(weekStart, timeZone), [weekStart, timeZone]);
+  const { from, to } = useMemo(() => hourlyWindow(weekStart, timeZone), [weekStart, timeZone]);
   const hourly = useHourlyBetween(from, to);
   const thresholds = useThresholds();
   const series = useMemo(() => (hourly.data ? weekSeries(hourly.data) : null), [hourly.data]);
@@ -41,6 +41,20 @@ export function useWeekSummary(weekStart: LocalDate) {
   const daily = useDaily(addDays(weekStart, -7), addDays(weekStart, 6));
   const stats = useMemo(() => (daily.data ? weekSummary(daily.data, weekStart) : null), [daily.data, weekStart]);
   return { query: daily, stats };
+}
+
+/** Days shown first (today and yesterday) load at once; the rest load as they come into view. */
+export const EAGER_DAYS = 2;
+
+/** Which day groups may fetch: the first `EAGER_DAYS` of `ordered`, plus every day revealed so far. */
+export function useLazyDays(ordered: readonly LocalDate[]) {
+  const [revealed, setRevealed] = useState<ReadonlySet<LocalDate>>(() => new Set());
+  const reveal = useCallback(
+    (date: LocalDate) => setRevealed((r) => (r.has(date) ? r : new Set(r).add(date))),
+    [],
+  );
+  const isActive = (date: LocalDate) => ordered.indexOf(date) < EAGER_DAYS || revealed.has(date);
+  return { isActive, reveal };
 }
 
 export type DayActivity = {
@@ -70,5 +84,11 @@ export function useOfflineState(timeZone: string | undefined) {
 
 export function usePlantTimeZone() {
   const plant = usePlant();
-  return { plant: plant.data ?? null, timeZone: plant.data?.timezone, query: plant };
+  return {
+    plant: plant.data ?? null,
+    timeZone: plant.data?.timezone,
+    query: plant,
+    /** The first plant load failed, so there is nothing to show but Retry. */
+    failed: plant.error != null && plant.data === undefined,
+  };
 }
