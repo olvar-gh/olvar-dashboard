@@ -13,6 +13,7 @@ export type Tick = { t: number; label: string };
 
 const MINUTE_MS = 60_000;
 const HOUR_MS = 60 * MINUTE_MS;
+const QUARTER_MS = 15 * MINUTE_MS;
 
 export function toMs(t: Date | string | number): number {
   return typeof t === 'number' ? t : new Date(t).getTime();
@@ -144,11 +145,33 @@ function wallMs(timeZone: string, t: number): number {
 /**
  * Start of the plant-local clock hour holding `t`. Unlike flooring to UTC hours this
  * matches the local clock in :30/:45 zones, and the repeated hour of a fall-back
- * day stays two separate hours.
+ * day stays two separate hours. When the offset changes inside the hour (for example
+ * Lord Howe's 30-minute DST shift) the hour after the change starts at the change.
  */
 export function localHourStart(t: number, timeZone: string): number {
-  const wall = wallMs(timeZone, t);
-  return t - (((wall % HOUR_MS) + HOUR_MS) % HOUR_MS);
+  const offset = tzOffsetMs(timeZone, t);
+  const naive = t - ((((t + offset) % HOUR_MS) + HOUR_MS) % HOUR_MS);
+  if (tzOffsetMs(timeZone, naive) === offset) return naive;
+  return offsetChange(naive, t, timeZone);
+}
+
+/** Start of the plant-local clock hour after the one starting at `start` (see `localHourStart`). */
+export function nextLocalHourStart(start: number, timeZone: string): number {
+  const offset = tzOffsetMs(timeZone, start);
+  const naive = start + HOUR_MS - ((((start + offset) % HOUR_MS) + HOUR_MS) % HOUR_MS);
+  if (tzOffsetMs(timeZone, naive) === offset) return naive;
+  // Historical offsets that change off the quarter hour (Africa/Monrovia 1972) would round
+  // back to `start`; always move forward so callers stepping bucket by bucket terminate.
+  const change = offsetChange(start, naive, timeZone);
+  return change > start ? change : naive;
+}
+
+/** First quarter-hour instant in `(from, to]` whose offset is the one at `to` (offsets change on quarter hours). */
+function offsetChange(from: number, to: number, timeZone: string): number {
+  const offset = tzOffsetMs(timeZone, to);
+  let t = Math.floor(to / QUARTER_MS) * QUARTER_MS;
+  while (t - QUARTER_MS > from && tzOffsetMs(timeZone, t - QUARTER_MS) === offset) t -= QUARTER_MS;
+  return t;
 }
 
 /**

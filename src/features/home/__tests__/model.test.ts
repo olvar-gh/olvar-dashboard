@@ -1,4 +1,6 @@
 import type { Reading } from '@/data';
+import { toBuckets } from '@/components/charts/HourBars';
+import { formatTime } from '@/domain/format';
 import { localDayBounds } from '@/domain/time';
 
 import {
@@ -15,6 +17,7 @@ import {
 } from '../model';
 
 const TZ = 'Asia/Seoul';
+const HOUR = 3_600_000;
 const reading = (recorded_at: string, patch: Partial<Reading> = {}): Reading => ({
   id: 1,
   device_id: 'olvar-a1b2c3',
@@ -142,6 +145,37 @@ describe('today', () => {
       { t: Date.parse('2026-11-01T05:00:00Z'), v: 100 },
       { t: Date.parse('2026-11-01T06:00:00Z'), v: 300 },
     ]);
+  });
+
+  it('follows the plant clock across a 30-minute DST shift (Lord Howe)', () => {
+    const tz = 'Australia/Lord_Howe';
+    // Spring forward 2026-10-04: 02:00 +10:30 becomes 02:30 +11, so 02:30-03:00 is a half-hour bucket.
+    const spring = localDayBounds(tz, '2026-10-04');
+    const springRows = [
+      reading('2026-10-03T15:10:00Z', { lux: 100 }), // 01:40 local
+      reading('2026-10-03T15:40:00Z', { lux: 300 }), // 02:40 local
+      reading('2026-10-03T16:10:00Z', { lux: 500 }), // 03:10 local
+    ];
+    expect(hourlyMeans(springRows, spring.start, spring.end, tz)).toEqual([
+      { t: Date.parse('2026-10-03T14:30:00Z'), v: 100 },
+      { t: Date.parse('2026-10-03T15:30:00Z'), v: 300 },
+      { t: Date.parse('2026-10-03T16:00:00Z'), v: 500 },
+    ]);
+    const springBars = toBuckets(springRows.map((r) => ({ t: r.recorded_at, v: r.lux })), [spring.start.getTime(), spring.end.getTime()], HOUR, spring.end.getTime(), tz);
+    expect(springBars).toHaveLength(24);
+    expect(springBars.map((b) => formatTime(new Date(b.start), tz)).slice(0, 4)).toEqual(['00:00', '01:00', '02:30', '03:00']);
+    expect(springBars.filter((b) => b.v != null)).toHaveLength(3);
+
+    // Fall back 2026-04-05: 02:00 +11 becomes 01:30 +10:30, so the day has 25 buckets.
+    const fall = localDayBounds(tz, '2026-04-05');
+    const fallRows = [reading('2026-04-04T14:50:00Z', { lux: 100 }), reading('2026-04-04T15:10:00Z', { lux: 300 })];
+    expect(hourlyMeans(fallRows, fall.start, fall.end, tz)).toEqual([
+      { t: Date.parse('2026-04-04T14:00:00Z'), v: 100 },
+      { t: Date.parse('2026-04-04T15:00:00Z'), v: 300 },
+    ]);
+    const fallBars = toBuckets([], [fall.start.getTime(), fall.end.getTime()], HOUR, fall.end.getTime(), tz);
+    expect(fallBars).toHaveLength(25);
+    for (let i = 1; i < fallBars.length; i++) expect(fallBars[i].start).toBe(fallBars[i - 1].end);
   });
 
   it('picks the newest successful plant reply', () => {
