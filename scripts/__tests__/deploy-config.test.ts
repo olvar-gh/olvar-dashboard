@@ -57,6 +57,7 @@ describe('public/_headers', () => {
 
 describe('checkBuildEnv', () => {
   const url = 'https://ref.supabase.co';
+  const notPublishable = 'EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY is not a publishable key (sb_publishable_...)';
 
   it('accepts a Supabase build with a publishable key', () => {
     expect(
@@ -65,22 +66,38 @@ describe('checkBuildEnv', () => {
   });
 
   it('rejects a secret key', () => {
-    expect(
-      checkBuildEnv({ EXPO_PUBLIC_SUPABASE_URL: url, EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY: 'sb_secret_abc' }),
-    ).toEqual(['EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY is not a publishable key (sb_publishable_...)']);
+    const problems = checkBuildEnv({ EXPO_PUBLIC_SUPABASE_URL: url, EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY: 'sb_secret_abc' });
+    expect(problems).toHaveLength(2);
+    expect(problems[0]).toMatch(/secret keys must never be used/);
+    expect(problems[1]).toBe(notPublishable);
   });
 
   it('rejects a legacy JWT key', () => {
     expect(
       checkBuildEnv({ EXPO_PUBLIC_SUPABASE_URL: url, EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY: 'eyJhbGciOiJIUzI1NiJ9.x.y' }),
-    ).toEqual(['EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY is not a publishable key (sb_publishable_...)']);
+    ).toEqual([notPublishable]);
   });
 
   it('requires both Supabase values when the data source defaults to supabase', () => {
-    expect(checkBuildEnv({ EXPO_PUBLIC_SUPABASE_URL: '' })).toEqual([
-      'EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY is not set',
-      'EXPO_PUBLIC_SUPABASE_URL is not set',
-    ]);
+    const [problem, ...rest] = checkBuildEnv({ EXPO_PUBLIC_SUPABASE_URL: '' });
+    expect(rest).toEqual([]);
+    expect(problem).toMatch(/EXPO_PUBLIC_SUPABASE_URL: required/);
+    expect(problem).toMatch(/EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY: required/);
+  });
+
+  it('rejects an unknown data source, which the app refuses at startup', () => {
+    const [problem, ...rest] = checkBuildEnv({ EXPO_PUBLIC_DATA_SOURCE: 'fixture' });
+    expect(rest).toEqual([]);
+    expect(problem).toMatch(/EXPO_PUBLIC_DATA_SOURCE/);
+  });
+
+  it('rejects a Supabase URL without a scheme', () => {
+    const [problem, ...rest] = checkBuildEnv({
+      EXPO_PUBLIC_SUPABASE_URL: 'ref.supabase.co',
+      EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY: 'sb_publishable_abc',
+    });
+    expect(rest).toEqual([]);
+    expect(problem).toMatch(/EXPO_PUBLIC_SUPABASE_URL: Invalid URL/);
   });
 
   it('needs no Supabase values for a fixtures build', () => {
@@ -89,8 +106,8 @@ describe('checkBuildEnv', () => {
 
   it('still rejects a non-publishable key in a fixtures build, since it is inlined anyway', () => {
     expect(
-      checkBuildEnv({ EXPO_PUBLIC_DATA_SOURCE: 'fixtures', EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY: 'sb_secret_abc' }),
-    ).toEqual(['EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY is not a publishable key (sb_publishable_...)']);
+      checkBuildEnv({ EXPO_PUBLIC_DATA_SOURCE: 'fixtures', EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY: 'eyJhbGciOiJIUzI1NiJ9.x.y' }),
+    ).toEqual([notPublishable]);
   });
 });
 

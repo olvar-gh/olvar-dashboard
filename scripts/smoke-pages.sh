@@ -18,7 +18,7 @@ fi
 
 npx -y wrangler@4.164.0 pages dev "$dir" --port "$port" >"$log" 2>&1 &
 server=$!
-trap 'kill "$server" 2>/dev/null || true; rm -f "$log"' EXIT
+trap 'kill "$server" 2>/dev/null || true; rm -f "$log" "$log.headers"' EXIT
 
 ready=0
 for _ in $(seq 1 90); do
@@ -52,11 +52,16 @@ for route in / /settings/devices /sensors /timeline /chat /sign-in /no/such/page
 done
 
 stale="$base/_expo/static/js/web/removed-by-a-later-deploy.js"
-if curl -sI "$stale" | grep -qiE '^cache-control:.*(immutable|max-age=[1-9])'; then
+stale_body=$(curl -s -D "$log.headers" -w '\n%{http_code}' "$stale")
+stale_code=${stale_body##*$'\n'}
+if [[ $stale_code != 200 || $stale_body != *'<div id="root">'* ]]; then
+  echo "✗ a missing bundle -> $stale_code, not the app shell"
+  fail=1
+elif grep -qiE '^cache-control:.*(immutable|max-age=[1-9])' "$log.headers"; then
   echo "✗ the SPA fallback for a missing bundle is cached long-term"
   fail=1
 else
-  echo "✓ the SPA fallback for a missing bundle is revalidated"
+  echo "✓ a missing bundle -> index.html, revalidated"
 fi
 
 if grep -q 'invalid redirect rule' "$log"; then

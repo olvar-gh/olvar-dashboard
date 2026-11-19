@@ -6,6 +6,8 @@
 const fs = require('node:fs');
 const path = require('node:path');
 
+const { parseEnv } = require('../src/env.ts');
+
 const SECRET_KEY = /sb_secret_[A-Za-z0-9_-]+/;
 const SCANNED = new Set(['.html', '.js', '.json', '.map']);
 
@@ -19,16 +21,16 @@ function* files(dir) {
 
 function checkBuildEnv(env) {
   const problems = [];
-  const value = (name) => (env[name] === '' ? undefined : env[name]);
-  const source = value('EXPO_PUBLIC_DATA_SOURCE') ?? 'supabase';
-  const key = value('EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY');
-  // src/env.ts reads the key statically, so Expo inlines it even into a fixtures build.
-  if (key !== undefined && !key.startsWith('sb_publishable_')) {
-    problems.push('EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY is not a publishable key (sb_publishable_...)');
+  try {
+    parseEnv(env);
+  } catch (error) {
+    problems.push(error.message);
   }
-  if (source === 'supabase') {
-    if (key === undefined) problems.push('EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY is not set');
-    if (value('EXPO_PUBLIC_SUPABASE_URL') === undefined) problems.push('EXPO_PUBLIC_SUPABASE_URL is not set');
+  // Stricter than parseEnv, and checked for fixtures builds too: src/env.ts reads the key
+  // statically, so Expo inlines it whatever the data source.
+  const key = env.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
+  if (key && !key.startsWith('sb_publishable_')) {
+    problems.push('EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY is not a publishable key (sb_publishable_...)');
   }
   return problems;
 }
