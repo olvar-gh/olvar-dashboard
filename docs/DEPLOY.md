@@ -140,15 +140,16 @@ Fill in `EXPO_PUBLIC_DATA_SOURCE=supabase`, the project URL and the `sb_publisha
 With the iPhone connected and unlocked:
 
 ```bash
-npm run ios:release                            # lists the connected devices to pick from
-npm run ios:release -- --device "My iPhone"    # or by name / UDID (xcrun devicectl list devices)
+npm run ios:release                            # installs on the one connected iPhone
+npm run ios:release -- --device "My iPhone"    # with several connected: by name or UDID (xcrun devicectl list devices)
 ```
 
 `scripts/ios-release.js` does the following:
 
 1. Fails early if Xcode is older than 27 or the build env is wrong. It validates the env with the app's own `parseEnv` (`src/env.ts`) and the same check as the web build (a key that does not start with `sb_publishable_` fails). It also refuses `EXPO_PUBLIC_DATA_SOURCE=fixtures` unless you pass `--allow-fixtures`.
-2. Runs `npx expo prebuild --platform ios` to generate or update `ios/` from `app.json` (Continuous Native Generation; `ios/` is git-ignored, never edit it by hand).
-3. Runs `npx expo run:ios --configuration Release --no-bundler --device …`, which builds the Release configuration with the JS bundle embedded, signs it, installs it and launches it. The app then runs without Metro or the Mac. Release builds do not include the dev client.
+2. Finds the iPhone with `xcrun devicectl`. It considers only physical iPhones that are paired and reachable, never a simulator. With none connected it stops and says so. With several connected it asks for `--device`.
+3. Runs `npx expo prebuild --platform ios --no-clean` to generate `ios/` from `app.json`, or update it in place (Continuous Native Generation; `ios/` is git-ignored, never edit it by hand). `--no-clean` keeps the signing team you set in Xcode.
+4. Runs `npx expo run:ios --configuration Release --no-bundler --device <UDID>` for that iPhone, which builds the Release configuration with the JS bundle embedded, signs it, installs it and launches it. The app then runs without Metro or the Mac. Release builds do not include the dev client.
 
 On the first build, Expo asks which signing team to use and writes it into the generated project. If signing still fails, run `xed ios`, select the `olvar` target → **Signing & Capabilities**, tick **Automatically manage signing**, pick your team, and run the script again.
 
@@ -156,7 +157,7 @@ Options:
 
 | Option | Effect |
 | --- | --- |
-| `--dry-run` | Checks Xcode and the env, prints the commands, builds nothing. |
+| `--dry-run` | Checks Xcode, the env and (for `ios:release`) the connected iPhone, prints the commands, builds nothing. |
 | `--clean` | Regenerates `ios/` from scratch (`prebuild --clean`). Use it after changing plugins or native config in `app.json`, or after an Expo SDK upgrade. It drops the team chosen in Xcode, so you pick it again (or set `APPLE_TEAM_ID` for archives). |
 | `--allow-fixtures` | Builds a demo app on fixtures. |
 
@@ -177,7 +178,7 @@ This needs the paid Apple Developer Program and an App Store Connect record:
 3. In the Organizer, select the archive → **Distribute App → App Store Connect → Upload**. Keep **Manage Version and Build Number** ticked, so Xcode raises the build number when one is already taken. To keep build numbers in the repo instead, raise `expo.ios.buildNumber` in `app.json` before each upload; to ship a new user-facing version, raise `expo.version`.
 4. App Store Connect processes the build in about 10 to 15 minutes. Then, in **TestFlight → Internal Testing**, add yourself to a group and install the build with the TestFlight app. Internal testers (up to 100 App Store Connect users) need no review. External testers need Beta App Review, plus a privacy policy URL and beta test information.
 
-You can also archive entirely from the Xcode UI (`xed ios`, then **Product → Archive** with the `olvar` scheme). Xcode's bundling step runs `expo export:embed` in production mode, which reads the same `.env.production.local`, but it does not run the script's checks. Run `npm run ios:release -- --dry-run` first.
+You can also archive entirely from the Xcode UI (`xed ios`, then **Product → Archive** with the `olvar` scheme). This path does not use the script and its checks. It also does not see your terminal's environment: Xcode's bundling step runs `expo export:embed` in production mode, which takes its values only from the env files (`.env.production.local`, then `.env.local`, `.env.production`, `.env`) and from the environment Xcode itself was started with. So make sure `.env.production.local` sets all three `EXPO_PUBLIC_*` values, or a `fixtures` line in `.env.local` ends up in the build. If you override values in the shell, use `npm run ios:archive`, so the check and the archive see the same values.
 
 Export compliance is already answered in `app.json` (`usesNonExemptEncryption: false`), so TestFlight does not ask about encryption for each build.
 
@@ -192,5 +193,5 @@ export EXPO_PUBLIC_DATA_SOURCE=fixtures   # for the export and the checker alike
 npx expo export -p web
 node scripts/check-web-export.js dist
 scripts/smoke-pages.sh dist   # Cloudflare's local Pages server (wrangler pages dev); checks deep links and that the fallback is not cached long-term; fails if the port is taken
-npm run ios:release -- --dry-run   # on the Mac mini: checks Xcode and .env.production.local, prints the build commands, builds nothing
+npm run ios:archive -- --dry-run   # on the Mac mini: checks Xcode and .env.production.local, prints the build commands, builds nothing (ios:release also needs the iPhone connected)
 ```

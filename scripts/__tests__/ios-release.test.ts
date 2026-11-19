@@ -8,7 +8,9 @@ import {
   archivePath,
   checkReleaseEnv,
   describeEnv,
+  listIphones,
   parseArgs,
+  pickIphone,
   projectName,
   releasePlan,
   resolveBuildEnv,
@@ -23,7 +25,7 @@ const supabase = {
 };
 
 describe('parseArgs', () => {
-  it('defaults to a device build that lets Expo pick the device', () => {
+  it('defaults to a device build on the only connected iPhone', () => {
     expect(parseArgs([])).toMatchObject({ mode: 'device', device: undefined, clean: false, dryRun: false });
   });
 
@@ -65,6 +67,10 @@ describe('checkReleaseEnv', () => {
       expect.stringMatching(/APPLE_TEAM_ID/),
     ]);
   });
+
+  it('treats a blank APPLE_TEAM_ID as unset, as the template leaves it', () => {
+    expect(checkReleaseEnv({ ...supabase, APPLE_TEAM_ID: '' }, { allowFixtures: false })).toEqual([]);
+  });
 });
 
 describe('resolveBuildEnv', () => {
@@ -98,6 +104,15 @@ describe('resolveBuildEnv', () => {
     expect(files).toEqual(['.env.production.local', '.env.local']);
   });
 
+  it('ignores a blank APPLE_TEAM_ID in the shell or a file', () => {
+    fs.writeFileSync(path.join(dir, '.env.production.local'), 'APPLE_TEAM_ID=\n');
+    expect(resolveBuildEnv(dir, {}).env).not.toHaveProperty('APPLE_TEAM_ID');
+    fs.writeFileSync(path.join(dir, '.env.production.local'), 'APPLE_TEAM_ID=ABCDE12345\n');
+    const { env, sources } = resolveBuildEnv(dir, { APPLE_TEAM_ID: '' });
+    expect(env.APPLE_TEAM_ID).toBe('ABCDE12345');
+    expect(sources.APPLE_TEAM_ID).toBe('.env.production.local');
+  });
+
   it('lets a lower-priority file fill a key the release file leaves out', () => {
     fs.writeFileSync(path.join(dir, '.env.local'), 'EXPO_PUBLIC_DATA_SOURCE=fixtures\n');
     fs.writeFileSync(path.join(dir, '.env.production.local'), 'EXPO_PUBLIC_SUPABASE_URL=https://ref.supabase.co\n');
@@ -124,23 +139,98 @@ describe('describeEnv', () => {
   });
 });
 
-describe('releasePlan', () => {
-  const ctx = { name: 'olvar', teamId: undefined, archive: '/A/olvar.xcarchive' };
+describe('listIphones', () => {
+  const device = (reality: string, deviceType: string, state: string, name: string, udid: string) => ({
+    properties: {
+      hardware: { reality, deviceType, udid },
+      connection: { pairingState: 'paired', state },
+      state: { name },
+    },
+  });
 
-  it('builds Release with the bundle embedded and installs on the device', () => {
-    expect(releasePlan(parseArgs(['--device', 'iPhone']), ctx)).toEqual([
-      { cmd: 'npx', args: ['expo', 'prebuild', '--platform', 'ios'] },
-      { cmd: 'npx', args: ['expo', 'run:ios', '--configuration', 'Release', '--no-bundler', '--device', 'iPhone'] },
+  it('keeps physical iPhones only and marks the unreachable ones', () => {
+    const json = {
+      result: {
+        devices: [
+          device('simulated', 'iPhone', 'connected', 'Sim', '541D8631-A015-47B9-8B84-7F9E7A257283'),
+          device('physical', 'iPad', 'connected', 'iPad', '00008103-000A'),
+          device('physical', 'iPhone', 'disconnected', 'Phone', '00008140-001E'),
+          device('physical', 'iPhone', 'unavailable', 'Old phone', '00008030-0002'),
+        ],
+      },
+    };
+    expect(listIphones(json)).toEqual([
+      { name: 'Phone', udid: '00008140-001E', connected: true },
+      { name: 'Old phone', udid: '00008030-0002', connected: false },
     ]);
   });
 
-  it('always targets a device, never the simulator', () => {
-    expect(releasePlan(parseArgs([]), ctx)[1].args.slice(-1)).toEqual(['--device']);
-    expect(releasePlan(parseArgs(['--device']), ctx)[1].args.slice(-1)).toEqual(['--device']);
+  it('reads the deprecated fields of older devicectl output', () => {
+    const json = {
+      result: {
+        devices: [
+          {
+            hardwareProperties: { reality: 'physical', deviceType: 'iPhone', udid: '00008140-001E' },
+            connectionProperties: { pairingState: 'paired', tunnelState: 'connected' },
+            deviceProperties: { name: 'Phone' },
+          },
+        ],
+      },
+    };
+    expect(listIphones(json)).toEqual([{ name: 'Phone', udid: '00008140-001E', connected: true }]);
   });
 
-  it('passes --clean to prebuild', () => {
-    expect(releasePlan(parseArgs(['--clean']), ctx)[0].args).toContain('--clean');
+  it('handles no devices', () => {
+    expect(listIphones({})).toEqual([]);
+  });
+});
+
+describe('pickIphone', () => {
+  const phone = { name: "Owner's iPhone", udid: '00008140-001E', connected: true };
+  const spare = { name: 'Spare', udid: '00008030-0002', connected: true };
+  const away = { name: 'Away', udid: '00008110-0003', connected: false };
+
+  it('uses the only connected iPhone', () => {
+    expect(pickIphone([phone, away], undefined)).toBe(phone);
+    expect(pickIphone([phone], true)).toBe(phone);
+  });
+
+  it('fails clearly when no iPhone is connected', () => {
+    expect(() => pickIphone([away], undefined)).toThrow(/No iPhone is connected/);
+    expect(() => pickIphone([], true)).toThrow(/No iPhone is connected/);
+  });
+
+  it('asks for --device when several are connected', () => {
+    expect(() => pickIphone([phone, spare], undefined)).toThrow(/--device <udid>[\s\S]*00008030-0002/);
+  });
+
+  it('matches --device by name or UDID, ignoring case', () => {
+    expect(pickIphone([phone, spare], 'spare')).toBe(spare);
+    expect(pickIphone([phone, spare], '00008140-001e')).toBe(phone);
+  });
+
+  it('rejects an unknown or unreachable --device, such as a simulator', () => {
+    expect(() => pickIphone([phone], 'iPhone 17 Pro')).toThrow(/No iPhone named or with UDID "iPhone 17 Pro"/);
+    expect(() => pickIphone([phone, away], 'Away')).toThrow(/paired but not reachable/);
+  });
+});
+
+describe('releasePlan', () => {
+  const ctx = { name: 'olvar', teamId: undefined, archive: '/A/olvar.xcarchive', udid: '00008140-001E' };
+
+  it('keeps ios/ and installs the Release build on the chosen iPhone by UDID', () => {
+    expect(releasePlan(parseArgs(['--device', 'iPhone']), ctx)).toEqual([
+      { cmd: 'npx', args: ['expo', 'prebuild', '--platform', 'ios', '--no-clean'] },
+      {
+        cmd: 'npx',
+        args: ['expo', 'run:ios', '--configuration', 'Release', '--no-bundler', '--device', '00008140-001E'],
+      },
+    ]);
+  });
+
+  it('regenerates ios/ only with --clean', () => {
+    expect(releasePlan(parseArgs(['--clean']), ctx)[0].args).toEqual(['expo', 'prebuild', '--platform', 'ios', '--clean']);
+    expect(releasePlan(parseArgs(['--archive']), ctx)[0].args).toContain('--no-clean');
   });
 
   it('archives for any iOS device and opens the archive in Xcode', () => {
@@ -154,8 +244,10 @@ describe('releasePlan', () => {
   });
 
   it('leaves signing to the Xcode project without a team ID', () => {
-    const [, archive] = releasePlan(parseArgs(['--archive']), ctx);
-    expect(archive.args.join(' ')).not.toContain('DEVELOPMENT_TEAM');
+    for (const teamId of [undefined, '']) {
+      const [, archive] = releasePlan(parseArgs(['--archive']), { ...ctx, teamId });
+      expect(archive.args.join(' ')).not.toContain('DEVELOPMENT_TEAM');
+    }
   });
 });
 

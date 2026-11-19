@@ -4,10 +4,11 @@
 // from the same files Expo reads when it bundles a Release build (process env, then
 // .env.production.local, .env.local, .env.production, .env) and are checked first.
 //
-//   node scripts/ios-release.js [--device <name|udid>]   build, install and launch on an iPhone
+//   node scripts/ios-release.js [--device <name|udid>]   build, install and launch on a connected iPhone
 //   node scripts/ios-release.js --archive                archive for TestFlight, open it in Xcode
 //
 // Options: --clean (regenerate ios/ from app.json), --allow-fixtures, --dry-run (check only).
+/* global __dirname */
 const { spawnSync } = require('node:child_process');
 const fs = require('node:fs');
 const os = require('node:os');
@@ -32,7 +33,7 @@ function parseArgs(argv) {
     else if (arg === '--dry-run') opts.dryRun = true;
     else if (arg === '--help' || arg === '-h') opts.help = true;
     else if (arg === '--device' || arg === '-d') {
-      // Without a value, `expo run:ios --device` lists the connected devices to pick from.
+      // Without a value, the only connected iPhone is used.
       const next = argv[i + 1];
       opts.device = next && !next.startsWith('-') ? argv[++i] : true;
     } else if (arg.startsWith('--device=')) opts.device = arg.slice('--device='.length);
@@ -57,7 +58,9 @@ function resolveBuildEnv(root, systemEnv = process.env) {
   /** @type {Record<string, string>} */
   const sources = {};
   for (const key of [...ENV_KEYS, 'APPLE_TEAM_ID']) {
-    if (systemEnv[key] !== undefined) {
+    // Expo keeps an empty shell value over the files; APPLE_TEAM_ID is ours, and blank means unset.
+    if (key === 'APPLE_TEAM_ID' && !systemEnv[key] && !fileEnv[key]) continue;
+    if (systemEnv[key] !== undefined && (key !== 'APPLE_TEAM_ID' || systemEnv[key])) {
       env[key] = systemEnv[key];
       sources[key] = 'shell';
     } else if (fileEnv[key] !== undefined) {
@@ -81,7 +84,7 @@ function checkReleaseEnv(env, { allowFixtures }) {
   if ((env.EXPO_PUBLIC_DATA_SOURCE ?? 'supabase') === 'fixtures' && !allowFixtures) {
     problems.push('EXPO_PUBLIC_DATA_SOURCE is fixtures: the app would show demo data (pass --allow-fixtures if intended)');
   }
-  if (env.APPLE_TEAM_ID !== undefined && !/^[A-Z0-9]{10}$/.test(env.APPLE_TEAM_ID)) {
+  if (env.APPLE_TEAM_ID && !/^[A-Z0-9]{10}$/.test(env.APPLE_TEAM_ID)) {
     problems.push('APPLE_TEAM_ID must be the 10-character Team ID from developer.apple.com → Membership');
   }
   return problems;
@@ -116,12 +119,64 @@ function archivePath(name, now = new Date(), home = os.homedir()) {
   return path.join(home, 'Library/Developer/Xcode/Archives', day, `${name} ${day} ${time}.xcarchive`);
 }
 
-function releasePlan(opts, { name, teamId, archive }) {
-  const steps = [{ cmd: 'npx', args: ['expo', 'prebuild', '--platform', 'ios', ...(opts.clean ? ['--clean'] : [])] }];
+/**
+ * Physical iPhones from `xcrun devicectl list devices --json-output`. devicectl lists simulators
+ * and every paired phone too; a phone it cannot reach right now is in state "unavailable".
+ */
+function listIphones(devicectlJson) {
+  return (devicectlJson?.result?.devices ?? [])
+    .map((d) => {
+      const hardware = d.properties?.hardware ?? d.hardwareProperties ?? {};
+      const connection = d.properties?.connection ?? {};
+      const state = connection.state ?? d.connectionProperties?.tunnelState;
+      const pairing = connection.pairingState ?? d.connectionProperties?.pairingState;
+      return {
+        name: d.properties?.state?.name ?? d.deviceProperties?.name ?? hardware.marketingName ?? hardware.udid,
+        udid: hardware.udid,
+        physical: hardware.reality === 'physical' && hardware.deviceType === 'iPhone',
+        connected: pairing === 'paired' && state !== undefined && state !== 'unavailable',
+      };
+    })
+    .filter((d) => d.physical && d.udid)
+    .map(({ name, udid, connected }) => ({ name, udid, connected }));
+}
+
+/** The iPhone to install on, as a UDID, so `expo run:ios` can never fall back to a simulator. */
+function pickIphone(iphones, wanted) {
+  const connected = iphones.filter((d) => d.connected);
+  const list = (devices) => devices.map((d) => `\n  ${d.name}  ${d.udid}`).join('');
+  if (typeof wanted === 'string') {
+    const match = iphones.find((d) => d.udid.toLowerCase() === wanted.toLowerCase() || d.name.toLowerCase() === wanted.toLowerCase());
+    if (!match) throw new Error(`No iPhone named or with UDID "${wanted}". Connected iPhones:${list(connected) || ' none'}`);
+    if (!match.connected) throw new Error(`${match.name} is paired but not reachable: connect it by USB and unlock it`);
+    return match;
+  }
+  if (connected.length === 1) return connected[0];
+  if (connected.length === 0) {
+    throw new Error(
+      'No iPhone is connected: connect it by USB, unlock it, tap Trust and turn on Developer Mode (docs/DEPLOY.md)',
+    );
+  }
+  throw new Error(`Several iPhones are connected; pick one with --device <udid>:${list(connected)}`);
+}
+
+function connectedIphones() {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'olvar-devicectl-'));
+  try {
+    const out = path.join(dir, 'devices.json');
+    const run = spawnSync('xcrun', ['devicectl', 'list', 'devices', '--quiet', '--json-output', out], { encoding: 'utf8' });
+    if (run.status !== 0 || !fs.existsSync(out)) throw new Error(`xcrun devicectl list devices failed: ${run.stderr || run.error}`);
+    return listIphones(JSON.parse(fs.readFileSync(out, 'utf8')));
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+}
+
+function releasePlan(opts, { name, teamId, archive, udid }) {
+  // Prebuild recreates ios/ unless told not to, which would drop the team chosen in Xcode.
+  const steps = [{ cmd: 'npx', args: ['expo', 'prebuild', '--platform', 'ios', opts.clean ? '--clean' : '--no-clean'] }];
   if (opts.mode === 'device') {
-    // Without --device, run:ios targets a simulator; a bare --device lists the connected devices.
-    const device = typeof opts.device === 'string' ? ['--device', opts.device] : ['--device'];
-    steps.push({ cmd: 'npx', args: ['expo', 'run:ios', '--configuration', 'Release', '--no-bundler', ...device] });
+    steps.push({ cmd: 'npx', args: ['expo', 'run:ios', '--configuration', 'Release', '--no-bundler', '--device', udid] });
     return steps;
   }
   steps.push({
@@ -163,16 +218,26 @@ function main(argv) {
 
   const appJson = JSON.parse(fs.readFileSync(path.join(ROOT, 'app.json'), 'utf8'));
   const name = projectName(appJson);
-  const steps = releasePlan(opts, { name, teamId: resolved.env.APPLE_TEAM_ID, archive: archivePath(name) });
+
+  let iphone;
+  if (opts.mode === 'device' && major !== undefined) {
+    try {
+      iphone = pickIphone(connectedIphones(), opts.device);
+    } catch (error) {
+      problems.push(error.message);
+    }
+  }
 
   console.log(`iOS ${opts.mode === 'device' ? 'release build for a connected iPhone' : 'archive for TestFlight'}`);
   console.log(`  Xcode: ${major ?? 'missing'}`);
+  if (iphone) console.log(`  iPhone: ${iphone.name} (${iphone.udid})`);
   console.log(`  env files: ${resolved.files.length ? resolved.files.join(', ') : '(none; copy .env.production.local.example)'}`);
   for (const line of describeEnv(resolved)) console.log(`  ${line}`);
   if (problems.length) {
     for (const p of problems) console.error(`✗ ${p}`);
     return 1;
   }
+  const steps = releasePlan(opts, { name, teamId: resolved.env.APPLE_TEAM_ID, archive: archivePath(name), udid: iphone?.udid });
   console.log(opts.dryRun ? 'Would run:' : 'Running:');
   for (const step of steps) console.log(`  $ ${formatStep(step)}`);
   if (opts.dryRun) return 0;
@@ -188,7 +253,18 @@ function main(argv) {
   return 0;
 }
 
-module.exports = { archivePath, checkReleaseEnv, describeEnv, parseArgs, projectName, releasePlan, resolveBuildEnv, xcodeMajor };
+module.exports = {
+  archivePath,
+  checkReleaseEnv,
+  describeEnv,
+  listIphones,
+  parseArgs,
+  pickIphone,
+  projectName,
+  releasePlan,
+  resolveBuildEnv,
+  xcodeMajor,
+};
 
 if (require.main === module) {
   try {
