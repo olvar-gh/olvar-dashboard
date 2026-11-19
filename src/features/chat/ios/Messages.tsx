@@ -53,7 +53,10 @@ function Day({ day, chat, all, timeZone, onDayLayout }: { day: ChatDay<ChatRow>;
       <Text style={styles.divider}>{`${day.label} ${formatTime(day.messages[0].created_at, timeZone)}`}</Text>
       {day.messages.map((m) =>
         m.role === 'user' ? (
-          <UserBubble key={m.id} text={m.content} />
+          <View key={m.id} style={styles.question}>
+            <UserBubble text={m.content} />
+            {chat.unanswered?.id === m.id ? <Unanswered chat={chat} /> : null}
+          </View>
         ) : (
           <PlantBubble key={m.id} message={m} timeZone={timeZone} onRetry={m.error ? retryFor(chat, all, m) : undefined} />
         ),
@@ -65,6 +68,24 @@ function Day({ day, chat, all, timeZone, onDayLayout }: { day: ChatDay<ChatRow>;
 function retryFor(chat: ChatModel, all: ChatRow[], reply: ChatRow) {
   const question = questionFor(all, reply);
   return question ? () => chat.submit(question) : undefined;
+}
+
+/** Under the newest question when no answer to it was stored. */
+function Unanswered({ chat }: { chat: ChatModel }) {
+  return (
+    <View style={styles.unanswered} testID="chat-unanswered">
+      <Text style={[styles.note, styles.noteError]}>{chat.unanswered?.error ?? 'No answer arrived.'}</Text>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel="Retry"
+        accessibilityState={{ disabled: !!chat.rateLimit }}
+        disabled={!!chat.rateLimit}
+        onPress={() => void chat.retryUnanswered()}
+        hitSlop={8}>
+        <Text style={[styles.retry, chat.rateLimit ? styles.dimmed : null]}>Retry</Text>
+      </Pressable>
+    </View>
+  );
 }
 
 function UserBubble({ text, note, faded, onPress }: { text: string; note?: string; faded?: boolean; onPress?: () => void }) {
@@ -147,9 +168,12 @@ const styles = StyleSheet.create({
   day: { gap: 14, paddingBottom: 14 },
   older: { paddingBottom: 14 },
   idle: { opacity: 0 },
+  dimmed: { opacity: 0.4 },
   olderError: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 8, paddingBottom: 14 },
   retry: { ...typography.iosCaption1, color: colors.brand.olive, fontWeight: '600' },
   divider: { ...typography.iosCaption1, color: iosColors.labelTertiary, textAlign: 'center', paddingTop: 4 },
+  question: { gap: 4 },
+  unanswered: { flexDirection: 'row', justifyContent: 'flex-end', alignItems: 'center', gap: 4 },
   user: { alignItems: 'flex-end', gap: 4, paddingLeft: 48 },
   userBubble: { backgroundColor: colors.brand.olive, borderRadius: 20, paddingHorizontal: 14, paddingVertical: 9 },
   faded: { opacity: 0.6 },

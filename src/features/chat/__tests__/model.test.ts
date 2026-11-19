@@ -1,6 +1,6 @@
 import type { ChatMessageRow, PlantStatus, Reading } from '@/data';
 
-import { chipValue, contextRows, formatCountdown, isSendKey, optimisticVisible, questionFor, rateLimitText, sendErrorText, suggestions } from '../model';
+import { chipValue, contextRows, formatCountdown, isSendKey, optimisticVisible, questionFor, rateLimitText, sendErrorText, suggestions, unansweredQuestion } from '../model';
 import { ChatError } from '@/data';
 
 const TZ = 'Asia/Seoul';
@@ -24,6 +24,16 @@ function row(id: number, role: 'user' | 'plant', content: string, replyTo: numbe
 }
 
 describe('chat model', () => {
+  it('finds the newest question that has no stored answer', () => {
+    expect(unansweredQuestion([row(1, 'user', 'a'), row(2, 'plant', 'b', 1), row(3, 'user', 'c')])?.id).toBe(3);
+    expect(unansweredQuestion([row(1, 'user', 'a'), row(2, 'plant', 'b', 1)])).toBeNull();
+    // An overlapping send can store the reply before a later question; only the newest row counts.
+    expect(unansweredQuestion([row(1, 'user', 'a'), row(3, 'plant', 'b', 2), row(2, 'user', 'c')])).toBeNull();
+    // The newest user row counts even when an older question's reply is stored after it.
+    expect(unansweredQuestion([row(1, 'user', 'a'), row(2, 'user', 'c'), row(3, 'plant', 'b', 1)])?.id).toBe(2);
+    expect(unansweredQuestion([])).toBeNull();
+  });
+
   it('quotes the current temperature in a suggestion', () => {
     expect(suggestions(23.6)).toContain('Is 24 °C too warm for me?');
     expect(suggestions(null)).toContain('Is it too warm for me?');
