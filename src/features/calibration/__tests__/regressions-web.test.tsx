@@ -2,9 +2,10 @@
 import { act, fireEvent, screen, waitFor } from '@testing-library/react-native';
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { Pressable, Text } from 'react-native';
+import { Pressable, StyleSheet, Text } from 'react-native';
 
 import { renderWithFixtures } from '@/components/shell/testing/render-app';
+import { Modal as WebModal } from '@/components/ui/Modal.web';
 import type { FixtureSource } from '@/data';
 
 import { CalibrationScreen as WebCalibration } from '../CalibrationScreen.web';
@@ -94,5 +95,19 @@ describe('web dialog while saving', () => {
     expect(wet.props.numberOfLines).toBeUndefined();
     expect(screen.getByText('Hold the probe in open air until the value settles').props.numberOfLines).toBeUndefined();
     expect(screen.getByText('2 · Wet reading').props.numberOfLines).toBeUndefined();
+  });
+});
+
+describe('web dialog focus', () => {
+  // The desktop focus trap focuses the first focusable element on open; the backdrop drew a blue
+  // ring around the whole viewport. Tab must still reach the dialog's own buttons.
+  it('keeps the backdrop out of the tab order without a focus ring, and the buttons focusable', async () => {
+    await renderWithFixtures(
+      <WebModal visible testID="calibration" title="Calibrate soil sensor" onDismiss={jest.fn()} cancel={{ label: 'Cancel', onPress: jest.fn() }} />,
+    );
+    const backdrop = screen.getByTestId('calibration-backdrop');
+    expect(backdrop.props.tabIndex).toBe(-1);
+    expect(StyleSheet.flatten(backdrop.props.style)).toMatchObject({ outlineStyle: 'none' });
+    expect(screen.getByRole('button', { name: 'Cancel' }).props.focusable).not.toBe(false);
   });
 });

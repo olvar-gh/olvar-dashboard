@@ -36,8 +36,12 @@ export function Modal({ visible, onDismiss, ...card }: ModalProps) {
     <RNModal transparent visible={visible} animationType="fade" onRequestClose={onDismiss}>
       <View accessibilityViewIsModal onAccessibilityEscape={onDismiss} style={styles.overlay}>
         <ScrollView style={styles.scrollView} contentContainerStyle={styles.scroll}>
+          {/* The focus trap focuses its first focusable child on open. The backdrop is a click target
+              only (Escape closes the dialog), so it is not a tab stop and draws no ring; Tab goes
+              straight to the dialog's buttons, which keep theirs. */}
           <Pressable
             accessible={false}
+            tabIndex={-1}
             testID={card.testID && `${card.testID}-backdrop`}
             onPress={(e) => e.target === e.currentTarget && onDismiss()}
             style={styles.backdrop}
@@ -70,5 +74,5 @@ const styles = StyleSheet.create({
   overlay: { flex: 1, backgroundColor: scrim },
   scrollView: { flex: 1 },
   scroll: { flexGrow: 1 },
-  backdrop: { flexGrow: 1, justifyContent: 'center', padding: 16 },
+  backdrop: { flexGrow: 1, justifyContent: 'center', padding: 16, outlineStyle: 'none' } as object,
 });

@@ -1,7 +1,7 @@
 import { configure } from '@testing-library/react-native';
 import { router } from 'expo-router';
 import { act, fireEvent, screen, waitFor } from 'expo-router/testing-library';
-import { Alert, type AlertButton } from 'react-native';
+import { Alert, Keyboard, type AlertButton } from 'react-native';
 
 import { renderApp } from '@/components/shell/testing/render-app';
 import { DataError } from '@/data';
@@ -160,6 +160,19 @@ describe('Care targets', () => {
     await fireEvent.press(screen.getByTestId('care-save'));
     await waitFor(() => expect(app.source.world.plant.threshold_overrides).toEqual({ soil_pct: { ok_low: 38 } }));
     expect(await screen.findByText('38–85%')).toBeTruthy();
+  });
+
+  it('keeps Save Ranges above the number keyboard and offers Done to dismiss it', async () => {
+    await open('/settings/care-targets?edit=1');
+    const low = await screen.findByTestId('target-soil_pct-low');
+    const page = screen.getByTestId('care-targets-screen');
+    expect(page.props.automaticallyAdjustKeyboardInsets).toBe(true);
+    expect(page.props.keyboardShouldPersistTaps).toBe('handled');
+    expect(low.props.inputAccessoryViewID).toBe('care-targets-keyboard');
+    expect(screen.getByTestId('target-lux-high').props.inputAccessoryViewID).toBe('care-targets-keyboard');
+    const dismiss = jest.spyOn(Keyboard, 'dismiss');
+    await fireEvent.press(screen.getByTestId('care-keyboard-done'));
+    expect(dismiss).toHaveBeenCalled();
   });
 
   it('opened from the Settings switch, leaves edit mode after a save', async () => {

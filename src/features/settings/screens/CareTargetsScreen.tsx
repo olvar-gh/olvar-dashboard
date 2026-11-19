@@ -1,13 +1,16 @@
 import { useLocalSearchParams } from 'expo-router';
 import { useEffect, useRef } from 'react';
-import { Alert, StyleSheet, View } from 'react-native';
+import { Alert, InputAccessoryView, Keyboard, StyleSheet, View } from 'react-native';
 
 import { PageScroll } from '@/components/shell';
 import { Button, confirmAlert, ErrorState, Field, IosListRow, ListSection, NavBar, RangeCard, SkeletonCard } from '@/components/ui';
-import { colors } from '@/theme';
+import { colors, iosColors } from '@/theme';
 
 import { useCareTargets } from '../hooks';
 import { formatNow, formatRange, METRICS, okRange, scaleFor, speciesName, usesPreset } from '../model';
+
+/** Ties the number fields to the keyboard toolbar that dismisses the decimal pad (it has no return key). */
+const KEYBOARD_TOOLBAR = 'care-targets-keyboard';
 
 /** iPhone care targets: the preset switch, each metric's ideal range, and Low/High rows while editing. */
 export function CareTargetsScreen() {
@@ -39,7 +42,15 @@ export function CareTargetsScreen() {
   };
 
   return (
-    <PageScroll testID="care-targets-screen" keyboardDismissMode="interactive" contentContainerStyle={styles.page}>
+    // The scroll view insets itself above the keyboard so Save Ranges stays reachable, and a tap on
+    // Save while typing presses it instead of only closing the keyboard.
+    <PageScroll
+      testID="care-targets-screen"
+      keyboardDismissMode="interactive"
+      keyboardShouldPersistTaps="handled"
+      automaticallyAdjustKeyboardInsets
+      contentContainerStyle={styles.page}
+    >
       <NavBar title="Care Targets" />
       {c.plant.isPending || (p && c.thresholds.isPending) ? (
         <SkeletonCard lines={4} testID="care-targets-loading" />
@@ -94,6 +105,7 @@ export function CareTargetsScreen() {
                       keyboardType="decimal-pad"
                       editable={!c.saving}
                       error={!!error}
+                      inputAccessoryViewID={KEYBOARD_TOOLBAR}
                       testID={`target-${cfg.metric}-low`}
                     />
                     <Field
@@ -104,6 +116,7 @@ export function CareTargetsScreen() {
                       editable={!c.saving}
                       error={!!error}
                       separator
+                      inputAccessoryViewID={KEYBOARD_TOOLBAR}
                       testID={`target-${cfg.metric}-high`}
                     />
                   </ListSection>
@@ -124,6 +137,13 @@ export function CareTargetsScreen() {
           ) : !c.presetOn ? (
             <Button size="large" variant="plain" label="Edit Ranges" onPress={c.startEditing} testID="care-edit" />
           ) : null}
+          {c.open ? (
+            <InputAccessoryView nativeID={KEYBOARD_TOOLBAR}>
+              <View style={styles.toolbar}>
+                <Button variant="plain" label="Done" onPress={() => Keyboard.dismiss()} testID="care-keyboard-done" />
+              </View>
+            </InputAccessoryView>
+          ) : null}
         </>
       )}
     </PageScroll>
@@ -134,4 +154,12 @@ const styles = StyleSheet.create({
   page: { gap: 12 },
   metric: { gap: 4 },
   actions: { gap: 4, marginTop: 8 },
+  toolbar: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    paddingHorizontal: 8,
+    backgroundColor: iosColors.groupedBackgroundSecondary,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: iosColors.separatorNonOpaque,
+  },
 });
