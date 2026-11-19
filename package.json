@@ -52,6 +52,8 @@
   "scripts": {
     "start": "expo start",
     "ios": "expo run:ios",
+    "ios:release": "node scripts/ios-release.js",
+    "ios:archive": "node scripts/ios-release.js --archive",
     "web": "expo start --web",
     "lint": "expo lint",
     "typecheck": "tsc --noEmit",
