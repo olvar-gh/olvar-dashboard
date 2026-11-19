@@ -162,6 +162,20 @@ describe('Care targets', () => {
     expect(await screen.findByText('38–85%')).toBeTruthy();
   });
 
+  it('gives every number field the Done key', async () => {
+    await open('/settings/care-targets?edit=1');
+    await screen.findByTestId('target-soil_pct-low');
+    const page = screen.getByTestId('care-targets-screen');
+    expect(page.props.automaticallyAdjustKeyboardInsets).toBe(true);
+    expect(page.props.keyboardShouldPersistTaps).toBe('handled');
+    const fields = ['soil_pct', 'lux', 'temperature_c', 'humidity_pct'].flatMap((m) => [`target-${m}-low`, `target-${m}-high`]);
+    for (const id of fields) {
+      // returnKeyType without an accessory ID makes iOS add its own Done toolbar to each decimal pad.
+      expect(screen.getByTestId(id).props).toMatchObject({ returnKeyType: 'done', keyboardType: 'decimal-pad' });
+      expect(screen.getByTestId(id).props.inputAccessoryViewID).toBeUndefined();
+    }
+  });
+
   it('opened from the Settings switch, leaves edit mode after a save', async () => {
     const app = await open('/settings/care-targets?edit=1');
     await fireEvent.changeText(await screen.findByTestId('target-soil_pct-low'), '40');

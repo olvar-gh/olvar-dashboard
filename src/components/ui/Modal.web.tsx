@@ -1,4 +1,5 @@
-import { Modal as RNModal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useRef } from 'react';
+import { Modal as RNModal, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { colors, radius, typography } from '@/theme';
 
@@ -30,20 +31,40 @@ export function ModalCard({ title, subtitle, children, cancel, confirm, style, t
   );
 }
 
+/** Backdrop DOM events; View's types omit them, but React Native Web passes them through. */
+type BackdropEvent = { target: unknown; currentTarget: unknown };
+
 /** Centred dialog over a 40 % text/primary scrim. */
 export function Modal({ visible, onDismiss, ...card }: ModalProps) {
+  // Both the press and the release must be on the scrim: a drag from the dialog that ends on the
+  // scrim fires a click on the backdrop too, and must not close it.
+  const pressedOnScrim = useRef(false);
+  const backdropHandlers = {
+    onPointerDown: (e: BackdropEvent) => {
+      pressedOnScrim.current = e.target === e.currentTarget;
+    },
+    onClick: (e: BackdropEvent) => {
+      const dismiss = pressedOnScrim.current && e.target === e.currentTarget;
+      pressedOnScrim.current = false;
+      if (dismiss) onDismiss();
+    },
+  } as object;
   return (
-    <RNModal transparent visible={visible} animationType="fade" onRequestClose={onDismiss}>
+    // React Native Web's modal only traps focus and handles Escape once its own fade ends, so a Tab
+    // pressed during the fade left the dialog. The modal opens unanimated and the overlay fades in.
+    <RNModal transparent visible={visible} animationType="none" onRequestClose={onDismiss}>
       <View accessibilityViewIsModal onAccessibilityEscape={onDismiss} style={styles.overlay}>
         <ScrollView style={styles.scrollView} contentContainerStyle={styles.scroll}>
-          <Pressable
-            accessible={false}
+          {/* A plain View, not a Pressable: the focus trap focuses the first element that accepts
+              focus() (any tabindex), and a focused backdrop showed no ring. React Native Web
+              forwards the DOM click, so only a click on the scrim itself closes the dialog. */}
+          <View
             testID={card.testID && `${card.testID}-backdrop`}
-            onPress={(e) => e.target === e.currentTarget && onDismiss()}
+            {...backdropHandlers}
             style={styles.backdrop}
           >
             <ModalCard {...card} style={[styles.floating, card.style]} />
-          </Pressable>
+          </View>
         </ScrollView>
       </View>
     </RNModal>
@@ -67,7 +88,13 @@ const styles = StyleSheet.create({
   title: { ...typography.cardTitle, color: colors.text.primary },
   subtitle: { ...typography.cardSubtitle, color: colors.text.tertiary },
   footer: { flexDirection: 'row', justifyContent: 'flex-end', gap: 8 },
-  overlay: { flex: 1, backgroundColor: scrim },
+  overlay: {
+    flex: 1,
+    backgroundColor: scrim,
+    animationKeyframes: [{ from: { opacity: 0 }, to: { opacity: 1 } }],
+    animationDuration: '300ms',
+    animationTimingFunction: 'ease-in',
+  } as object,
   scrollView: { flex: 1 },
   scroll: { flexGrow: 1 },
   backdrop: { flexGrow: 1, justifyContent: 'center', padding: 16 },

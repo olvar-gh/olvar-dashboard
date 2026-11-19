@@ -5,6 +5,7 @@ import { useState } from 'react';
 import { Pressable, Text } from 'react-native';
 
 import { renderWithFixtures } from '@/components/shell/testing/render-app';
+import { Modal as WebModal } from '@/components/ui/Modal.web';
 import type { FixtureSource } from '@/data';
 
 import { CalibrationScreen as WebCalibration } from '../CalibrationScreen.web';
@@ -94,5 +95,24 @@ describe('web dialog while saving', () => {
     expect(wet.props.numberOfLines).toBeUndefined();
     expect(screen.getByText('Hold the probe in open air until the value settles').props.numberOfLines).toBeUndefined();
     expect(screen.getByText('2 · Wet reading').props.numberOfLines).toBeUndefined();
+  });
+});
+
+describe('web dialog focus', () => {
+  // The desktop focus trap focuses the first element that accepts focus(), even at tabindex -1. A
+  // Pressable backdrop took it with no visible ring; a plain View cannot, so the trap reaches the
+  // dialog's buttons. The browser behaviour is checked in e2e/web/dialog-focus.spec.ts.
+  it('renders the backdrop as a plain view that closes the dialog only on a click on the scrim', async () => {
+    const onDismiss = jest.fn();
+    await renderWithFixtures(
+      <WebModal visible testID="calibration" title="Calibrate soil sensor" onDismiss={onDismiss} cancel={{ label: 'Cancel', onPress: jest.fn() }} />,
+    );
+    const backdrop = screen.getByTestId('calibration-backdrop');
+    expect(backdrop.props.tabIndex).toBeUndefined();
+    expect(backdrop.props.focusable).toBeUndefined();
+    expect(backdrop.props.accessibilityRole).toBeUndefined();
+    backdrop.props.onPointerDown({ target: 1, currentTarget: 1 });
+    backdrop.props.onClick({ target: 1, currentTarget: 1 });
+    expect(onDismiss).toHaveBeenCalledTimes(1);
   });
 });

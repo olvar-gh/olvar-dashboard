@@ -39,7 +39,16 @@ export function CareTargetsScreen() {
   };
 
   return (
-    <PageScroll testID="care-targets-screen" keyboardDismissMode="interactive" contentContainerStyle={styles.page}>
+    // The scroll view keeps the focused field above the keyboard and insets its content by the
+    // keyboard height, so Save Ranges can be scrolled above it; each decimal pad's Done closes it.
+    // A tap on Save while typing presses it instead of only closing the keyboard.
+    <PageScroll
+      testID="care-targets-screen"
+      keyboardDismissMode="interactive"
+      keyboardShouldPersistTaps="handled"
+      automaticallyAdjustKeyboardInsets
+      contentContainerStyle={styles.page}
+    >
       <NavBar title="Care Targets" />
       {c.plant.isPending || (p && c.thresholds.isPending) ? (
         <SkeletonCard lines={4} testID="care-targets-loading" />
@@ -94,6 +103,7 @@ export function CareTargetsScreen() {
                       keyboardType="decimal-pad"
                       editable={!c.saving}
                       error={!!error}
+                      returnKeyType="done"
                       testID={`target-${cfg.metric}-low`}
                     />
                     <Field
@@ -104,6 +114,7 @@ export function CareTargetsScreen() {
                       editable={!c.saving}
                       error={!!error}
                       separator
+                      returnKeyType="done"
                       testID={`target-${cfg.metric}-high`}
                     />
                   </ListSection>
