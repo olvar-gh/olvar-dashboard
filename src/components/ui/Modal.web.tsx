@@ -1,3 +1,4 @@
+import { useRef } from 'react';
 import { Modal as RNModal, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { colors, radius, typography } from '@/theme';
@@ -30,8 +31,24 @@ export function ModalCard({ title, subtitle, children, cancel, confirm, style, t
   );
 }
 
+/** Backdrop DOM events; View's types omit them, but React Native Web passes them through. */
+type BackdropEvent = { target: unknown; currentTarget: unknown };
+
 /** Centred dialog over a 40 % text/primary scrim. */
 export function Modal({ visible, onDismiss, ...card }: ModalProps) {
+  // Both the press and the release must be on the scrim: a drag from the dialog that ends on the
+  // scrim fires a click on the backdrop too, and must not close it.
+  const pressedOnScrim = useRef(false);
+  const backdropHandlers = {
+    onPointerDown: (e: BackdropEvent) => {
+      pressedOnScrim.current = e.target === e.currentTarget;
+    },
+    onClick: (e: BackdropEvent) => {
+      const dismiss = pressedOnScrim.current && e.target === e.currentTarget;
+      pressedOnScrim.current = false;
+      if (dismiss) onDismiss();
+    },
+  } as object;
   return (
     // React Native Web's modal only traps focus and handles Escape once its own fade ends, so a Tab
     // pressed during the fade left the dialog. The modal opens unanimated and the overlay fades in.
@@ -43,7 +60,7 @@ export function Modal({ visible, onDismiss, ...card }: ModalProps) {
               forwards the DOM click, so only a click on the scrim itself closes the dialog. */}
           <View
             testID={card.testID && `${card.testID}-backdrop`}
-            {...backdropClick(onDismiss)}
+            {...backdropHandlers}
             style={styles.backdrop}
           >
             <ModalCard {...card} style={[styles.floating, card.style]} />
@@ -52,11 +69,6 @@ export function Modal({ visible, onDismiss, ...card }: ModalProps) {
       </View>
     </RNModal>
   );
-}
-
-/** A DOM `onClick` for the backdrop; View's types omit it, but React Native Web passes it through. */
-function backdropClick(onDismiss: () => void) {
-  return { onClick: (e: { target: unknown; currentTarget: unknown }) => e.target === e.currentTarget && onDismiss() } as object;
 }
 
 const styles = StyleSheet.create({

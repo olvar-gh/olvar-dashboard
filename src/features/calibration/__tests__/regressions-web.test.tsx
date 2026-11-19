@@ -111,8 +111,7 @@ describe('web dialog focus', () => {
     expect(backdrop.props.tabIndex).toBeUndefined();
     expect(backdrop.props.focusable).toBeUndefined();
     expect(backdrop.props.accessibilityRole).toBeUndefined();
-    backdrop.props.onClick({ target: 2, currentTarget: 1 });
-    expect(onDismiss).not.toHaveBeenCalled();
+    backdrop.props.onPointerDown({ target: 1, currentTarget: 1 });
     backdrop.props.onClick({ target: 1, currentTarget: 1 });
     expect(onDismiss).toHaveBeenCalledTimes(1);
   });

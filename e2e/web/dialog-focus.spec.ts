@@ -64,6 +64,17 @@ test.describe('backdrop', () => {
     await expect(dialog(page)).toHaveCount(0);
   });
 
+  test('a drag from the dialog that ends on the scrim keeps it open', async ({ page }) => {
+    await open(page);
+    const box = (await page.getByText('Live reading').boundingBox())!;
+    await page.mouse.move(box.x + 4, box.y + 4);
+    await page.mouse.down();
+    await page.mouse.move(8, 8, { steps: 5 });
+    await page.mouse.up();
+    await page.waitForTimeout(300);
+    await expect(dialog(page)).toBeVisible();
+  });
+
   test('in a short window the first scrim click closes it', async ({ page }) => {
     await page.setViewportSize({ width: 1050, height: 400 });
     await open(page);
