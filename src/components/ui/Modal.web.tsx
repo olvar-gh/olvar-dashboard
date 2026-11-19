@@ -1,4 +1,4 @@
-import { Modal as RNModal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Modal as RNModal, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { colors, radius, typography } from '@/theme';
 
@@ -33,21 +33,22 @@ export function ModalCard({ title, subtitle, children, cancel, confirm, style, t
 /** Centred dialog over a 40 % text/primary scrim. */
 export function Modal({ visible, onDismiss, ...card }: ModalProps) {
   return (
-    <RNModal transparent visible={visible} animationType="fade" onRequestClose={onDismiss}>
+    // React Native Web's modal only traps focus and handles Escape once its own fade ends, so a Tab
+    // pressed during the fade left the dialog. The modal opens unanimated and the overlay fades in.
+    <RNModal transparent visible={visible} animationType="none" onRequestClose={onDismiss}>
       <View accessibilityViewIsModal onAccessibilityEscape={onDismiss} style={styles.overlay}>
         <ScrollView style={styles.scrollView} contentContainerStyle={styles.scroll}>
-          {/* The focus trap focuses its first focusable child on open. The backdrop is a click target
-              only (Escape closes the dialog), so it is not a tab stop and draws no ring; Tab goes
-              straight to the dialog's buttons, which keep theirs. */}
-          <Pressable
-            accessible={false}
-            tabIndex={-1}
+          {/* A plain View, not a Pressable: the focus trap focuses the first element that accepts
+              focus() (any tabindex), and a focused backdrop showed no ring. Without one, the trap
+              lands on the dialog's own controls. A tap on the scrim itself closes the dialog. */}
+          <View
             testID={card.testID && `${card.testID}-backdrop`}
-            onPress={(e) => e.target === e.currentTarget && onDismiss()}
+            onStartShouldSetResponder={(e) => e.target === e.currentTarget}
+            onResponderRelease={onDismiss}
             style={styles.backdrop}
           >
             <ModalCard {...card} style={[styles.floating, card.style]} />
-          </Pressable>
+          </View>
         </ScrollView>
       </View>
     </RNModal>
@@ -71,8 +72,14 @@ const styles = StyleSheet.create({
   title: { ...typography.cardTitle, color: colors.text.primary },
   subtitle: { ...typography.cardSubtitle, color: colors.text.tertiary },
   footer: { flexDirection: 'row', justifyContent: 'flex-end', gap: 8 },
-  overlay: { flex: 1, backgroundColor: scrim },
+  overlay: {
+    flex: 1,
+    backgroundColor: scrim,
+    animationKeyframes: [{ from: { opacity: 0 }, to: { opacity: 1 } }],
+    animationDuration: '300ms',
+    animationTimingFunction: 'ease-in',
+  } as object,
   scrollView: { flex: 1 },
   scroll: { flexGrow: 1 },
-  backdrop: { flexGrow: 1, justifyContent: 'center', padding: 16, outlineStyle: 'none' } as object,
+  backdrop: { flexGrow: 1, justifyContent: 'center', padding: 16 },
 });

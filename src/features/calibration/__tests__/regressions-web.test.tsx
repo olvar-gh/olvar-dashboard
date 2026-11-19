@@ -2,7 +2,7 @@
 import { act, fireEvent, screen, waitFor } from '@testing-library/react-native';
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { Pressable, StyleSheet, Text } from 'react-native';
+import { Pressable, Text } from 'react-native';
 
 import { renderWithFixtures } from '@/components/shell/testing/render-app';
 import { Modal as WebModal } from '@/components/ui/Modal.web';
@@ -99,15 +99,22 @@ describe('web dialog while saving', () => {
 });
 
 describe('web dialog focus', () => {
-  // The desktop focus trap focuses the first focusable element on open; the backdrop drew a blue
-  // ring around the whole viewport. Tab must still reach the dialog's own buttons.
-  it('keeps the backdrop out of the tab order without a focus ring, and the buttons focusable', async () => {
+  // The desktop focus trap focuses the first element that accepts focus(), even at tabindex -1. A
+  // Pressable backdrop took it with no visible ring; a plain View cannot, so the trap reaches the
+  // dialog's buttons. The browser behaviour is checked in e2e/web/dialog-focus.spec.ts.
+  it('renders the backdrop as a plain view that still closes the dialog when the scrim is tapped', async () => {
+    const onDismiss = jest.fn();
     await renderWithFixtures(
-      <WebModal visible testID="calibration" title="Calibrate soil sensor" onDismiss={jest.fn()} cancel={{ label: 'Cancel', onPress: jest.fn() }} />,
+      <WebModal visible testID="calibration" title="Calibrate soil sensor" onDismiss={onDismiss} cancel={{ label: 'Cancel', onPress: jest.fn() }} />,
     );
     const backdrop = screen.getByTestId('calibration-backdrop');
-    expect(backdrop.props.tabIndex).toBe(-1);
-    expect(StyleSheet.flatten(backdrop.props.style)).toMatchObject({ outlineStyle: 'none' });
-    expect(screen.getByRole('button', { name: 'Cancel' }).props.focusable).not.toBe(false);
+    expect(backdrop.props.tabIndex).toBeUndefined();
+    expect(backdrop.props.focusable).toBeUndefined();
+    expect(backdrop.props.accessibilityRole).toBeUndefined();
+    const scrim = { target: 1, currentTarget: 1 };
+    expect(backdrop.props.onStartShouldSetResponder(scrim)).toBe(true);
+    expect(backdrop.props.onStartShouldSetResponder({ target: 2, currentTarget: 1 })).toBe(false);
+    backdrop.props.onResponderRelease(scrim);
+    expect(onDismiss).toHaveBeenCalledTimes(1);
   });
 });

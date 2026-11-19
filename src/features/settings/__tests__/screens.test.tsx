@@ -1,12 +1,14 @@
 import { configure } from '@testing-library/react-native';
 import { router } from 'expo-router';
 import { act, fireEvent, screen, waitFor } from 'expo-router/testing-library';
-import { Alert, Keyboard, type AlertButton } from 'react-native';
+import { Alert, Keyboard, type AlertButton, type LayoutChangeEvent, type ScrollViewInstance } from 'react-native';
 
 import { renderApp } from '@/components/shell/testing/render-app';
 import { DataError } from '@/data';
 
 import { isSaving } from '../drafts';
+import { METRICS } from '../model';
+import { createRevealSave } from '../screens/CareTargetsScreen';
 
 // Each test renders the whole route tree; the first render of a file can take over a second.
 configure({ asyncUtilTimeout: 5000 });
@@ -162,17 +164,39 @@ describe('Care targets', () => {
     expect(await screen.findByText('38–85%')).toBeTruthy();
   });
 
-  it('keeps Save Ranges above the number keyboard and offers Done to dismiss it', async () => {
+  it('gives every number field the Done key', async () => {
     await open('/settings/care-targets?edit=1');
-    const low = await screen.findByTestId('target-soil_pct-low');
+    await screen.findByTestId('target-soil_pct-low');
     const page = screen.getByTestId('care-targets-screen');
     expect(page.props.automaticallyAdjustKeyboardInsets).toBe(true);
     expect(page.props.keyboardShouldPersistTaps).toBe('handled');
-    expect(low.props.inputAccessoryViewID).toBe('care-targets-keyboard');
-    expect(screen.getByTestId('target-lux-high').props.inputAccessoryViewID).toBe('care-targets-keyboard');
-    const dismiss = jest.spyOn(Keyboard, 'dismiss');
-    await fireEvent.press(screen.getByTestId('care-keyboard-done'));
-    expect(dismiss).toHaveBeenCalled();
+    const fields = ['soil_pct', 'lux', 'temperature_c', 'humidity_pct'].flatMap((m) => [`target-${m}-low`, `target-${m}-high`]);
+    for (const id of fields) {
+      // returnKeyType without an accessory ID makes iOS add its own Done toolbar to each decimal pad.
+      expect(screen.getByTestId(id).props).toMatchObject({ returnKeyType: 'done', keyboardType: 'decimal-pad' });
+      expect(screen.getByTestId(id).props.inputAccessoryViewID).toBeUndefined();
+    }
+  });
+
+  it('scrolls Save Ranges above the keyboard when a lower field is focused, not a top one', () => {
+    const reveal = createRevealSave();
+    const scrollToEnd = jest.fn();
+    reveal.setScroll({ scrollToEnd } as unknown as ScrollViewInstance);
+    const layout = (y: number, height: number) => ({ nativeEvent: { layout: { x: 0, y, width: 370, height } } }) as LayoutChangeEvent;
+    // An iPhone 17 form: 874 pt tall; each metric 250 pt with its fields 90 pt down; Save at the end.
+    reveal.onViewportLayout(layout(0, 874));
+    METRICS.forEach((cfg, i) => {
+      reveal.onMetricLayout(cfg)(layout(80 + i * 262, 250));
+      reveal.onFieldsLayout(cfg)(layout(90, 160));
+    });
+    reveal.onActionsLayout(layout(1140, 112));
+    jest.spyOn(Keyboard, 'isVisible').mockReturnValue(true);
+    jest.spyOn(Keyboard, 'metrics').mockReturnValue({ screenX: 0, screenY: 538, width: 402, height: 336 });
+
+    reveal.onFieldFocus(METRICS[0]);
+    expect(scrollToEnd).not.toHaveBeenCalled();
+    reveal.onFieldFocus(METRICS[3]);
+    expect(scrollToEnd).toHaveBeenCalledWith({ animated: true });
   });
 
   it('opened from the Settings switch, leaves edit mode after a save', async () => {
