@@ -159,9 +159,9 @@ describe('desktop chat', () => {
     try {
       await fireEvent.changeText(screen.getByTestId('chat-input'), 'Are you there?');
       await fireEvent.press(screen.getByTestId('chat-send'));
+      expect(await screen.findByTestId('chat-offline')).toBeTruthy();
       expect(send).not.toHaveBeenCalled();
       expect(screen.getByTestId('chat-input').props.value).toBe('Are you there?');
-      expect(screen.getByTestId('chat-offline')).toBeTruthy();
       expect(screen.queryByTestId('chat-typing')).toBeNull();
     } finally {
       onlineManager.setOnline(true);

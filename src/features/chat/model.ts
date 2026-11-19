@@ -65,6 +65,16 @@ export function optimisticVisible(messages: readonly ChatMessageRow[], text: str
   return !messages.some((m) => m.role === 'user' && m.id > lastIdAtSend && m.content === text);
 }
 
+/**
+ * The newest message when it is the user's and no reply to it is stored: the answer never
+ * arrived (the send failed after the question was saved, or the app closed while waiting).
+ */
+export function unansweredQuestion<T extends ChatMessageRow>(messages: readonly T[]): T | null {
+  const last = messages.at(-1);
+  if (!last || last.role !== 'user') return null;
+  return messages.some((m) => m.reply_to === last.id) ? null : last;
+}
+
 /** The question a plant reply answers, for Retry on an error row. */
 export function questionFor(messages: readonly ChatMessageRow[], reply: ChatMessageRow): string | null {
   return messages.find((m) => m.id === reply.reply_to)?.content ?? null;

@@ -1,11 +1,11 @@
-import { onlineManager } from '@tanstack/react-query';
 import { useCallback, useMemo, useRef, useState } from 'react';
 
 import { useChatHistory, useDevice, useGateway, useLatest, useNow, usePlant, usePlantStatus, useSendChat, type ChatError } from '@/data';
 import { groupChatDays } from '@/domain/chat-days';
 import { formatAge, formatTime, secondsSince } from '@/domain/format';
 
-import { canRetry, contextRows, isChatRow, MAX_MESSAGE_CHARS, OFFLINE_TEXT, optimisticVisible, rateLimitText, sendErrorText } from './model';
+import { canRetry, contextRows, isChatRow, MAX_MESSAGE_CHARS, OFFLINE_TEXT, optimisticVisible, rateLimitText, sendErrorText, unansweredQuestion } from './model';
+import { isOffline } from './network';
 
 type FailedSend = { id: number; text: string; lastIdAtSend: number; error: ChatError };
 
@@ -37,12 +37,22 @@ export function useChat() {
   // A send before the history is in would put its bubble nowhere and race the first page.
   const ready = messages !== undefined;
 
+  // Set while the connection is checked, so a second tap cannot slip a duplicate send in.
+  const checking = useRef(false);
+
   /** Sends `text`; only a send from the composer (`fromDraft`) clears it, so a chip or retry keeps the draft. */
   const deliver = useCallback(
-    (text: string, fromDraft: boolean) => {
+    async (text: string, fromDraft: boolean) => {
       const message = text.trim();
-      if (!ready || !message || message.length > MAX_MESSAGE_CHARS || send.isPending || rateLimited) return false;
-      if (!onlineManager.isOnline()) {
+      if (!ready || !message || message.length > MAX_MESSAGE_CHARS || send.isPending || rateLimited || checking.current) return false;
+      checking.current = true;
+      let offline: boolean;
+      try {
+        offline = await isOffline();
+      } finally {
+        checking.current = false;
+      }
+      if (offline) {
         setNotice(OFFLINE_TEXT);
         return false;
       }
@@ -70,7 +80,10 @@ export function useChat() {
 
   const retryFailed = (id: number) => {
     const failure = failures.find((f) => f.id === id);
-    if (failure && submit(failure.text)) setFailures((f) => f.filter((x) => x.id !== id));
+    if (!failure) return;
+    void submit(failure.text).then((sent) => {
+      if (sent) setFailures((f) => f.filter((x) => x.id !== id));
+    });
   };
   const dismissFailed = (id: number) => setFailures((f) => f.filter((x) => x.id !== id));
 
@@ -80,6 +93,9 @@ export function useChat() {
   const failed = failures
     .filter((f) => optimisticVisible(messages ?? [], f.text, f.lastIdAtSend))
     .map((f) => ({ id: f.id, text: f.text, error: sendErrorText(f.error), retry: canRetry(f.error) }));
+  // The last question was stored but never answered; while a send is out its answer may still come.
+  const lastQuestion = messages ? unansweredQuestion(messages) : null;
+  const unanswered = lastQuestion && !send.isPending && failed.length === 0 ? { id: lastQuestion.id, text: lastQuestion.content } : null;
 
   const display = status.display;
   const reading = latest.data;
@@ -116,6 +132,9 @@ export function useChat() {
     failed,
     retryFailed,
     dismissFailed,
+    /** The newest question has no stored answer; `retryUnanswered` asks it again. */
+    unanswered,
+    retryUnanswered: () => (unanswered ? submit(unanswered.text) : Promise.resolve(false)),
     /** A send refused before it left (offline); the draft is kept. */
     notice,
     dismissNotice: () => setNotice(null),
