@@ -75,7 +75,7 @@ function Body({ w }: { w: CalibrationWizard }) {
         <View style={styles.liveText}>
           <Text style={styles.liveLabel}>Live reading</Text>
           <View style={styles.valueRow}>
-            <Text style={styles.value}>{live.raw == null ? '—' : formatNumber(live.raw)}</Text>
+            <Text style={styles.value}>{live.raw == null ? '-' : formatNumber(live.raw)}</Text>
             <Text style={styles.unit}>raw ADC</Text>
           </View>
         </View>

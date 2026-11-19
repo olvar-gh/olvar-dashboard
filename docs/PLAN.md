@@ -1,6 +1,6 @@
-# olvar-dashboard — Project plan
+# olvar-dashboard: design document
 
-Status: planning only. Updated Nov 16, 2026 for the **final contract** (decisions A–H), the user's follow-up decisions, the new Figma frames at 1920 and 1512, and the interface in the **current** olvar-gateway plan (commit `1629277`, "seal retained rollups, exact soil averages, validate timezone").
+This document describes the design of the dashboard: its scope, the research behind it, the architecture, and how each part is built and accepted. It follows the gateway contract (product decisions A to H, referenced below where they shape the app), the Figma frames at 1920 and 1512, and the interface in the [olvar-gateway](https://github.com/olvar-gh/olvar-gateway) plan at commit `1629277` ("seal retained rollups, exact soil averages, validate timezone").
 
 Scope of this repo: the Expo app that serves **desktop web** and **native iOS** from one codebase. It reads the Supabase data and calls the Edge Function owned by `olvar-gateway`.
 
@@ -9,14 +9,14 @@ Scope of this repo: the Expo app that serves **desktop web** and **native iOS** 
 ## 1. Summary
 
 - **Stack:** Expo **SDK 58** (React Native **0.88**, React **19.3**, react-native-web 0.21), Expo Router, TypeScript (strict).
-  - Xcode ≥ 26.4 is required; EAS builds on SDK 58 use Xcode 27.1.
+  - Xcode ≥ 26.4 is required; release builds use Xcode 27.1.
 - **One codebase, two layouts:**
   - **Desktop web** uses a sidebar shell built to the Figma **Desktop 1920** and **Desktop 1512** frames.
   - **iOS** uses system **native tabs** (Home · Sensors · Timeline · Chat) with Liquid Glass, built to the Figma 402×874 frames.
   - Screens, data hooks, charts and tokens are shared.
 - **"Avatar" means chat with your plant** (decision A):
   - The Chat screen calls the gateway's Edge Function `chat`.
-  - Replies come from `deepseek-flash` with thinking off, in first person as the plant and in the user's language.
+  - Replies come from Claude Haiku 5.5 (`claude-haiku-5-5`, Anthropic API), in first person as the plant and in the user's language.
   - Messages are stored in `chat_messages`.
 - **Status pill:** the pill text (`overall_label`), the per-metric labels (`<metric>_label`) and the one-line `summary` are **display-only**, read from the gateway view `plant_status_v`.
   - The dashboard contains no threshold logic.
@@ -34,15 +34,15 @@ Scope of this repo: the Expo app that serves **desktop web** and **native iOS** 
   - Every list query is bounded or paginated past the 1,000-row API limit.
   - Timeline offline periods come from the gateway function `device_offline_periods()`.
   - Database types are a pinned copy of `olvar-gateway/supabase/types/database.types.ts`.
-- **Shipping:** web on **EAS Hosting**; iOS via **EAS Build → TestFlight**, which needs the Apple Developer Program ($99/yr).
+- **Shipping:** web on **Cloudflare Pages**; iOS as a local Xcode Release build, with TestFlight uploads from Xcode's Organizer, which needs the Apple Developer Program ($99/yr). See `docs/DEPLOY.md`.
 
 ---
 
 ## 2. Research findings (with sources)
 
-### 2.1 Figma (read directly: file `ZMGAYBFUZjGsECpL54uEJg`, page `0:1`)
+### 2.1 Figma (design file, page `0:1`)
 
-**v1 frames.** Node IDs work with `get_design_context` and `get_screenshot`. The **Desktop 1920 and Desktop 1512 frames are the primary web references.** The older 1440×1024 frames are kept only for component details.
+**v1 frames.** Node IDs refer to frames in the design file. The **Desktop 1920 and Desktop 1512 frames are the primary web references.** The older 1440×1024 frames are kept only for component details.
 
 | Screen | Desktop 1920×1080 | Desktop 1512×982 | Desktop 1440 (older) | iPhone 402×874 |
 |---|---|---|---|---|
@@ -93,7 +93,7 @@ data/temp #e07a4f  data/humidity #5fa3a8 (tint #e6f2f2)
 - Body: **Inter** 400/500/600.
 - iOS large title: **Inter Bold 34/41, tracking 0.4**.
 
-#### 2.1.1 What v1 shows in place of Figma elements (decisions A, B, E and the user follow-up)
+#### 2.1.1 What v1 shows in place of Figma elements (decisions A, B and E)
 
 Even the new frames still contain deferred features. Each one is handled consistently:
 
@@ -101,12 +101,12 @@ Even the new frames still contain deferred features. Each one is handled consist
 |---|---|
 | "every 10 s", "Raspberry Pi 4", "USB serial to gateway" | "every minute", "Raspberry Pi 3B", "Wi-Fi · MQTT" |
 | Sidebar plant switcher, ⌘K search, bell, the iPhone "+" button | Not rendered. The sidebar top shows the plant nickname without the switcher chevron. |
-| Home "Recent insights" card | **Kept as a placeholder card**, titled "Recent insights", with an empty-state body: "Insights are coming soon — Sparks will point out trends here." It uses `EmptyState` inside `Card` at the frame size. |
-| Home health score "86/100" | Replaced by the status pill (`overall_label`) plus the server's `summary` line (for example "Soil is getting dry — water soon"), both from `plant_status_v`. |
+| Home "Recent insights" card | **Kept as a placeholder card**, titled "Recent insights", with an empty-state body: "Insights are coming soon. Sparks will point out trends here." It uses `EmptyState` inside `Card` at the frame size. |
+| Home health score "86/100" | Replaced by the status pill (`overall_label`) plus the server's `summary` line (for example "Soil is getting dry, water soon"), both from `plant_status_v`. |
 | Home "Sparks says" bubble | Shows the **latest stored `plant` chat message** with its time. With no chat yet, it shows "Ask Sparks how it's doing →", linking to Chat. No LLM call is made for Home. |
 | "Water in ~2 days", "6.2 h of good light today" | Dropped, because prediction and threshold maths belong to deferred features or the server. Each card instead shows a plain fact such as "Peak 1,560 lux today". |
 | Timeline Day/Week/Month toggle and filter chips | **Week view only, with no filters.** Week navigation ‹ › and "Jump to date" stay. |
-| Timeline "Log care" button and "Upcoming care" card | The button is not rendered. The side column keeps the card slot as an "Upcoming care — coming soon" placeholder, the same pattern as Home. |
+| Timeline "Log care" button and "Upcoming care" card | The button is not rendered. The side column keeps the card slot as an "Upcoming care: coming soon" placeholder, the same pattern as Home. |
 | Timeline "Waterings" and "Alerts" summary rows, plus alert and care events | Not shown (deferred care log and alerts). Week summary shows averages and their change against the previous week. |
 | Chat "Past conversations" (1920 left column; 1512 side column) | **Kept as day groups.** The single conversation is grouped by local date. Each entry shows the first user message of that day, and clicking it scrolls to that day. The "New chat" button and mic icon are not rendered, because there are no threads. The **"Based on readings from HH:mm"** footer is kept, using `chat_messages.based_on_reading_at`. |
 | Settings Plant profile: Species, Location, Added, photo | Nickname and **Location** (free text, ≤ 60 characters) are editable. Time zone is edited in Account. Species comes from the plant profile (read-only) and Added is `created_at` (read-only). Photo is not rendered (no column). |
@@ -118,69 +118,66 @@ Even the new frames still contain deferred features. Each one is handled consist
 
 ### 2.2 Expo / React Native / iOS 27
 
-- **Expo SDK 58** (Oct 15, 2026): React Native 0.88, built for iOS 27 (scene life cycle, resizable iPhone apps). — https://expo.dev/changelog/sdk-58
-- **Version table:** SDK 58 pairs with RN 0.88, React 19.3.0, react-native-web 0.21.0, Node ≥ 22.13, iOS 16.4+, Xcode 26.4+. — https://docs.expo.dev/versions/latest
-- **EAS images:** EAS uses Xcode 27.1, and the Strict TypeScript API is now the default. — https://expo.dev/blog/how-to-upgrade-to-sdk-58
+- **Expo SDK 58** (Oct 15, 2026): React Native 0.88, built for iOS 27 (scene life cycle, resizable iPhone apps). Source: https://expo.dev/changelog/sdk-58
+- **Version table:** SDK 58 pairs with RN 0.88, React 19.3.0, react-native-web 0.21.0, Node ≥ 22.13, iOS 16.4+, Xcode 26.4+. Source: https://docs.expo.dev/versions/latest
+- **SDK 58 upgrade notes:** builds use Xcode 27.1, and the Strict TypeScript API is now the default. Source: https://expo.dev/blog/how-to-upgrade-to-sdk-58
 - **Expo Go:** SDK 58 support has been on the App Store since Oct 22, and Expo Go now requires a login.
   - https://apps.apple.com/us/app/expo-go/id982107779
   - https://expo.dev/changelog
 - **Native tabs:** `expo-router/native-tabs` gives a Liquid Glass tab bar on iOS 26+. For web, a headless `expo-router/ui` layout goes in `*.web.tsx`.
   - https://docs.expo.dev/router/advanced/native-tabs
   - https://docs.expo.dev/router/advanced/platform-specific-modules
-- **Glass effect:** `expo-glass-effect` (`GlassView`, `isLiquidGlassAvailable`, `isGlassEffectAPIAvailable`) works on iOS 26+, falls back to a plain `View`, and is included in Expo Go. — https://docs.expo.dev/versions/latest/sdk/glass-effect
-- **Glass pitfalls:** animating opacity, or mounting on demand over other glass, renders blank. — https://opointo.com/docs/guides/liquid-glass-react-native
-- **iOS 27 rules:** apps must be resizable and a launch screen is required. — https://developer.apple.com/documentation/technotes/tn3192-migrating-your-app-from-the-deprecated-uirequiresfullscreen-key
+- **Glass effect:** `expo-glass-effect` (`GlassView`, `isLiquidGlassAvailable`, `isGlassEffectAPIAvailable`) works on iOS 26+, falls back to a plain `View`, and is included in Expo Go. Source: https://docs.expo.dev/versions/latest/sdk/glass-effect
+- **Glass pitfalls:** animating opacity, or mounting on demand over other glass, renders blank. Source: https://opointo.com/docs/guides/liquid-glass-react-native
+- **iOS 27 rules:** apps must be resizable and a launch screen is required. Source: https://developer.apple.com/documentation/technotes/tn3192-migrating-your-app-from-the-deprecated-uirequiresfullscreen-key
 - **Web blur:** CSS `backdrop-filter` is Baseline 2024, with about 97% browser support.
   - https://developer.mozilla.org/en-US/docs/Web/CSS/Reference/Properties/backdrop-filter
   - https://caniuse.com/css-backdrop-filter
-- **Variable fonts:** supported on native from SDK 58, and RN 0.88 adds `fontVariationSettings`. — https://docs.expo.dev/develop/user-interface/fonts/
-- **Font loading:** `@expo-google-fonts` `useFonts` works on web and in Expo Go; the config plugin needs a dev build. — https://github.com/expo/google-fonts
-- **Web output modes:** `single`, `static` or `server`. — https://docs.expo.dev/guides/publishing-websites
+- **Variable fonts:** supported on native from SDK 58, and RN 0.88 adds `fontVariationSettings`. Source: https://docs.expo.dev/develop/user-interface/fonts/
+- **Font loading:** `@expo-google-fonts` `useFonts` works on web and in Expo Go; the config plugin needs a dev build. Source: https://github.com/expo/google-fonts
+- **Web output modes:** `single`, `static` or `server`. Source: https://docs.expo.dev/guides/publishing-websites
 
 ### 2.3 Styling, charts
 
 - **NativeWind:** 4.2.7 is stable (Tailwind 3); **v5 (Tailwind 4) is a release candidate** and not for production.
   - https://www.nativewind.dev/docs/getting-started/installation
   - https://www.nativewind.dev/v5
-- **Unistyles 3:** needs Nitro and is not supported in Expo Go. — https://unistyl.es/v3/start/getting-started
-- **Tailwind in Expo:** web-only unless NativeWind or Uniwind is added. — https://docs.expo.dev/guides/tailwind
-- **Skia on web:** CanvasKit WASM adds **2.9 MB gzipped**. — https://shopify.github.io/react-native-skia/docs/getting-started/web
-- **Victory Native XL:** documents no web target. — https://github.com/FormidableLabs/victory-native-xl
-- **gifted-charts:** its web version is a separate package. — https://www.npmjs.com/package/react-native-gifted-charts
-- **`react-native-svg`:** supports iOS, web and Expo Go; version 15.16.0 for SDK 58. — https://docs.expo.dev/versions/latest/sdk/svg/
+- **Unistyles 3:** needs Nitro and is not supported in Expo Go. Source: https://unistyl.es/v3/start/getting-started
+- **Tailwind in Expo:** web-only unless NativeWind or Uniwind is added. Source: https://docs.expo.dev/guides/tailwind
+- **Skia on web:** CanvasKit WASM adds **2.9 MB gzipped**. Source: https://shopify.github.io/react-native-skia/docs/getting-started/web
+- **Victory Native XL:** documents no web target. Source: https://github.com/FormidableLabs/victory-native-xl
+- **gifted-charts:** its web version is a separate package. Source: https://www.npmjs.com/package/react-native-gifted-charts
+- **`react-native-svg`:** supports iOS, web and Expo Go; version 15.16.0 for SDK 58. Source: https://docs.expo.dev/versions/latest/sdk/svg/
 
 ### 2.4 Supabase
 
-- **API keys:** use publishable keys in apps and secret keys only on servers; legacy keys are deprecated by the end of 2026. — https://supabase.com/docs/guides/getting-started/api-keys
-- **Expo setup:** sessions are stored through `expo-sqlite/localStorage/install`, with env vars `EXPO_PUBLIC_SUPABASE_URL` and `EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY`. — https://docs.expo.dev/guides/using-supabase
-- **Realtime:** Postgres Changes needs the table in the publication, and RLS is checked per subscriber. Realtime streams tables, not views. — https://supabase.com/docs/guides/realtime/postgres-changes
-- **Generated types:** `supabase gen types typescript --remote=<ref>`. — https://supabase.com/docs/reference/cli/supabase-gen
-- **Edge Function auth:** `supabase.functions.invoke` sends the user JWT, which the function verifies. — https://supabase.com/docs/guides/functions/auth
-- **TanStack Query:** React v5 (5.107.x). — https://github.com/TanStack/query/releases
+- **API keys:** use publishable keys in apps and secret keys only on servers; legacy keys are deprecated by the end of 2026. Source: https://supabase.com/docs/guides/getting-started/api-keys
+- **Expo setup:** sessions are stored through `expo-sqlite/localStorage/install`, with env vars `EXPO_PUBLIC_SUPABASE_URL` and `EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY`. Source: https://docs.expo.dev/guides/using-supabase
+- **Realtime:** Postgres Changes needs the table in the publication, and RLS is checked per subscriber. Realtime streams tables, not views. Source: https://supabase.com/docs/guides/realtime/postgres-changes
+- **Generated types:** `supabase gen types typescript --remote=<ref>`. Source: https://supabase.com/docs/reference/cli/supabase-gen
+- **Edge Function auth:** `supabase.functions.invoke` sends the user JWT, which the function verifies. Source: https://supabase.com/docs/guides/functions/auth
+- **TanStack Query:** React v5 (5.107.x). Source: https://github.com/TanStack/query/releases
 - **Row limit:** by default a Supabase project returns **at most 1,000 rows per request**. The limit applies silently (no error), and `range(from, to)` paginates, in query order.
   - https://supabase.com/docs/reference/javascript/select
   - https://supabase.com/docs/reference/javascript/range
   - A full day of raw readings (about 1,440 rows) is over this limit, so it must be paginated.
 
-### 2.5 DeepSeek (used only by the gateway's `chat` function)
+### 2.5 Claude Haiku 5.5 (used only by the gateway's `chat` function)
 
-- The model is `deepseek-flash`, served by V4.1-Flash-1017. Thinking is on by default, so the function sends `thinking: {type: "disabled"}`.
-  - https://api-docs.deepseek.com/
-  - https://api-docs.deepseek.com/updates
-- **Cost:** $0.30 input / $1.20 output per 1M tokens at peak, so about $0.0013 per chat turn. — https://api-docs.deepseek.com/quick_start/pricing/
+- The function calls the Anthropic Messages API with the model `claude-haiku-5-5`. The `chat` contract the dashboard uses (§4) is the same whichever model answers.
+  - https://platform.claude.com/docs/en/api/messages
+- Thinking is on by default on this model. Short chat replies do not need it, so the function can send `thinking: {type: "disabled"}`, which the model accepts at effort `high` or below.
+- **Cost:** $0.10 input / $0.50 output per 1M tokens (prompts up to 100K tokens), so well under $0.001 per chat turn. Source: https://platform.claude.com/docs/en/about-claude/pricing
 
 ### 2.6 Hosting, distribution, testing
 
-- **EAS Hosting:** the free tier allows 100k requests a month; a custom domain needs a paid plan.
-  - https://expo.dev/pricing
-  - https://docs.expo.dev/eas/hosting/introduction
-- **EAS Build:** the free plan includes 15 iOS builds a month. — https://expo.dev/pricing
-- **TestFlight:** requires the Apple Developer Program at $99/yr. — https://developer.apple.com/programs
-- **Testing:** `jest-expo` with React Native Testing Library for unit tests; Maestro on the iOS Simulator for end-to-end tests, locally or in EAS Workflows.
+- **Web hosting:** the `single` web export is static files, served from Cloudflare Pages (see `docs/DEPLOY.md`).
+- **iOS builds:** Release builds are made locally with Xcode; a free Personal Team can install on your own iPhone, but those builds expire after 7 days.
+- **TestFlight:** requires the Apple Developer Program at $99/yr. Source: https://developer.apple.com/programs
+- **Testing:** `jest-expo` with React Native Testing Library for unit tests; Maestro on the iOS Simulator for end-to-end tests.
   - https://docs.expo.dev/develop/unit-testing
-  - https://docs.expo.dev/eas/workflows/examples/e2e-tests
 - **Playwright screenshots:**
-  - `toHaveScreenshot` supports `mask` for regions to ignore. — https://playwright.dev/docs/test-snapshots
+  - `toHaveScreenshot` supports `mask` for regions to ignore. Source: https://playwright.dev/docs/test-snapshots
   - `page.screenshot()` defaults to `scale: "device"`, which gives 2× pixels on a DPR 2 project.
   - `scale: "css"` gives one pixel per CSS pixel. `expect(page).toHaveScreenshot()` defaults to `"css"`.
   - https://playwright.dev/docs/api/class-page
@@ -203,18 +200,18 @@ Even the new frames still contain deferred features. Each one is handled consist
 | Pagination | One helper, `fetchAll()`. It pages with `.range()` in steps of 1,000, ordered by `recorded_at, id`, with a fixed upper time bound captured at request start. It stops when a page has fewer than 1,000 rows (a page of exactly 1,000 triggers one more request) and de-duplicates by `id`. Chat history is keyset-paged (50 at a time, older on scroll-up). No raw-reading query runs without either `fetchAll()` or an explicit `limit`. | Raising the project's max-rows limit: a day only gets longer, and it hides the bug. |
 | Realtime and freshness | Subscribe to `readings` INSERT (filter `device_id=eq.<id>`) as a **signal**: re-read the latest `readings_v` row and `plant_status_v`. Subscribe to `devices` UPDATE, which invalidates the device and `plant_status_v` queries. Subscribe to `chat_messages` INSERT. Invalidate everything on reconnect. Status freshness rules are in §5.5. Poll `gateways.last_seen_at` every 60 s, because it has no Realtime. | Event-driven only: if the Pi loses power there is no INSERT or UPDATE, and the status would stay "healthy" forever. |
 | Status | **Display only**, from `plant_status_v`: `overall_label`, `<metric>_label`, `summary`. The status keys pick only colours and icons. Charts draw target bands from the effective threshold numbers but do not judge values. | Client-side rules or client-written labels would let clients disagree. |
-| Chat | `functions.invoke('chat', {body:{plant_id, message}})`, then render `reply`, with "Based on readings from HH:mm" from `based_on_reading_at`. Optimistic user bubble. A 429 with `retry_after` shows a countdown. A reply row with `error` set is shown as a fallback message with Retry. | Calling DeepSeek from the client is forbidden (the key would leak). |
-| Type sharing | Pinned copy of `olvar-gateway/supabase/types/database.types.ts`, synced by `scripts/sync-types.sh <ref>`. CI checks the copy matches. | Submodule, private npm package, remote type generation. |
+| Chat | `functions.invoke('chat', {body:{plant_id, message}})`, then render `reply`, with "Based on readings from HH:mm" from `based_on_reading_at`. Optimistic user bubble. A 429 with `retry_after` shows a countdown. A reply row with `error` set is shown as a fallback message with Retry. | Calling the model API from the client is forbidden (the Anthropic key would leak). |
+| Type sharing | Pinned copy of `olvar-gateway/supabase/types/database.types.ts`, synced by `scripts/sync-types.sh <ref>`. CI checks the copy matches. | Submodule, a published npm package, remote type generation. |
 | Fonts / icons | Inter, plus Fraunces as a variable TTF (WONK/SOFT axes). Figma SVG icons converted with `@svgr/cli --native`. | System fonts; `@expo/vector-icons`. |
 | Auth | Email and password sign-in only. Display name stored in Supabase Auth user metadata (`auth.updateUser({data})`). Password change re-authenticates with the current password, then calls `updateUser({password})`. | Create account and forgot password are deferred, and signups are disabled on the server. |
-| Hosting | **EAS Hosting** on an `*.expo.app` URL | Vercel, if a free custom domain is wanted later. |
-| iOS distribution | **EAS Build → EAS Submit → TestFlight** (internal) | A free Apple ID sideload expires quickly. |
+| Hosting | **Cloudflare Pages**, built from the repo on each push to `main` | EAS Hosting (a custom domain needs a paid plan), Vercel. |
+| iOS distribution | **Local Xcode Release build**, archived and uploaded to TestFlight from Xcode's Organizer | Cloud builds (EAS Build and Submit): not needed for one owner. A free Apple ID sideload expires after 7 days. |
 
 ---
 
 ## 4. Contract changes
 
-**No contract changes are proposed.** The dashboard follows the final contract (A–H). My earlier proposals are withdrawn:
+**The dashboard needs no contract changes.** It uses the gateway contract (decisions A to H) as is. These features are out of scope for v1 and have no backing in the contract:
 - `avatar_states`
 - personalities
 - care events, insights, notifications
@@ -222,7 +219,7 @@ Even the new frames still contain deferred features. Each one is handled consist
 - `claim_device`
 - `readings_bucketed`
 
-**Interface the dashboard consumes**, as documented in the current olvar-gateway plan (`docs/PLAN.md` §5.4–5.7, commit `1629277`):
+**Interface the dashboard consumes**, as documented in the olvar-gateway plan (`docs/PLAN.md` §5.4–5.7, commit `1629277`):
 
 | Need | olvar-gateway interface |
 |---|---|
@@ -241,7 +238,7 @@ Even the new frames still contain deferred features. Each one is handled consist
 
 Notes (not contract changes):
 1. A grant of execute on `effective_thresholds` to `authenticated` would avoid the client-side merge. This is a gateway implementation detail; the dashboard works either way.
-2. My earlier client-side offline-gap detection is **withdrawn**. The Timeline uses `device_offline_periods()`, so the 180 s rule lives only on the server.
+2. There is **no client-side offline-gap detection**. The Timeline uses `device_offline_periods()`, so the 180 s rule lives only on the server.
 
 ---
 
@@ -252,16 +249,16 @@ Notes (not contract changes):
 ```
  ESP32 ─MQTT(60 s)→ Pi 3B gateway ─secret key→ Supabase Postgres (readings, rollups, devices, plants, chat_messages,
                                                 views readings_v / readings_hourly_v / plant_status_v) ── olvar-gateway
-                                              Edge Function chat ──→ DeepSeek deepseek-flash (thinking off)
+                                              Edge Function chat ──→ Anthropic API, Claude Haiku 5.5
                      publishable key + owner JWT ▲          ▲ Realtime: readings INSERT (signal), devices UPDATE, chat_messages INSERT
               ┌──────────────────────── olvar-dashboard ───────────────────────────────────────┐
-              │ Expo Router app — web SPA (EAS Hosting)  /  iOS (EAS Build → TestFlight)          │
+              │ Expo Router app: web SPA (Cloudflare Pages)  /  iOS (Xcode → TestFlight)          │
               └───────────────────────────────────────────────────────────────────────────────────┘
 ```
 
 ### 5.2 Navigation (v1)
 
-- **Routes:** `(auth)/sign-in`, plus `(app)/*` gated by session. If there is no plant row, the app shows an empty state ("No plant set up yet — run the gateway setup").
+- **Routes:** `(auth)/sign-in`, plus `(app)/*` gated by session. If there is no plant row, the app shows an empty state ("No plant set up yet. Run the gateway setup.").
 - **iOS:**
   - `NativeTabs`: Home · Sensors · Timeline · Chat.
   - A Settings glass button on Home.
@@ -276,11 +273,10 @@ Notes (not contract changes):
 
 ```
 olvar-dashboard/
-├─ app.json · eas.json · package.json · tsconfig.json · jest.config.js
+├─ app.json · package.json · tsconfig.json · jest.config.js · LICENSE
 ├─ .env.example                      # EXPO_PUBLIC_SUPABASE_URL, EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY, EXPO_PUBLIC_DATA_SOURCE
 ├─ assets/fonts/ · assets/images/
 ├─ design/tokens.json · design/layout.json        # Figma variables + measured 1920/1512 layout values
-├─ design/figma/*.png                # reference exports: <Screen>-1920.png, <Screen>-1512.png, <Screen>-iphone.png
 ├─ src/
 │  ├─ app/
 │  │  ├─ _layout.tsx                 # fonts, QueryClient, Auth, SafeArea
@@ -307,15 +303,15 @@ olvar-dashboard/
 │  ├─ domain/     format.ts, status-style.ts (status key → colour/icon only), time.ts (plant timezone),
 │  │              timeline-events.ts, calibration.ts, chat-days.ts, status-freshness.ts
 │  └─ theme/      tokens.ts, layout.ts (tiers, §5.4), typography.ts, fonts.ts, useBreakpoint.ts
-├─ e2e/web/       *.spec.ts, playwright.config.ts, figma-diff.ts, figma-masks.json
+├─ e2e/web/       *.spec.ts, playwright.config.ts, serve-spa.mjs, __screenshots__/ (full-page baselines)
 ├─ .maestro/      sign-in.yaml, home.yaml, chat.yaml, calibrate.yaml
-├─ .eas/workflows/ ci.yml, deploy-web.yml, e2e-ios.yml
-└─ scripts/       sync-types.sh, export-figma.md
+├─ .github/workflows/ ci.yml
+└─ scripts/       sync-types.sh, check-web-export.js, ios-release.js, smoke-pages.sh
 ```
 
 ### 5.4 Responsive strategy (from the Desktop 1920 / 1512 frames)
 
-**Vertical rule (user decision).** Every web page is a vertically scrolling document (`PageScroll`):
+**Vertical rule.** Every web page is a vertically scrolling document (`PageScroll`):
 - There are **no viewport-height containers**, `100vh` sizing or fitted heights.
 - Content keeps its designed size and the page grows.
 - Frame heights (1080 / 982) are only the first screenful for visual tests.
@@ -382,16 +378,16 @@ States are built from existing components and tokens:
   - today's extrema
 
   An outage that starts while the Timeline is open therefore appears as "Offline since HH:mm" (`ongoing`) within about 60 s of the 180 s expiry, without waiting for recovery, navigation or reconnect. Past days are immutable and are not refetched.
-- **Calibration state vs failed read.** These are two **independent** checks, fixing the review finding.
+- **Calibration state vs failed read.** These are two **independent** checks.
   - *Calibrated?* is decided **only** from the device configuration: `soil_dry_raw` and `soil_wet_raw` are both non-null, cross-checked with `plant_status_v.soil_calibrated`.
   - *Soil read failed?* means `soil_raw` is null on the latest `readings_v` row.
 
   | Calibrated | `soil_raw` | Soil card shows |
   |---|---|---|
   | no | value | Raw value, a "Not calibrated" notice and a **Calibrate** button |
-  | no | null | "—", "Read failed at HH:mm" and the "Not calibrated" notice |
+  | no | null | "-", "Read failed at HH:mm" and the "Not calibrated" notice |
   | yes | value | `soil_pct`, as in the design |
-  | yes | null | "—" and "Read failed at HH:mm". **No recalibration prompt.** |
+  | yes | null | "-" and "Read failed at HH:mm". **No recalibration prompt.** |
 
   The same rule applies to the other metrics: a null value means "Read failed", and charts break the line.
 - **Empty states:**
@@ -435,13 +431,9 @@ States are built from existing components and tokens:
 
 ---
 
-## 6. Task breakdown (parallelizable, disjoint file ownership)
+## 6. Build steps and acceptance criteria
 
-**Order.**
-1. **T0 first.** It installs every dependency, so later tasks never edit `package.json`.
-2. **T1–T5 in parallel.**
-3. **T6–T12 in parallel**, against T1/T2/T4 or their stubbed interfaces.
-4. **T13–T14** can start alongside T6.
+The app is built in the steps T0 to T14 below. Each step lists its scope, the work and how it is accepted.
 
 **No hardware needed.** Everything is built and tested with `EXPO_PUBLIC_DATA_SOURCE=fixtures`.
 - "(live)" checks use the gateway's local `supabase start` with its seed and its fake ESP32 (`tools/fake_esp32.py`).
@@ -449,22 +441,17 @@ States are built from existing components and tokens:
 
 ### T0: Scaffold
 
-**Owns:** `package.json`, lockfile, `app.json`, `eas.json`, `tsconfig.json`, `jest.config.js`, `.env.example`, `.gitignore`, `src/app/+not-found.tsx`, `.eas/workflows/ci.yml`.
-
 **Work:**
 - Create the app from the `default@sdk-58` template.
 - App config: `web.output: "single"`, `scheme: "olvar"`, `supportsTablet: false`, the expo-font plugin.
 - Dependencies: expo-router, react-native-svg, d3-scale, d3-shape, @supabase/supabase-js, expo-sqlite, @tanstack/react-query, expo-glass-effect, expo-font, zod.
-- Dev dependencies: jest-expo, @testing-library/react-native, @playwright/test, pixelmatch, pngjs, @svgr/cli.
-- EAS profiles: development, preview, production, e2e-test.
+- Dev dependencies: jest-expo, @testing-library/react-native, @playwright/test, @svgr/cli.
 
 **Accept:** expo-doctor is clean; `tsc`, `npm test` and `expo export -p web` pass; `expo run:ios` launches.
 
 **Verify:** CI on each PR.
 
 ### T1: Tokens, layout tiers, fonts, icons
-
-**Owns:** `src/theme/**`, `assets/fonts/**`, `design/tokens.json`, `design/layout.json`, `src/components/icons/**`.
 
 **Work:**
 - Figma variables and text styles become typed tokens.
@@ -481,8 +468,6 @@ States are built from existing components and tokens:
 
 ### T2: UI primitives and state components
 
-**Owns:** `src/components/ui/**`, `src/app/(dev)/gallery.tsx`.
-
 **Work:**
 - The Figma components used by v1.
 - `StatusPill`, `Skeleton`, `EmptyState` (including the "coming soon" variant), `ErrorState`, `OfflineBanner`.
@@ -497,8 +482,6 @@ States are built from existing components and tokens:
 
 ### T3: Charts
 
-**Owns:** `src/components/charts/**`.
-
 **Work:**
 - SVG charts from `{t, v | null}` series.
 - Target band drawn from given min/max values; null gaps; a "Now" marker.
@@ -510,8 +493,6 @@ States are built from existing components and tokens:
 **Verify:** Jest; Playwright gallery.
 
 ### T4: Data layer
-
-**Owns:** `src/data/**`, `scripts/sync-types.sh`.
 
 **Work:**
 - A `DataSource` interface with Supabase and fixtures implementations, plus the hooks listed in §5.3.
@@ -563,8 +544,6 @@ States are built from existing components and tokens:
 
 ### T5: Domain helpers
 
-**Owns:** `src/domain/**`.
-
 **Work:**
 - `status-style.ts` (status key → colour and icon; **text always comes from the server labels**).
 - `status-freshness.ts`:
@@ -590,8 +569,6 @@ States are built from existing components and tokens:
 
 ### T6: Shell and sign-in
 
-**Owns:** `src/app/_layout.tsx`, `src/app/(auth)/**`, `src/app/(app)/_layout.tsx`, `src/components/shell/**`, `src/features/auth/**`.
-
 **Work:**
 - The session gate.
 - NativeTabs on iOS; on web, the Sidebar (272 or 248 by tier, without switcher or search).
@@ -610,8 +587,6 @@ States are built from existing components and tokens:
 
 ### T7: Home
 
-**Owns:** `src/app/(app)/index.tsx`, `src/features/home/**`.
-
 **Work:**
 - Plant card:
   - nickname, species and location
@@ -624,15 +599,13 @@ States are built from existing components and tokens:
 - iPhone stack layout.
 
 **Accept:**
-- Figma diff of `226:7520` / `226:7892` is under threshold, with masks (T13).
+- The layout follows `226:7520` / `226:7892` (column checks and full-page baselines, T13).
 - A new fixture reading updates the cards without a reload.
 - Every soil-card state from the §5.5 matrix renders.
 
-**Verify:** Playwright with figma-diff, RNTL, Maestro `home.yaml`.
+**Verify:** Playwright, RNTL, Maestro `home.yaml`.
 
 ### T8: Sensors
-
-**Owns:** `src/app/(app)/sensors.tsx`, `src/features/sensors/**`.
 
 **Work:**
 - 24 h / 7 d / 30 d segmented control: 24 h reads `readings_v` through `fetchAll()` (about 1,440 rows); 7 d and 30 d read `readings_hourly_v` (≤ 720 rows).
@@ -645,13 +618,11 @@ States are built from existing components and tokens:
 - The range switch uses the right source.
 - The 24 h chart's last point is the latest reading, even when the window holds more than 1,000 rows.
 - Snapshots for the normal, offline, null-read and uncalibrated states.
-- Figma diff of `227:7830` / `227:8145`.
+- The layout follows `227:7830` / `227:8145`.
 
 **Verify:** Jest, Playwright, Maestro.
 
 ### T9: Timeline
-
-**Owns:** `src/app/(app)/timeline.tsx`, `src/features/timeline/**`.
 
 **Work:**
 - Week navigation (limited to 90 days) and "Jump to date".
@@ -661,7 +632,7 @@ States are built from existing components and tokens:
   - daily extrema, from `readings_daily_v` plus a raw time lookup, or raw only for today
   - calibration and chat events (§5.5)
 - The Week summary from `readings_daily_v`.
-- The "Upcoming care — coming soon" placeholder.
+- The "Upcoming care: coming soon" placeholder.
 
 **Accept:**
 - A golden test checks the event list for each fixture day. It must include:
@@ -672,13 +643,11 @@ States are built from existing components and tokens:
   - an "Offline since …" (ongoing) event
 - No event appears for the 2-min gap.
 - Dates older than 90 days are disabled.
-- Figma diff of `227:8461` / `227:9006`.
+- The layout follows `227:8461` / `227:9006`.
 
 **Verify:** Jest, Playwright.
 
 ### T10: Chat
-
-**Owns:** `src/app/(app)/chat.tsx`, `src/features/chat/**`.
 
 **Work:**
 - At `xl`, the three-column layout: day-grouped conversations, chat, and "What Sparks sees" (latest `readings_v`, `<metric>_label`, "Updated N s ago"). At `lg`, two columns with conversations below the context card.
@@ -691,15 +660,13 @@ States are built from existing components and tokens:
 
 **Accept:**
 - With fixtures, a canned reply.
-- **(live)** A round trip through the local `chat` function with a stubbed DeepSeek.
-- No DeepSeek host or key in the web bundle (CI grep).
-- Figma diff of `227:9552` / `227:9813`.
+- **(live)** A round trip through the local `chat` function with a stubbed model API.
+- No Anthropic API host or key in the web bundle (CI grep).
+- The layout follows `227:9552` / `227:9813`.
 
 **Verify:** RNTL, Playwright, Maestro `chat.yaml`.
 
 ### T11: Soil calibration
-
-**Owns:** `src/app/(app)/calibrate.tsx`, `src/features/calibration/**`.
 
 **Work:** the wizard from §5.5, shown as a modal over Settings (`227:11051` / `227:11599`) and as an iOS sheet (`134:2509`).
 
@@ -711,8 +678,6 @@ States are built from existing components and tokens:
 **Verify:** Jest (state machine), Playwright, Maestro `calibrate.yaml`, then a manual check with the real probe.
 
 ### T12: Settings / Account
-
-**Owns:** `src/app/(app)/settings/**`, `src/features/settings/**`.
 
 **Work:**
 - **Plant profile:** nickname and location are editable; species and added date are read-only.
@@ -730,25 +695,19 @@ States are built from existing components and tokens:
   - A nickname change shows up in the sidebar and in the next chat reply.
   - Saving an override changes `plant_status_v` labels and the chart target bands.
   - A time-zone change moves the Timeline day bounds.
-- Figma diff of `227:10136` / `227:10593` and `227:12148` / `227:12271`.
+- The layout follows `227:10136` / `227:10593` and `227:12148` / `227:12271`.
 
 **Verify:** Jest, Playwright, Maestro.
 
 ### T13: Web visual and E2E harness
 
-**Owns:** `e2e/web/**`, `design/figma/**`, `scripts/export-figma.md`.
-
 **Work:**
 - **Playwright projects:**
-  - `fhd-1920` (1920×1080, DPR 1) and `mbp-1512` (1512×982, DPR 2): the **Figma-compared targets**.
+  - `fhd-1920` (1920×1080, DPR 1) and `mbp-1512` (1512×982, DPR 2): the **design sizes**, with layout checks and baselines.
   - `layout-1280`, `layout-1728`, `layout-2560`: layout-invariant checks only.
   - `web-narrow` (402×874).
 - **Server and fixtures:** serve the web export with `npx expo serve` in fixtures mode. The fixture content matches the frames' sample data where possible: "Sparks", 42 %, 1,240 lux, 23.4 °C, 58 %. Freeze the clock to the frames' dates with `page.clock.install`, and turn animations off.
-- **Figma diff:** `figma-diff.ts` compares the **first screenful** at 1920 and 1512 against `design/figma/<Screen>-1920.png` / `-1512.png` for the 8 v1 screens.
-  - **Scale:** captures use `page.screenshot({ clip: {x: 0, y: 0, width: vw, height: vh}, scale: 'css', animations: 'disabled' })`. A DPR 2 project (`mbp-1512`) therefore yields **1512×982**, the same size as the 1× Figma export, not 3024×1964.
-  - **Size guard:** the script asserts that capture and reference dimensions are equal before diffing, and fails loudly if they are not.
-  - **Masks:** `figma-masks.json` holds the regions §2.1.1 changes or removes (switcher, search, bell, health score, Log care, filter chips, New chat, mic, alert switches, Add device, photo / username / delete account). Masks are stored in **CSS pixels**, the same coordinate space as the capture and the export.
-  - **Threshold:** the diff is advisory; start at 8 % after masking.
+- **Layout checks:** at 1920 and 1512 the specs assert the measured column widths, card sizes and the sign-in form position from §2.1.
 - **Snapshot baselines:** `toHaveScreenshot` **full-page** baselines at 1920 and 1512, with `scale: 'css'` set explicitly (pages scroll; nothing is clipped to the viewport).
 - **Layout invariants**, checked at every width:
   - no horizontal scroll
@@ -759,46 +718,44 @@ States are built from existing components and tokens:
   - document height is not limited to the viewport height
 
 **Accept:**
-- CI runs the suite on each PR and attaches the diff report.
+- The visual suite runs locally on macOS, where the baselines live.
 - A one-token change fails the snapshots.
 
-**Verify:** CI artifacts.
+**Verify:** Playwright report.
 
 ### T14: iOS pipeline and web deploy
 
-**Owns:** `.maestro/**`, `.eas/workflows/e2e-ios.yml`, `.eas/workflows/deploy-web.yml`, `assets/images/**`.
-
 **Work:**
 - Maestro flows on the iPhone 17 Pro simulator (iOS 27).
-- An EAS e2e build plus a Maestro job.
-- `eas deploy`: previews on PRs, `--prod` on main.
+- Local iOS Release builds: `npm run ios:release` installs on a connected iPhone and `npm run ios:archive` archives for TestFlight (`docs/DEPLOY.md`).
+- Web deploys on Cloudflare Pages, with a check of the export (`scripts/check-web-export.js`).
 - Icon, splash and launch screen.
 
 **Accept:**
 - Maestro passes on fixtures.
-- A preview URL is posted per PR.
-- A TestFlight preview build exists.
+- Each push to `main` deploys the web export.
+- A TestFlight build uploads from Xcode's Organizer.
 
-**Verify:** workflow logs and App Store Connect.
+**Verify:** Cloudflare Pages build log and App Store Connect.
 
 ---
 
-## 7. Things the user must do by hand
+## 7. Manual setup
 
-1. **Expo account:** run `npx eas-cli login` (Expo Go also needs a login), then `eas init`.
-2. **Apple Developer Program:** enroll ($99/yr), create the App Store Connect app record (or let `eas submit` create it), and add yourself as an internal TestFlight tester.
+1. **Cloudflare Pages:** create the Pages project from this repo and set its build variables (`docs/DEPLOY.md`).
+2. **Apple Developer Program** (for TestFlight only): enroll ($99/yr), create the App Store Connect app record, and add yourself as an internal TestFlight tester.
 3. **Xcode:** install **27.1** with the iOS 27 simulator. Optionally install Maestro with `curl -fsSL https://get.maestro.mobile.dev | bash`.
-4. **iPhone:** enable Developer Mode, then run `eas device:create` for internal builds.
-5. **Supabase keys:** take the project URL and the **publishable** key from the gateway setup. Put them in `.env.local` and in EAS env vars (`eas env:create`). Never use a secret key here.
+4. **iPhone:** enable Developer Mode and pair it with Xcode.
+5. **Supabase keys:** take the project URL and the **publishable** key from the gateway setup. Put them in `.env.local` (development), `.env.production.local` (iOS release) and the Cloudflare Pages build variables. Never use a secret key here.
 6. **Owner login:** keep the owner email and password created by the gateway setup. Use a test owner on the local stack for live tests.
-7. **Figma exports:** export the 8 v1 frames at 1920 and 1512, plus the iPhone frames, as 1× PNGs into `design/figma/` using the naming in §5.3. Alternatively, give a worker Figma access to run T13's export step.
-8. **GitHub:** make sure `gh` can read `olvar-gh/olvar-gateway`, which the type sync needs.
+
+The type sync (`scripts/sync-types.sh`) reads the public [olvar-gateway](https://github.com/olvar-gh/olvar-gateway) repo and needs no GitHub login.
 
 ---
 
 ## 8. Risks
 
-- **The frames still contain deferred features.** Building to them means removing those elements consistently (§2.1.1), so the Figma diffs depend on correct masks. If the designer later updates the frames for v1, the masks can be removed.
+- **The frames still contain deferred features.** Building to them means removing those elements consistently (§2.1.1), so the app intentionally differs from the frames in those places.
 - **Raw-reading volume:** the Sensors 24 h view needs 2 paginated requests (about 1,440 rows). Forgetting `fetchAll()` on a new query would silently drop the newest rows, which is why T4 tests the > 1,000-row case live.
 - **Timeline cost:** each day is loaded lazily and costs:
   - one small RPC call
@@ -810,18 +767,14 @@ States are built from existing components and tokens:
 - **Expo Router SDK 58 core rework and native tabs.** Pin patch versions and keep the shell isolated.
 - **Liquid Glass pitfalls:** animating opacity or mounting on demand breaks it, and it needs iOS 26+.
 - **60 s cadence makes calibration slow:** about 3 minutes per step.
-- **Web font rasterization differs from Figma**, so the Figma diff is advisory.
 
 ---
 
-## 9. Open questions for the user
+## 9. Design choices
 
-None are blocking. The follow-up decisions answered the remaining items:
 - Vertical scrolling has no limit.
 - "Recent insights" stays as a "coming soon" placeholder.
 - The responsive rules follow the 1920 / 1512 frames.
-
-Choices this plan made that the user may want to glance at:
 - Timeline's "Upcoming care" slot uses the same "coming soon" placeholder.
 - Chat's "Past conversations" column groups the single conversation by day, because the schema has no threads.
 - Care targets are editable through `threshold_overrides` (`ok_low`/`ok_high` only); the per-row alert switches stay hidden.

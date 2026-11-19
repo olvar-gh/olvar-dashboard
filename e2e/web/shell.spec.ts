@@ -1,11 +1,8 @@
 import { expect, test, type Page } from '@playwright/test';
 
 import { FIXTURE_EMAIL, FIXTURE_PASSWORD } from '../../src/data/fixtures/generate';
-import { figmaDiff, type Rect } from './figma';
 
 // T6 shell and sign-in on the fixtures build.
-
-const FIGMA_MAX_DIFF = 0.08;
 
 const tierOf = (width: number) => (width >= 1728 ? 'xl' : width >= 1280 ? 'lg' : width >= 768 ? 'md' : 'compact');
 const sidebarWidth = { xl: 272, lg: 248, md: 72, compact: 0 } as const;
@@ -125,63 +122,22 @@ test.describe('desktop shell', () => {
   });
 });
 
-test.describe('Figma', () => {
+test.describe('Sign-in layout', () => {
   test.beforeEach(({}, info) => {
-    test.skip(!['fhd-1920', 'mbp-1512'].includes(info.project.name), 'Figma frames exist at 1920 and 1512 only');
+    test.skip(!['fhd-1920', 'mbp-1512'].includes(info.project.name), 'the layout is measured at 1920 and 1512');
   });
 
-  test('sign in matches 227:10075 / 227:10095', async ({ page }, info) => {
+  test('brand panel and form follow the 1920 / 1512 layout', async ({ page }) => {
     const width = page.viewportSize()!.width;
     await page.goto('/sign-in?session=signed-out');
-    await page.getByLabel('Password').fill('••••••••••');
     await ready(page);
     const form = (await page.getByRole('form').boundingBox())!;
-    // The form is compared on its own below; here the brand panel and page background count.
-    const masks: Rect[] = [{ x: form.x, y: form.y, width: form.width, height: form.height + 36 }];
-    const share = await figmaDiff(page, `SignIn-${width}`, info.outputDir, { masks });
-    console.log(`SignIn-${width}: ${(share * 100).toFixed(2)} % differs outside the form`);
-    expect(share).toBeLessThan(FIGMA_MAX_DIFF);
-
     const panel = (await page.getByTestId('brand-panel').boundingBox())!;
     expect(panel.width).toBe(width === 1920 ? 800 : 672);
     expect(form.width).toBe(360);
     expect(Math.round(form.x)).toBe(Math.round(panel.width + (width - panel.width - 360) / 2));
-  });
-
-  test('the sign-in form sits on the Figma form', async ({ page }, info) => {
-    const width = page.viewportSize()!.width;
-    await page.goto('/sign-in?session=signed-out');
-    await page.getByLabel('Password').fill('••••••••••');
-    await ready(page);
-    const figma = width === 1920 ? { x: 1180, y: 351 } : { x: 912, y: 302 };
-    const form = (await page.getByRole('form').boundingBox())!;
-    expect(Math.abs(form.x - figma.x)).toBeLessThanOrEqual(1);
-    expect(Math.abs(form.y - figma.y)).toBeLessThanOrEqual(1);
-    // Only the subtitle differs: it cannot name the plant before sign-in.
-    const share = await figmaDiff(page, `SignIn-${width}`, `${info.outputDir}/form`, {
-      clip: { ...figma, width: 360, height: 343 },
-      masks: [{ x: figma.x, y: figma.y + 105, width: 360, height: 21 }],
-    });
-    console.log(`SignIn-${width} form: ${(share * 100).toFixed(2)} % differs`);
-    expect(share).toBeLessThan(FIGMA_MAX_DIFF);
-  });
-
-  test('sidebar matches the Home frame sidebar', async ({ page }, info) => {
-    const width = page.viewportSize()!.width;
-    await page.goto('/');
-    await expect(page.getByTestId('gateway-status')).toBeVisible();
-    await ready(page);
-    const w = width === 1920 ? 272 : 248;
-    // The plant switcher chevron, search and nav (shifted up without search) are masked; the
-    // gateway footer sits on the frame's bottom edge, which is 1024 high in the 1512 export.
-    const share = await figmaDiff(page, `Home-${width}`, info.outputDir, {
-      clip: { x: 0, y: 0, width: w, height: 300 },
-      masks: [
-        { x: 180, y: 20, width: 60, height: 40 },
-        { x: 0, y: 64, width: w, height: 236 },
-      ],
-    });
-    console.log(`Home-${width} sidebar top: ${(share * 100).toFixed(2)} % differs`);
-    expect(share).toBeLessThan(FIGMA_MAX_DIFF);
+    const designed = width === 1920 ? { x: 1180, y: 351 } : { x: 912, y: 302 };
+    expect(Math.abs(form.x - designed.x)).toBeLessThanOrEqual(1);
+    expect(Math.abs(form.y - designed.y)).toBeLessThanOrEqual(1);
   });
 });

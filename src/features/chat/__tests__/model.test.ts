@@ -63,8 +63,8 @@ describe('chat model', () => {
 
   it('marks a null value as a failed read with its time', () => {
     const rows = contextRows(reading({ lux: null }), status, TZ);
-    expect(rows[1]).toMatchObject({ value: '—', note: 'Read failed at 14:29', failed: true });
-    expect(chipValue(rows[1], reading({ lux: null }))).toBe('—');
+    expect(rows[1]).toMatchObject({ value: '-', note: 'Read failed at 14:29', failed: true });
+    expect(chipValue(rows[1], reading({ lux: null }))).toBe('-');
   });
 
   it('keeps uncalibrated soil apart from a failed soil read', () => {

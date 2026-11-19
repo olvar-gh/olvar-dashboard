@@ -135,7 +135,7 @@ function trimNumber(v: number, decimals: number): string {
 
 /** "35 – 60 %", "500 – 1,500 lux", "18 – 27 °C" (desktop) or "35–60%" style when `tight`. */
 export function formatRange(cfg: MetricConfig, range: Range | null, tight = false): string {
-  if (!range) return '—';
+  if (!range) return '-';
   const low = trimNumber(range.low, cfg.decimals);
   const high = trimNumber(range.high, cfg.decimals);
   if (!tight) return `${low} – ${high} ${cfg.unit}`;

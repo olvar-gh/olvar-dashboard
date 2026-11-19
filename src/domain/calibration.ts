@@ -32,7 +32,7 @@ export function calibrationMismatch(
 }
 
 export type SoilCardState = {
-  /** What the big number shows: `soil_pct`, the raw value, or "—". */
+  /** What the big number shows: `soil_pct`, the raw value, or "-". */
   value: 'pct' | 'raw' | 'none';
   /** Show "Read failed at HH:mm". */
   readFailed: boolean;

@@ -1,5 +1,5 @@
 {
-  "$source": "Measured from Figma ZMGAYBFUZjGsECpL54uEJg frames '/ Desktop 1920' (226:7520, 227:7830, 227:8461, 227:9552, 227:10075, 227:10136, 227:11051, 227:12148) and '/ Desktop 1512' (226:7892, 227:8145, 227:9006, 227:9813, 227:10095, 227:10593, 227:11599, 227:12271); md and compact tiers from docs/PLAN.md section 5.4",
+  "$source": "Measured from the design file's Figma frames '/ Desktop 1920' (226:7520, 227:7830, 227:8461, 227:9552, 227:10075, 227:10136, 227:11051, 227:12148) and '/ Desktop 1512' (226:7892, 227:8145, 227:9006, 227:9813, 227:10095, 227:10593, 227:11599, 227:12271); md and compact tiers from docs/PLAN.md section 5.4",
   "tiers": {
     "compact": { "minWidth": 0, "sidebarWidth": 0, "paddingX": 16, "paddingTop": 16, "contentMaxWidth": null },
     "md": { "minWidth": 768, "sidebarWidth": 72, "paddingX": 24, "paddingTop": 24, "contentMaxWidth": null },

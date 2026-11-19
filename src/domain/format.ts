@@ -2,7 +2,7 @@
 
 import { localDate, type LocalDate } from './time';
 
-export const EMPTY_VALUE = '—';
+export const EMPTY_VALUE = '-';
 
 export type Metric = 'temperature' | 'humidity' | 'light' | 'soil';
 
@@ -37,7 +37,7 @@ export function formatNumber(v: number, decimals = 0): string {
   return v.toLocaleString('en-US', { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
 }
 
-/** Sensor value with its unit; null (read failed / no data) → "—". */
+/** Sensor value with its unit; null (read failed / no data) → "-". */
 export function formatMetric(metric: Metric, v: number | null | undefined): string {
   if (v == null || !Number.isFinite(v)) return EMPTY_VALUE;
   switch (metric) {

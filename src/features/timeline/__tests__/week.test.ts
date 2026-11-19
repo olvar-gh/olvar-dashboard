@@ -144,7 +144,7 @@ describe('week summary', () => {
 
   it('shows a dash and no change when a week has no data for a metric', () => {
     const stats = weekSummary([daily('2026-11-15', { soil_pct_avg: null })], '2026-11-15');
-    expect(stats[0]).toMatchObject({ value: '—', delta: null, average: null });
+    expect(stats[0]).toMatchObject({ value: '-', delta: null, average: null });
     expect(stats[1].delta).toBeNull();
   });
 });

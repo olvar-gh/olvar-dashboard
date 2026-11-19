@@ -113,7 +113,7 @@ export type StatusLabels = Partial<Record<`${MetricSpec['statusColumn']}_${'labe
 
 export type SensorCardModel = {
   metric: MetricKey;
-  /** Big number without its unit, or "—". */
+  /** Big number without its unit, or "-". */
   value: string;
   unit: string;
   /** Per-metric status key (colour only) and the server's label for it. */

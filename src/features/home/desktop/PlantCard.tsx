@@ -65,7 +65,7 @@ export function PlantCard({ plant, status, message, lastReading, width, minHeigh
           <View style={styles.readingText}>
             <Text style={styles.readingLabel}>Last reading</Text>
             <View style={styles.readingValue}>
-              <Text style={styles.readingTime}>{lastReading?.time ?? '—'}</Text>
+              <Text style={styles.readingTime}>{lastReading?.time ?? '-'}</Text>
               {lastReading ? <Text style={styles.readingAge}>{formatAge(lastReading.ageS)}</Text> : null}
             </View>
           </View>

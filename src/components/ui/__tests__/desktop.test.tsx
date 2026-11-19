@@ -90,9 +90,9 @@ describe('desktop Modal', () => {
 describe('desktop PageHeader', () => {
   it('renders title and date navigation with disabled state', async () => {
     const onPrev = jest.fn();
-    await render(<PageHeader title="Timeline" subtitle="Week" avatar="dongmin" dateNav={{ label: 'Nov 6', onPrev, nextDisabled: true }} />);
+    await render(<PageHeader title="Timeline" subtitle="Week" avatar="mina" dateNav={{ label: 'Nov 6', onPrev, nextDisabled: true }} />);
     expect(screen.getByRole('header', { name: 'Timeline' })).toBeTruthy();
-    expect(screen.getByText('D')).toBeTruthy();
+    expect(screen.getByText('M')).toBeTruthy();
     await fireEvent.press(screen.getByRole('button', { name: 'Previous' }));
     expect(onPrev).toHaveBeenCalled();
     expect(screen.getByRole('button', { name: 'Next' })).toBeDisabled();

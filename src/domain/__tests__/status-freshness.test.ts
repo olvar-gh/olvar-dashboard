@@ -18,7 +18,7 @@ const latest = at(0).toISOString();
 const row = (over: Partial<CachedStatus> = {}): CachedStatus => ({
   overall: 'needs_attention',
   overall_label: 'Needs attention',
-  summary: 'Soil is getting dry — water soon',
+  summary: 'Soil is getting dry, water soon',
   latest_reading_at: latest,
   device_status: 'online',
   ...over,
@@ -65,7 +65,7 @@ describe('displayStatus', () => {
     expect(displayStatus(row(), at(60))).toEqual({
       overall: 'needs_attention',
       overallLabel: 'Needs attention',
-      summary: 'Soil is getting dry — water soon',
+      summary: 'Soil is getting dry, water soon',
       offline: false,
       aged: false,
       offlineSince: null,

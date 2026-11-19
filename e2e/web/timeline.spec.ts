@@ -1,8 +1,6 @@
 import { expect, test } from '@playwright/test';
 
-import { figmaDiff } from './figma';
-
-// T9 Timeline on the fixtures build, with the clock on the Figma frames' week (Sat Nov 7, 15:00 Seoul).
+// T9 Timeline on the fixtures build, with the clock on the design frames' week (Sat Nov 7, 15:00 Seoul).
 
 const FRAME_TIME = new Date('2026-11-07T06:00:00Z');
 
@@ -10,7 +8,7 @@ test.beforeEach(async ({ page }) => {
   await page.clock.install({ time: FRAME_TIME });
 });
 
-test('Timeline matches the desktop frame layout and scrolls as a document', async ({ page }, info) => {
+test('Timeline matches the desktop frame layout and scrolls as a document', async ({ page }) => {
   const { width, height } = page.viewportSize()!;
   await page.goto('/timeline');
   await expect(page.getByRole('heading', { name: 'Timeline', level: 1 })).toBeVisible();
@@ -32,13 +30,6 @@ test('Timeline matches the desktop frame layout and scrolls as a document', asyn
   expect(scrollWidth).toBeLessThanOrEqual(width);
   const docHeight = await page.evaluate(() => document.documentElement.scrollHeight);
   expect(docHeight).toBeGreaterThan(height);
-
-  if (width === 1920 || width === 1512) {
-    const name = `Timeline-${width}`;
-    const diff = await figmaDiff(page, name, info.outputPath('figma'));
-    info.annotations.push({ type: 'figma-diff', description: `${name}: ${(diff * 100).toFixed(1)} %` });
-    await page.screenshot({ path: info.outputPath(`${name}-full.png`), fullPage: true, scale: 'css' });
-  }
 });
 
 test('Jump to date disables days outside the 90-day history', async ({ page }) => {

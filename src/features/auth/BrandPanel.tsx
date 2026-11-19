@@ -12,7 +12,7 @@ export function BrandPanel({ width }: { width: number }) {
       </View>
       <View style={styles.spacer} />
       <Text style={styles.headline}>Your plants, in their own words.</Text>
-      <Text style={styles.body}>Live soil, light, temperature and humidity — and a plant that tells you how it feels.</Text>
+      <Text style={styles.body}>Live soil, light, temperature and humidity, and a plant that tells you how it feels.</Text>
     </View>
   );
 }

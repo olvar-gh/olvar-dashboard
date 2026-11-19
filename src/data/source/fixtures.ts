@@ -48,7 +48,7 @@ const OFFLINE_S = 180;
 const MIN = 60_000;
 const HEARTBEAT_MS = 300_000;
 
-const SESSION: Session = { userId: '00000000-0000-4000-8000-0000000000a1', email: FIXTURE_EMAIL, name: 'Dongmin' };
+const SESSION: Session = { userId: '00000000-0000-4000-8000-0000000000a1', email: FIXTURE_EMAIL, name: 'Mina' };
 
 function avg(values: number[]): number | null {
   return values.length ? values.reduce((a, b) => a + b, 0) / values.length : null;
@@ -198,9 +198,9 @@ export function createFixtureSource(options: FixtureSourceOptions = {}): Fixture
         overall,
         overall_label: { great: 'Feeling great', okay: 'Doing okay', offline: 'Offline', no_data: 'No data yet' }[overall],
         summary: {
-          great: "All good — I'm feeling great",
-          okay: 'All good — calibrate the soil sensor to track watering',
-          offline: "No recent readings — check the sensor's power and Wi-Fi",
+          great: "All good, I'm feeling great",
+          okay: 'All good. Calibrate the soil sensor to track watering',
+          offline: "No recent readings. Check the sensor's power and Wi-Fi",
           no_data: 'Waiting for the first reading',
         }[overall],
         issues: [],
@@ -363,11 +363,11 @@ export function createFixtureSource(options: FixtureSourceOptions = {}): Fixture
         ...asked,
         id: nextChatId++,
         role: 'plant',
-        content: "Thanks for asking! I'm comfortable right now — the soil is moist and the light is gentle.",
+        content: "Thanks for asking! I'm comfortable right now: the soil is moist and the light is gentle.",
         created_at: now().toISOString(),
         reply_to: asked.id,
         based_on_reading_at: latest()?.recorded_at ?? null,
-        model: 'deepseek-flash',
+        model: 'claude-haiku-5-5',
       };
       world.chat.push(reply);
       emit((h) => h.onChatMessage(reply));

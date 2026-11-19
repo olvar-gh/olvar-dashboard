@@ -31,7 +31,7 @@ export function IphoneGallery({ onOpenSheet }: { onOpenSheet: () => void }) {
   const [range, setRange] = useState<Range>('24h');
   const [preset, setPreset] = useState(true);
   const [email, setEmail] = useState('');
-  const [last, setLast] = useState('—');
+  const [last, setLast] = useState('-');
   const native = Platform.OS !== 'web';
 
   return (
@@ -84,7 +84,7 @@ export function IphoneGallery({ onOpenSheet }: { onOpenSheet: () => void }) {
         <RangeCard testID="range-soil" caption="Soil moisture" value="42" status="% · Getting dry" unit="%" min={0} max={100} minLabel="0%" maxLabel="100%" low={35} high={60} current={42} color={iosColors.accentBlue} />
         <RangeCard caption="Light" value="1,240" status="lux · Just right" unit=" lux" min={0} max={4000} minLabel="0" maxLabel="4,000 lux" low={500} high={1500} current={1240} color={iosColors.accentYellow} />
         <RangeCard caption="Temperature" value="23.4" status="°C · Just right" unit=" °C" min={10} max={35} minLabel="10 °C" maxLabel="35 °C" low={18} high={27} current={23.4} color={iosColors.accentOrange} />
-        <RangeCard caption="Humidity" value="—" status="Read failed at 14:02" unit="%" min={0} max={100} minLabel="0%" maxLabel="100%" low={40} high={70} current={null} color={iosColors.accentTeal} />
+        <RangeCard caption="Humidity" value="-" status="Read failed at 14:02" unit="%" min={0} max={100} minLabel="0%" maxLabel="100%" low={40} high={70} current={null} color={iosColors.accentTeal} />
       </GallerySection>
 
       <GallerySection title="Glass buttons">

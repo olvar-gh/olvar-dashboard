@@ -103,7 +103,7 @@ function Body({ w }: { w: CalibrationWizard }) {
       <View testID="live-reading" style={styles.liveCard}>
         <Text style={styles.liveLabel}>Live reading</Text>
         <View style={styles.valueRow}>
-          <Text style={styles.value}>{live.raw == null ? '—' : formatNumber(live.raw)}</Text>
+          <Text style={styles.value}>{live.raw == null ? '-' : formatNumber(live.raw)}</Text>
           <Text style={styles.unit}>raw ADC</Text>
         </View>
         <Text testID="live-status" style={[styles.status, live.stability === 'stable' && styles.statusStable]}>
@@ -157,7 +157,7 @@ function StepRow({ w, step }: { w: CalibrationWizard; step: CaptureStep }) {
       icon={s.icon}
       iconTint={s.tint}
       separator={step === 'wet'}
-      value={captured != null ? formatNumber(captured) : w.step === step ? 'Measuring…' : '—'}
+      value={captured != null ? formatNumber(captured) : w.step === step ? 'Measuring…' : '-'}
       accessory={captured != null ? 'chevron' : 'none'}
       onPress={captured != null && !w.saving ? retake : undefined}
     />

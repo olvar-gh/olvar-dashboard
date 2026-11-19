@@ -160,7 +160,7 @@ export type SummaryMetric = 'soil' | 'temperature' | 'humidity' | 'light';
 export type SummaryStat = {
   metric: SummaryMetric;
   label: string;
-  /** Formatted average, or "—" when the week has no readings for it. */
+  /** Formatted average, or "-" when the week has no readings for it. */
   value: string;
   /** Change against the previous week, e.g. "−4%", "+0.6 °C"; null when either week has no data. */
   delta: string | null;
@@ -209,7 +209,7 @@ export function weekSummary(rows: readonly DailyRow[], weekStart: LocalDate): Su
       metric: m.metric,
       label: m.label,
       average: now,
-      value: now == null ? '—' : `${formatNumber(now, m.decimals)}${m.unit}`,
+      value: now == null ? '-' : `${formatNumber(now, m.decimals)}${m.unit}`,
       delta: now == null || before == null ? null : signed(now - before, m.decimals, m.unit),
     };
   });

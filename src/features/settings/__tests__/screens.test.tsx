@@ -231,10 +231,11 @@ describe('Account', () => {
   it('saves the name and keeps the email read-only', async () => {
     const app = await open('/settings/account');
     expect((await screen.findByTestId('account-email')).props.editable).toBe(false);
-    await fireEvent.changeText(screen.getByTestId('account-name'), 'Dongmin');
+    await fireEvent.changeText(screen.getByTestId('account-name'), 'Mina Park');
     await fireEvent.press(screen.getByTestId('account-save'));
-    await waitFor(() => expect(screen.getByTestId('account-name').props.value).toBe('Dongmin'));
-    expect(await app.source.auth.getSession()).toMatchObject({ name: 'Dongmin' });
+    // A successful save leaves the screen.
+    await waitFor(() => expect(app.getPathname()).not.toBe('/settings/account'));
+    expect(await app.source.auth.getSession()).toMatchObject({ name: 'Mina Park' });
   });
 
   it('changes the plant time zone from the picker', async () => {
