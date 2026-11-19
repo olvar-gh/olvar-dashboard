@@ -50,3 +50,6 @@ playwright-report/
 .env
 .env.local
 .playwright-mcp/
+
+# Cloudflare local Pages server state (scripts/smoke-pages.sh)
+.wrangler/
