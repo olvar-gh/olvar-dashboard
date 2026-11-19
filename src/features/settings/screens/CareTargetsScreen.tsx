@@ -1,13 +1,13 @@
 import { useLocalSearchParams } from 'expo-router';
-import { useEffect, useRef, useState } from 'react';
-import { Alert, Keyboard, StyleSheet, View, type LayoutChangeEvent, type ScrollViewInstance } from 'react-native';
+import { useEffect, useRef } from 'react';
+import { Alert, StyleSheet, View } from 'react-native';
 
 import { PageScroll } from '@/components/shell';
 import { Button, confirmAlert, ErrorState, Field, IosListRow, ListSection, NavBar, RangeCard, SkeletonCard } from '@/components/ui';
 import { colors } from '@/theme';
 
 import { useCareTargets } from '../hooks';
-import { formatNow, formatRange, METRICS, okRange, saveFitsWithField, scaleFor, speciesName, usesPreset, type MetricConfig } from '../model';
+import { formatNow, formatRange, METRICS, okRange, scaleFor, speciesName, usesPreset } from '../model';
 
 /** iPhone care targets: the preset switch, each metric's ideal range, and Low/High rows while editing. */
 export function CareTargetsScreen() {
@@ -25,8 +25,6 @@ export function CareTargetsScreen() {
     if (!c.open) c.startEditing();
   }, [edit, ready]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const { setScroll, onViewportLayout, onMetricLayout, onFieldsLayout, onFieldFocus, onActionsLayout } = useRevealSave();
-
   const onPreset = async (on: boolean) => {
     if (!on) return c.startEditing();
     if (p && usesPreset(p.threshold_overrides)) return c.cancel();
@@ -41,11 +39,10 @@ export function CareTargetsScreen() {
   };
 
   return (
-    // The scroll view insets itself above the keyboard so Save Ranges stays reachable, and a tap on
-    // Save while typing presses it instead of only closing the keyboard.
+    // The scroll view keeps the focused field above the keyboard and insets its content by the
+    // keyboard height, so Save Ranges can be scrolled above it; each decimal pad's Done closes it.
+    // A tap on Save while typing presses it instead of only closing the keyboard.
     <PageScroll
-      ref={setScroll}
-      onLayout={onViewportLayout}
       testID="care-targets-screen"
       keyboardDismissMode="interactive"
       keyboardShouldPersistTaps="handled"
@@ -82,7 +79,7 @@ export function CareTargetsScreen() {
             const draft = c.draft[cfg.metric];
             const error = c.rowErrors[cfg.metric];
             return (
-              <View key={cfg.metric} style={styles.metric} testID={`target-${cfg.metric}`} onLayout={onMetricLayout(cfg)}>
+              <View key={cfg.metric} style={styles.metric} testID={`target-${cfg.metric}`}>
                 {range ? (
                   <RangeCard
                     caption={cfg.label}
@@ -98,33 +95,29 @@ export function CareTargetsScreen() {
                   />
                 ) : null}
                 {c.open ? (
-                  <View onLayout={onFieldsLayout(cfg)} testID={`target-${cfg.metric}-fields`}>
-                    <ListSection footer={error}>
-                      <Field
-                        label="Low"
-                        value={draft.low}
-                        onChangeText={(v) => c.setRange(cfg.metric, 'low', v)}
-                        keyboardType="decimal-pad"
-                        editable={!c.saving}
-                        error={!!error}
-                        returnKeyType="done"
-                        onFocus={() => onFieldFocus(cfg)}
-                        testID={`target-${cfg.metric}-low`}
-                      />
-                      <Field
-                        label="High"
-                        value={draft.high}
-                        onChangeText={(v) => c.setRange(cfg.metric, 'high', v)}
-                        keyboardType="decimal-pad"
-                        editable={!c.saving}
-                        error={!!error}
-                        separator
-                        returnKeyType="done"
-                        onFocus={() => onFieldFocus(cfg)}
-                        testID={`target-${cfg.metric}-high`}
-                      />
-                    </ListSection>
-                  </View>
+                  <ListSection footer={error}>
+                    <Field
+                      label="Low"
+                      value={draft.low}
+                      onChangeText={(v) => c.setRange(cfg.metric, 'low', v)}
+                      keyboardType="decimal-pad"
+                      editable={!c.saving}
+                      error={!!error}
+                      returnKeyType="done"
+                      testID={`target-${cfg.metric}-low`}
+                    />
+                    <Field
+                      label="High"
+                      value={draft.high}
+                      onChangeText={(v) => c.setRange(cfg.metric, 'high', v)}
+                      keyboardType="decimal-pad"
+                      editable={!c.saving}
+                      error={!!error}
+                      separator
+                      returnKeyType="done"
+                      testID={`target-${cfg.metric}-high`}
+                    />
+                  </ListSection>
                 ) : null}
               </View>
             );
@@ -135,7 +128,7 @@ export function CareTargetsScreen() {
             </ListSection>
           ) : null}
           {c.open ? (
-            <View style={styles.actions} onLayout={onActionsLayout} testID="care-actions">
+            <View style={styles.actions}>
               <Button size="large" label="Save Ranges" onPress={() => void c.save()} loading={c.saving} testID="care-save" />
               <Button size="large" variant="plain" label="Cancel" onPress={c.cancel} disabled={c.saving} />
             </View>
@@ -146,66 +139,6 @@ export function CareTargetsScreen() {
       )}
     </PageScroll>
   );
-}
-
-/**
- * Brings Save Ranges above the keyboard when a lower field is focused. The keyboard inset alone
- * only scrolls the focused field into view, which leaves Save under the keyboard; scrolling to the
- * end is skipped when it would push the focused field off the top.
- */
-function useRevealSave() {
-  const [reveal] = useState(createRevealSave);
-  useEffect(() => reveal.subscribe(), [reveal]);
-  return reveal;
-}
-
-/** The layout bookkeeping behind useRevealSave (exported for tests). */
-export function createRevealSave() {
-  let scroll: ScrollViewInstance | null = null;
-  let viewport = 0;
-  let actionsBottom = 0;
-  const metricTop: Partial<Record<string, number>> = {};
-  const fieldsOffset: Partial<Record<string, number>> = {};
-  let focused: string | null = null;
-
-  const reveal = (keyboard: number) => {
-    if (!focused || !keyboard || !actionsBottom) return;
-    const fieldTop = (metricTop[focused] ?? 0) + (fieldsOffset[focused] ?? 0);
-    if (saveFitsWithField(fieldTop, actionsBottom, viewport, keyboard)) scroll?.scrollToEnd({ animated: true });
-  };
-
-  return {
-    setScroll: (node: ScrollViewInstance | null) => {
-      scroll = node;
-    },
-    subscribe: () => {
-      const shown = Keyboard.addListener('keyboardDidShow', (e) => reveal(e.endCoordinates.height));
-      const hidden = Keyboard.addListener('keyboardDidHide', () => {
-        focused = null;
-      });
-      return () => {
-        shown.remove();
-        hidden.remove();
-      };
-    },
-    onViewportLayout: (e: LayoutChangeEvent) => {
-      viewport = e.nativeEvent.layout.height;
-    },
-    onActionsLayout: (e: LayoutChangeEvent) => {
-      actionsBottom = e.nativeEvent.layout.y + e.nativeEvent.layout.height;
-    },
-    onMetricLayout: (cfg: MetricConfig) => (e: LayoutChangeEvent) => {
-      metricTop[cfg.metric] = e.nativeEvent.layout.y;
-    },
-    onFieldsLayout: (cfg: MetricConfig) => (e: LayoutChangeEvent) => {
-      fieldsOffset[cfg.metric] = e.nativeEvent.layout.y;
-    },
-    // Moving between fields with the keyboard already up does not always fire keyboardDidShow.
-    onFieldFocus: (cfg: MetricConfig) => {
-      focused = cfg.metric;
-      if (Keyboard.isVisible()) reveal(Keyboard.metrics()?.height ?? 0);
-    },
-  };
 }
 
 const styles = StyleSheet.create({

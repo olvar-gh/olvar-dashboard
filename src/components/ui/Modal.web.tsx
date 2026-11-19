@@ -39,12 +39,11 @@ export function Modal({ visible, onDismiss, ...card }: ModalProps) {
       <View accessibilityViewIsModal onAccessibilityEscape={onDismiss} style={styles.overlay}>
         <ScrollView style={styles.scrollView} contentContainerStyle={styles.scroll}>
           {/* A plain View, not a Pressable: the focus trap focuses the first element that accepts
-              focus() (any tabindex), and a focused backdrop showed no ring. Without one, the trap
-              lands on the dialog's own controls. A tap on the scrim itself closes the dialog. */}
+              focus() (any tabindex), and a focused backdrop showed no ring. React Native Web
+              forwards the DOM click, so only a click on the scrim itself closes the dialog. */}
           <View
             testID={card.testID && `${card.testID}-backdrop`}
-            onStartShouldSetResponder={(e) => e.target === e.currentTarget}
-            onResponderRelease={onDismiss}
+            {...backdropClick(onDismiss)}
             style={styles.backdrop}
           >
             <ModalCard {...card} style={[styles.floating, card.style]} />
@@ -53,6 +52,11 @@ export function Modal({ visible, onDismiss, ...card }: ModalProps) {
       </View>
     </RNModal>
   );
+}
+
+/** A DOM `onClick` for the backdrop; View's types omit it, but React Native Web passes it through. */
+function backdropClick(onDismiss: () => void) {
+  return { onClick: (e: { target: unknown; currentTarget: unknown }) => e.target === e.currentTarget && onDismiss() } as object;
 }
 
 const styles = StyleSheet.create({

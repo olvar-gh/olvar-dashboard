@@ -1,6 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 
-// The calibration dialog's focus on the fixtures build: the modal focus trap must not park focus
+// The calibration dialog's focus and backdrop on the fixtures build: the modal focus trap must not park focus
 // on the backdrop (no ring, so focus looked lost), and the first Tab lands on a dialog control
 // that shows its focus ring.
 
@@ -47,3 +47,42 @@ for (const how of ['mouse', 'keyboard'] as const) {
     }
   });
 }
+
+test.describe('backdrop', () => {
+  const open = async (page: Page) => {
+    await page.goto('/settings');
+    await page.getByRole('button', { name: 'Recalibrate' }).click();
+    await expect(page.getByText('Live reading')).toBeVisible();
+  };
+  const dialog = (page: Page) => page.getByTestId('calibration');
+
+  test('a click on the dialog keeps it open; a click on the scrim closes it', async ({ page }) => {
+    await open(page);
+    await page.getByText('Live reading').click();
+    await expect(dialog(page)).toBeVisible();
+    await page.mouse.click(8, 8);
+    await expect(dialog(page)).toHaveCount(0);
+  });
+
+  test('in a short window the first scrim click closes it', async ({ page }) => {
+    await page.setViewportSize({ width: 1050, height: 400 });
+    await open(page);
+    await page.mouse.click(8, 8);
+    await expect(dialog(page)).toHaveCount(0);
+  });
+
+  test('a touch swipe across the scrim does not close it', async ({ browser }) => {
+    const context = await browser.newContext({ hasTouch: true, viewport: { width: 1512, height: 982 } });
+    const page = await context.newPage();
+    await open(page);
+    const cdp = await context.newCDPSession(page);
+    const touch = (type: 'touchStart' | 'touchMove' | 'touchEnd', x: number) =>
+      cdp.send('Input.dispatchTouchEvent', { type, touchPoints: type === 'touchEnd' ? [] : [{ x, y: 20 }] });
+    await touch('touchStart', 40);
+    for (const x of [80, 140, 200, 260]) await touch('touchMove', x);
+    await touch('touchEnd', 260);
+    await page.waitForTimeout(300);
+    await expect(dialog(page)).toBeVisible();
+    await context.close();
+  });
+});

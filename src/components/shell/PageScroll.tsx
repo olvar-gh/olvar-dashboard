@@ -1,9 +1,8 @@
-import type { Ref } from 'react';
-import { ScrollView, StyleSheet, type ScrollViewInstance, type ScrollViewProps } from 'react-native';
+import { ScrollView, StyleSheet, type ScrollViewProps } from 'react-native';
 
 import { iosGroupedBackground } from '@/components/ui/color';
 
-export type PageScrollProps = Omit<ScrollViewProps, 'contentInsetAdjustmentBehavior'> & { ref?: Ref<ScrollViewInstance> };
+export type PageScrollProps = Omit<ScrollViewProps, 'contentInsetAdjustmentBehavior'>;
 
 /**
  * Screen container. On iOS: the scroll view under the native large-title header and tab bar, on

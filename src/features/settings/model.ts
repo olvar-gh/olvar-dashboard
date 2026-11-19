@@ -159,18 +159,6 @@ export function usesPreset(overrides: Json | null | undefined): boolean {
   return Object.keys(asObject(overrides ?? undefined)).length === 0;
 }
 
-/** Height an iPhone's collapsed navigation bar and status bar take from the top of the scroll view. */
-const IOS_TOP_BARS = 120;
-
-/**
- * Whether scrolling to the end of the Care Targets form brings Save Ranges above the keyboard
- * while the focused field (its top at `fieldTop`) stays on screen. Positions are in the scroll
- * content; `viewport` is the scroll view height and `keyboard` the keyboard height with its toolbar.
- */
-export function saveFitsWithField(fieldTop: number, actionsBottom: number, viewport: number, keyboard: number): boolean {
-  return actionsBottom - fieldTop <= viewport - IOS_TOP_BARS - keyboard;
-}
-
 export type RangeDraft = Record<ThresholdMetric, { low: string; high: string }>;
 
 export function draftFrom(thresholds: Thresholds | null | undefined, locale?: string): RangeDraft {

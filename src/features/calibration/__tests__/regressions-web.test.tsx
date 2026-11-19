@@ -102,7 +102,7 @@ describe('web dialog focus', () => {
   // The desktop focus trap focuses the first element that accepts focus(), even at tabindex -1. A
   // Pressable backdrop took it with no visible ring; a plain View cannot, so the trap reaches the
   // dialog's buttons. The browser behaviour is checked in e2e/web/dialog-focus.spec.ts.
-  it('renders the backdrop as a plain view that still closes the dialog when the scrim is tapped', async () => {
+  it('renders the backdrop as a plain view that closes the dialog only on a click on the scrim', async () => {
     const onDismiss = jest.fn();
     await renderWithFixtures(
       <WebModal visible testID="calibration" title="Calibrate soil sensor" onDismiss={onDismiss} cancel={{ label: 'Cancel', onPress: jest.fn() }} />,
@@ -111,10 +111,9 @@ describe('web dialog focus', () => {
     expect(backdrop.props.tabIndex).toBeUndefined();
     expect(backdrop.props.focusable).toBeUndefined();
     expect(backdrop.props.accessibilityRole).toBeUndefined();
-    const scrim = { target: 1, currentTarget: 1 };
-    expect(backdrop.props.onStartShouldSetResponder(scrim)).toBe(true);
-    expect(backdrop.props.onStartShouldSetResponder({ target: 2, currentTarget: 1 })).toBe(false);
-    backdrop.props.onResponderRelease(scrim);
+    backdrop.props.onClick({ target: 2, currentTarget: 1 });
+    expect(onDismiss).not.toHaveBeenCalled();
+    backdrop.props.onClick({ target: 1, currentTarget: 1 });
     expect(onDismiss).toHaveBeenCalledTimes(1);
   });
 });

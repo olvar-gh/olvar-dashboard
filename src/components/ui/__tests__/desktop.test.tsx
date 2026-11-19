@@ -71,11 +71,11 @@ describe('desktop Modal', () => {
     const onDismiss = jest.fn();
     await render(<Modal visible onDismiss={onDismiss} title="Dialog" testID="m" style={{ padding: 40 }} />);
     expect(flat(screen.getByTestId('m').props.style)).toMatchObject({ padding: 40, boxShadow: expect.any(String) });
-    // The backdrop is a responder View (not focusable), and claims only touches on the scrim itself.
+    // The backdrop is a plain View (not focusable) with a DOM click: only a click on the scrim closes.
     const backdrop = screen.getByTestId('m-backdrop');
-    expect(backdrop.props.onStartShouldSetResponder({ target: 'card', currentTarget: 'backdrop' })).toBe(false);
-    expect(backdrop.props.onStartShouldSetResponder({ target: 'backdrop', currentTarget: 'backdrop' })).toBe(true);
-    backdrop.props.onResponderRelease({ target: 'backdrop', currentTarget: 'backdrop' });
+    backdrop.props.onClick({ target: 'card', currentTarget: 'backdrop' });
+    expect(onDismiss).not.toHaveBeenCalled();
+    backdrop.props.onClick({ target: 'backdrop', currentTarget: 'backdrop' });
     expect(onDismiss).toHaveBeenCalledTimes(1);
   });
 });
