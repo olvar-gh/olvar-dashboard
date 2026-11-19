@@ -24,23 +24,16 @@ describe('app config', () => {
   });
 });
 
-describe('eas.json', () => {
-  const eas = readJson('eas.json');
-
-  it('never carries Supabase values; they come from EAS environments', () => {
-    for (const profile of Object.values<{ env?: Record<string, string> }>(eas.build)) {
-      for (const [name, value] of Object.entries(profile.env ?? {})) {
-        expect(name).not.toMatch(/SUPABASE/);
-        expect(value).not.toMatch(/sb_(secret|publishable)_/);
-      }
-    }
+describe('iOS builds', () => {
+  it('use no cloud build service', () => {
+    expect(fs.existsSync(path.join(root, 'eas.json'))).toBe(false);
+    expect(fs.existsSync(path.join(root, '.eas'))).toBe(false);
   });
 
-  it('builds production with a remote, auto-incremented build number', () => {
-    expect(eas.cli.appVersionSource).toBe('remote');
-    expect(eas.build.production).toMatchObject({ autoIncrement: true, environment: 'production' });
-    expect(eas.build.production.developmentClient).toBeUndefined();
-    expect(eas.build.production.distribution).toBeUndefined();
+  it('run the local release script from npm', () => {
+    const { scripts } = readJson('package.json');
+    expect(scripts['ios:release']).toBe('node scripts/ios-release.js');
+    expect(scripts['ios:archive']).toBe('node scripts/ios-release.js --archive');
   });
 });
 
