@@ -65,6 +65,9 @@ export function optimisticVisible(messages: readonly ChatMessageRow[], text: str
   return !messages.some((m) => m.role === 'user' && m.id > lastIdAtSend && m.content === text);
 }
 
+/** How long a send may take before a stored question without an answer counts as lost. */
+export const ANSWER_TIMEOUT_MS = 60_000;
+
 /**
  * The newest message when it is the user's and no reply to it is stored: the answer never
  * arrived (the send failed after the question was saved, or the app closed while waiting).
@@ -73,6 +76,18 @@ export function unansweredQuestion<T extends ChatMessageRow>(messages: readonly 
   const last = messages.at(-1);
   if (!last || last.role !== 'user') return null;
   return messages.some((m) => m.reply_to === last.id) ? null : last;
+}
+
+/**
+ * Drops an unanswered question that was asked again right after it, so a Retry of a stored
+ * question shows one bubble rather than two identical ones.
+ */
+export function withoutRetried<T extends ChatMessageRow>(messages: readonly T[]): T[] {
+  const answered = new Set(messages.map((m) => m.reply_to));
+  return messages.filter((m, i) => {
+    const next = messages[i + 1];
+    return m.role !== 'user' || answered.has(m.id) || !(next?.role === 'user' && next.content === m.content);
+  });
 }
 
 /** The question a plant reply answers, for Retry on an error row. */

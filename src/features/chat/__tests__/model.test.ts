@@ -1,6 +1,6 @@
 import type { ChatMessageRow, PlantStatus, Reading } from '@/data';
 
-import { chipValue, contextRows, formatCountdown, isSendKey, optimisticVisible, questionFor, rateLimitText, sendErrorText, suggestions, unansweredQuestion } from '../model';
+import { chipValue, contextRows, formatCountdown, isSendKey, optimisticVisible, questionFor, rateLimitText, sendErrorText, suggestions, unansweredQuestion, withoutRetried } from '../model';
 import { ChatError } from '@/data';
 
 const TZ = 'Asia/Seoul';
@@ -30,6 +30,14 @@ describe('chat model', () => {
     // An overlapping send can store the reply before a later question; only the newest row counts.
     expect(unansweredQuestion([row(1, 'user', 'a'), row(3, 'plant', 'b', 2), row(2, 'user', 'c')])).toBeNull();
     expect(unansweredQuestion([])).toBeNull();
+  });
+
+  it('shows a retried unanswered question once', () => {
+    const ids = (rows: ChatMessageRow[]) => withoutRetried(rows).map((m) => m.id);
+    expect(ids([row(1, 'user', 'a'), row(2, 'user', 'a'), row(3, 'plant', 'b', 2)])).toEqual([2, 3]);
+    // An answered question asked again, or a different question, stays.
+    expect(ids([row(1, 'user', 'a'), row(2, 'plant', 'b', 1), row(3, 'user', 'a')])).toEqual([1, 2, 3]);
+    expect(ids([row(1, 'user', 'a'), row(2, 'user', 'c')])).toEqual([1, 2]);
   });
 
   it('quotes the current temperature in a suggestion', () => {

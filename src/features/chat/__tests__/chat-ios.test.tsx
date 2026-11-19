@@ -85,43 +85,83 @@ describe('iPhone chat screen', () => {
     expect(screen.queryByTestId('chat-typing')).toBeNull();
   });
 
-  it('offers Retry for a stored question that never got an answer', async () => {
-    const app = await openChat((app) => {
-      const last = app.source.world.chat.at(-1)!;
-      app.source.world.chat.push({
-        ...last,
-        id: last.id + 1000,
-        role: 'user',
-        reply_to: null,
-        error: null,
-        content: 'Did you get this?',
-        created_at: new Date(Date.parse(last.created_at) + 60_000).toISOString(),
-      });
-      return app.queryClient.resetQueries({ queryKey: ['chat'] });
+  /** Stores `content` as a question with no answer, `ageMs` ago, as if the reply never came. */
+  function storeQuestion(app: Awaited<ReturnType<typeof renderApp>>, content: string, ageMs: number) {
+    const last = app.source.world.chat.at(-1)!;
+    app.source.world.chat.push({
+      ...last,
+      id: last.id + 1000,
+      role: 'user',
+      reply_to: null,
+      error: null,
+      content,
+      created_at: new Date(Date.now() - ageMs).toISOString(),
     });
+    return app.queryClient.resetQueries({ queryKey: ['chat'] });
+  }
+
+  it('offers Retry for a stored question that never got an answer, without a second bubble', async () => {
+    const app = await openChat((app) => storeQuestion(app, 'Did you get this?', 120_000));
     const row = await screen.findByTestId('chat-unanswered', {}, { timeout: 5000 });
     const send = jest.spyOn(app.source, 'sendChat');
     await fireEvent.press(within(row).getByRole('button', { name: 'Retry' }));
     await waitFor(() => expect(send).toHaveBeenCalledWith(app.source.world.plant.id, 'Did you get this?'));
+    expect(screen.getAllByText('Did you get this?')).toHaveLength(1);
     await waitFor(() => expect(screen.queryByTestId('chat-typing')).toBeNull(), { timeout: 3000 });
+    expect(screen.queryByTestId('chat-unanswered')).toBeNull();
+    expect(screen.getAllByText('Did you get this?')).toHaveLength(1);
+  });
+
+  it('waits before offering Retry for a question that may still be answered', async () => {
+    await openChat((app) => storeQuestion(app, 'Just asked', 5_000));
+    expect(await screen.findByText('Just asked', {}, { timeout: 5000 })).toBeTruthy();
     expect(screen.queryByTestId('chat-unanswered')).toBeNull();
   });
 
-  it('keeps Retry when the question was stored but the send failed', async () => {
+  it('keeps Retry for a stored question when a different send failed', async () => {
+    const app = await openChat((app) => storeQuestion(app, 'Did you get this?', 120_000));
+    await screen.findByTestId('chat-unanswered', {}, { timeout: 5000 });
+    jest.spyOn(app.source, 'sendChat').mockRejectedValueOnce(new ChatError('failed', 'network'));
+    await fireEvent.changeText(screen.getByTestId('chat-input'), 'Something else');
+    await fireEvent.press(screen.getByTestId('chat-send'));
+    expect(await screen.findByTestId('chat-send-error')).toBeTruthy();
+    expect(screen.getByTestId('chat-unanswered')).toBeTruthy();
+  });
+
+  it('shows a question stored before a timeout as unanswered, not as unsent', async () => {
     const app = await openChat();
     await screen.findAllByText(app.source.world.chat.at(-1)!.content, {}, { timeout: 5000 });
-    const real = app.source.sendChat.bind(app.source);
-    // The question is saved, then the answer is lost (a timeout after the server stored the row).
+    // The server saves the question, then the request times out; no Realtime event arrives.
     jest.spyOn(app.source, 'sendChat').mockImplementationOnce(async (plantId, message) => {
-      void real(plantId, message).catch(() => {});
-      await new Promise((r) => setTimeout(r, 50));
-      app.source.world.chat.splice(app.source.world.chat.findIndex((m) => m.reply_to != null && m.content.startsWith('Thanks')), 1);
+      const last = app.source.world.chat.at(-1)!;
+      app.source.world.chat.push({ ...last, id: last.id + 1000, plant_id: plantId, role: 'user', reply_to: null, error: null, content: message, created_at: new Date().toISOString() });
       throw new ChatError('failed', 'timeout');
     });
     await fireEvent.changeText(screen.getByTestId('chat-input'), 'Still there?');
     await fireEvent.press(screen.getByTestId('chat-send'));
     expect(await screen.findByTestId('chat-unanswered', {}, { timeout: 3000 })).toBeTruthy();
     expect(screen.queryByTestId('chat-send-error')).toBeNull();
+    expect(screen.queryByText(/Not sent/)).toBeNull();
+    expect(screen.getAllByText('Still there?')).toHaveLength(1);
+  });
+
+  it('keeps edits typed while the connection is checked', async () => {
+    const app = await openChat();
+    await screen.findAllByText(app.source.world.chat.at(-1)!.content, {}, { timeout: 5000 });
+    let online!: () => void;
+    network.getNetworkStateAsync.mockImplementationOnce(
+      () => new Promise((r) => (online = () => r({ type: 'WIFI', isConnected: true, isInternetReachable: true }))),
+    );
+    const send = jest.spyOn(app.source, 'sendChat');
+    await fireEvent.changeText(screen.getByTestId('chat-input'), 'First');
+    // Not awaited: the press resolves only once the check below completes.
+    const pressed = fireEvent.press(screen.getByTestId('chat-send'));
+    await waitFor(() => expect(online).toBeDefined());
+    await fireEvent.changeText(screen.getByTestId('chat-input'), 'First, and more');
+    await act(async () => online());
+    await pressed;
+    await waitFor(() => expect(send).toHaveBeenCalledWith(app.source.world.plant.id, 'First'));
+    expect(screen.getByTestId('chat-input').props.value).toBe('First, and more');
   });
 
   it('keeps a draft identical to the suggestion that is tapped', async () => {
