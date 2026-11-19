@@ -160,7 +160,10 @@ export function nextLocalHourStart(start: number, timeZone: string): number {
   const offset = tzOffsetMs(timeZone, start);
   const naive = start + HOUR_MS - ((((start + offset) % HOUR_MS) + HOUR_MS) % HOUR_MS);
   if (tzOffsetMs(timeZone, naive) === offset) return naive;
-  return offsetChange(start, naive, timeZone);
+  // Historical offsets that change off the quarter hour (Africa/Monrovia 1972) would round
+  // back to `start`; always move forward so callers stepping bucket by bucket terminate.
+  const change = offsetChange(start, naive, timeZone);
+  return change > start ? change : naive;
 }
 
 /** First quarter-hour instant in `(from, to]` whose offset is the one at `to` (offsets change on quarter hours). */
