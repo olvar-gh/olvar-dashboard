@@ -101,7 +101,7 @@ describe('iPhone chat screen', () => {
     return app.queryClient.resetQueries({ queryKey: ['chat'] });
   }
 
-  it('offers Retry for a stored question that never got an answer, without a second bubble', async () => {
+  it('offers Retry for a stored question that never got an answer and asks it again', async () => {
     const app = await openChat((app) => storeQuestion(app, 'Did you get this?', 120_000));
     const row = await screen.findByTestId('chat-unanswered', {}, { timeout: 5000 });
     // The fixture numbers rows from its own counter; store this exchange after the planted question.
@@ -114,11 +114,11 @@ describe('iPhone chat screen', () => {
     });
     await fireEvent.press(within(row).getByRole('button', { name: 'Retry' }));
     await waitFor(() => expect(send).toHaveBeenCalledWith(app.source.world.plant.id, 'Did you get this?'));
-    expect(screen.getAllByText('Did you get this?')).toHaveLength(1);
     await waitFor(() => expect(screen.queryByTestId('chat-typing')).toBeNull(), { timeout: 3000 });
     expect(await screen.findByText('Yes, got it.')).toBeTruthy();
     expect(screen.queryByTestId('chat-unanswered')).toBeNull();
-    expect(screen.getAllByText('Did you get this?')).toHaveLength(1);
+    // The unanswered question and the one asked again are both stored, and both stay.
+    expect(screen.getAllByText('Did you get this?')).toHaveLength(2);
   });
 
   it('shows a failed Retry on the original bubble', async () => {
@@ -129,6 +129,18 @@ describe('iPhone chat screen', () => {
     await waitFor(() => expect(screen.getByTestId('chat-unanswered')).toHaveTextContent(/Couldn’t reach Sparks/));
     expect(screen.queryByTestId('chat-send-error')).toBeNull();
     expect(screen.getAllByText('Did you get this?')).toHaveLength(1);
+  });
+
+  it('disables Retry during the rate-limit cooldown', async () => {
+    const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+    afterThis(() => alert.mockRestore());
+    const app = await openChat((app) => storeQuestion(app, 'Did you get this?', 120_000));
+    const row = await screen.findByTestId('chat-unanswered', {}, { timeout: 5000 });
+    jest.spyOn(app.source, 'sendChat').mockRejectedValueOnce(new ChatError('rate_limited', 'rate_limited', 150));
+    await fireEvent.press(within(row).getByRole('button', { name: 'Retry' }));
+    await screen.findByTestId('chat-rate-limit');
+    const retry = within(await screen.findByTestId('chat-unanswered')).getByRole('button', { name: 'Retry' });
+    expect(retry.props.accessibilityState).toMatchObject({ disabled: true });
   });
 
   it('does not resend a question answered while the connection was checked', async () => {

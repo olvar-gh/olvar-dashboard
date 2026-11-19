@@ -75,8 +75,14 @@ function Unanswered({ chat }: { chat: ChatModel }) {
   return (
     <View style={styles.unanswered} testID="chat-unanswered">
       <Text style={[styles.note, styles.noteError]}>{chat.unanswered?.error ?? 'No answer arrived.'}</Text>
-      <Pressable accessibilityRole="button" accessibilityLabel="Retry" onPress={() => void chat.retryUnanswered()} hitSlop={8}>
-        <Text style={styles.retry}>Retry</Text>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel="Retry"
+        accessibilityState={{ disabled: !!chat.rateLimit }}
+        disabled={!!chat.rateLimit}
+        onPress={() => void chat.retryUnanswered()}
+        hitSlop={8}>
+        <Text style={[styles.retry, chat.rateLimit ? styles.dimmed : null]}>Retry</Text>
       </Pressable>
     </View>
   );
@@ -162,6 +168,7 @@ const styles = StyleSheet.create({
   day: { gap: 14, paddingBottom: 14 },
   older: { paddingBottom: 14 },
   idle: { opacity: 0 },
+  dimmed: { opacity: 0.4 },
   olderError: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 8, paddingBottom: 14 },
   retry: { ...typography.iosCaption1, color: colors.brand.olive, fontWeight: '600' },
   divider: { ...typography.iosCaption1, color: iosColors.labelTertiary, textAlign: 'center', paddingTop: 4 },

@@ -1,10 +1,11 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useQueryClient, type InfiniteData } from '@tanstack/react-query';
+import { useCallback, useMemo, useRef, useState } from 'react';
 
-import { useChatHistory, useDevice, useGateway, useLatest, useNow, usePlant, usePlantStatus, useSendChat, type ChatError } from '@/data';
+import { keys, useChatHistory, useDevice, useGateway, useLatest, useNow, usePlant, usePlantStatus, useSendChat, type ChatError, type ChatMessageRow } from '@/data';
 import { groupChatDays } from '@/domain/chat-days';
 import { formatAge, formatTime, secondsSince } from '@/domain/format';
 
-import { ANSWER_TIMEOUT_MS, canRetry, contextRows, isChatRow, MAX_MESSAGE_CHARS, OFFLINE_RETRY_TEXT, OFFLINE_TEXT, optimisticVisible, rateLimitText, sendErrorText, storedRowOf, unansweredQuestion, withoutRetried, type RetryAttempt } from './model';
+import { ANSWER_TIMEOUT_MS, canRetry, contextRows, isChatRow, MAX_MESSAGE_CHARS, OFFLINE_RETRY_TEXT, OFFLINE_TEXT, optimisticVisible, rateLimitText, sendErrorText, storedRowOf, unansweredQuestion } from './model';
 import { isOffline } from './network';
 
 /** `retryOf` is the stored question a Retry asked again; its failure shows on that bubble. */
@@ -26,17 +27,10 @@ export function useChat() {
   const [lastIdAtSend, setLastIdAtSend] = useState(0);
   const [failures, setFailures] = useState<FailedSend[]>([]);
   const [notice, setNotice] = useState<string | null>(null);
-  const [attempts, setAttempts] = useState<RetryAttempt[]>([]);
-  const [sendingRetry, setSendingRetry] = useState(false);
   const failureId = useRef(0);
 
   const all = history.messages;
-  const messages = useMemo(() => (all ? withoutRetried(all.filter(isChatRow), attempts) : undefined), [all, attempts]);
-  // The send checks the newest rows after its await, not the ones from the render that started it.
-  const latestMessages = useRef(messages);
-  useEffect(() => {
-    latestMessages.current = messages;
-  }, [messages]);
+  const messages = useMemo(() => all?.filter(isChatRow), [all]);
   const lastQuestion = messages ? unansweredQuestion(messages) : null;
   // A question with no answer gets Retry once its send could have timed out (sooner for a known failure).
   const answerDueAt = lastQuestion ? new Date(Date.parse(lastQuestion.created_at) + ANSWER_TIMEOUT_MS) : null;
@@ -47,6 +41,14 @@ export function useChat() {
   const rateLimited = secondsLeft > 0;
   // A send before the history is in would put its bubble nowhere and race the first page.
   const ready = messages !== undefined;
+
+  const qc = useQueryClient();
+  const plantId = plant?.id ?? '';
+  /** The rows in the history cache now; a send reads them after its await, not the render's copy. */
+  const cachedRows = useCallback(() => {
+    const pages = qc.getQueryData<InfiniteData<ChatMessageRow[]>>(keys.chat(plantId))?.pages.flat() ?? [];
+    return [...pages, ...(qc.getQueryData<ChatMessageRow[]>(keys.chatLive(plantId)) ?? [])];
+  }, [qc, plantId]);
 
   // Set while the connection is checked, so a second tap cannot slip a duplicate send in.
   const checking = useRef(false);
@@ -70,18 +72,14 @@ export function useChat() {
         setNotice(fromDraft ? OFFLINE_TEXT : OFFLINE_RETRY_TEXT);
         return false;
       }
-      const rows = latestMessages.current ?? [];
+      const rows = cachedRows();
       // The answer may have come in while the connection was checked.
       if (retryOf != null && rows.some((m) => m.reply_to === retryOf)) return false;
       setNotice(null);
       const lastId = Math.max(0, ...rows.map((m) => m.id));
       setLastIdAtSend(lastId);
-      if (retryOf != null) setAttempts((a) => [...a, { of: retryOf, text: message, lastIdAtSend: lastId }]);
-      setSendingRetry(retryOf != null);
       send.mutate(message, {
-        onSuccess: () => setSendingRetry(false),
         onError: (error: ChatError) => {
-          setSendingRetry(false);
           if (error.kind === 'rate_limited') {
             setRetryUntil(Date.now() + (error.retryAfterS ?? 60) * 1000);
             if (retryOf == null) setDraft((d) => d || message);
@@ -97,7 +95,7 @@ export function useChat() {
       if (fromDraft) setDraft((d) => (d === text ? '' : d));
       return true;
     },
-    [history, rateLimited, ready, send],
+    [cachedRows, history, rateLimited, ready, send],
   );
   const submit = useCallback((text: string) => deliver(text), [deliver]);
   const sendDraft = useCallback(() => deliver(draft, { fromDraft: true }), [deliver, draft]);
@@ -113,8 +111,7 @@ export function useChat() {
 
   const rows = messages ?? [];
   const pendingText = send.isPending ? send.variables : undefined;
-  // A Retry in flight is shown by the stored question's own bubble.
-  const showPending = pendingText != null && !sendingRetry && optimisticVisible(rows, pendingText, lastIdAtSend);
+  const showPending = pendingText != null && optimisticVisible(rows, pendingText, lastIdAtSend);
   // A send that timed out may still have been stored; its row replaces the failed bubble.
   const failed = failures
     .filter((f) => f.retryOf == null && optimisticVisible(rows, f.text, f.lastIdAtSend))

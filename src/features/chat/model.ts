@@ -81,18 +81,9 @@ export function unansweredQuestion<T extends ChatMessageRow>(messages: readonly 
   return messages.some((m) => m.reply_to === last.id) ? null : last;
 }
 
-/** A Retry of the stored question `of`, sent when `lastIdAtSend` was the newest id. */
-export type RetryAttempt = { of: number; text: string; lastIdAtSend: number };
-
 /** The user row a send of `text` stored, if it is in yet: the first one newer than the send. */
 export function storedRowOf<T extends ChatMessageRow>(messages: readonly T[], text: string, lastIdAtSend: number): T | undefined {
   return messages.find((m) => m.role === 'user' && m.id > lastIdAtSend && m.content === text);
-}
-
-/** Hides a retried question once its Retry stored a new row, so one bubble stands for both. */
-export function withoutRetried<T extends ChatMessageRow>(messages: readonly T[], attempts: readonly RetryAttempt[]): T[] {
-  const replaced = new Set(attempts.filter((a) => storedRowOf(messages, a.text, a.lastIdAtSend)).map((a) => a.of));
-  return replaced.size ? messages.filter((m) => !replaced.has(m.id)) : [...messages];
 }
 
 /** The question a plant reply answers, for Retry on an error row. */
