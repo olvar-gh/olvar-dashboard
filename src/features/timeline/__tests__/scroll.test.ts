@@ -20,7 +20,7 @@ describe('Timeline scroll (iPhone)', () => {
     expect(result.current.props.maintainVisibleContentPosition).toEqual({ minIndexForVisible: 0 });
   });
 
-  it('returns to the top under the large title when the week changes', async () => {
+  it('remounts the scroll view on a week change and re-reads its resting top', async () => {
     const { result, rerender, scrollTo } = await setup();
     await act(async () => {
       result.current.props.onLayout(layoutEvent(800));
@@ -30,10 +30,17 @@ describe('Timeline scroll (iPhone)', () => {
       result.current.props.onScroll(scrollEvent(2400));
     });
     expect(result.current.reach).toBe(3200);
+    const before = result.current.key;
 
     await rerender({ range: '2026-11-08' });
-    expect(scrollTo).toHaveBeenCalledWith({ y: -155, animated: false });
+    // Fabric clamps a negative scrollTo to 0, so the week change relies on a fresh scroll view.
+    expect(result.current.key).not.toBe(before);
+    expect(scrollTo).not.toHaveBeenCalled();
     expect(result.current.reach).toBe(800);
+
+    await act(async () => result.current.props.onScroll(scrollEvent(-150)));
+    await act(async () => result.current.scrollToContent(900));
+    expect(scrollTo).toHaveBeenLastCalledWith({ y: 900 - (150 - 52) - 8, animated: true });
   });
 
   it('does not move on the first render or when the week stays the same', async () => {
@@ -42,12 +49,13 @@ describe('Timeline scroll (iPhone)', () => {
     expect(scrollTo).not.toHaveBeenCalled();
   });
 
-  it('puts a picked day just under the header', async () => {
+  it('puts a picked day just under the collapsed header', async () => {
     const { result, scrollTo } = await setup();
     await act(async () => result.current.props.onScroll(scrollEvent(-155)));
-    act(() => result.current.scrollToContent(900));
-    expect(scrollTo).toHaveBeenLastCalledWith({ y: 900 - 155 - 8, animated: true });
-    act(() => result.current.scrollToContent(0));
+    await act(async () => result.current.scrollToContent(900));
+    // The large title collapses on the way (155 -> 103 pt), so the target uses the collapsed height.
+    expect(scrollTo).toHaveBeenLastCalledWith({ y: 900 - 103 - 8, animated: true });
+    await act(async () => result.current.scrollToContent(0));
     expect(scrollTo).toHaveBeenLastCalledWith({ y: -155, animated: true });
   });
 });

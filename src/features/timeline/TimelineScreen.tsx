@@ -119,6 +119,7 @@ function Timeline({ timeZone, plantName }: { timeZone: string; plantName: string
 
   return (
     <PageScroll
+      key={scroll.key}
       testID="timeline"
       {...({ ref: scroll.ref } as object)}
       {...scroll.props}
