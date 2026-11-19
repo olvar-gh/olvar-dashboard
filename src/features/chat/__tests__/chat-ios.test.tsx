@@ -3,6 +3,7 @@ import { Alert, Keyboard, ScrollView, StyleSheet, type KeyboardEvent } from 'rea
 
 import { renderApp } from '@/components/shell/testing/render-app';
 import { ChatError } from '@/data';
+import { addChatMessage } from '@/data/queries/chat';
 
 jest.mock('expo-network', () => ({
   getNetworkStateAsync: jest.fn(async () => ({ type: 'WIFI', isConnected: true, isInternetReachable: true })),
@@ -103,13 +104,62 @@ describe('iPhone chat screen', () => {
   it('offers Retry for a stored question that never got an answer, without a second bubble', async () => {
     const app = await openChat((app) => storeQuestion(app, 'Did you get this?', 120_000));
     const row = await screen.findByTestId('chat-unanswered', {}, { timeout: 5000 });
-    const send = jest.spyOn(app.source, 'sendChat');
+    // The fixture numbers rows from its own counter; store this exchange after the planted question.
+    const send = jest.spyOn(app.source, 'sendChat').mockImplementationOnce(async (plantId, message) => {
+      const last = app.source.world.chat.at(-1)!;
+      const asked = { ...last, id: last.id + 1, plant_id: plantId, role: 'user', content: message, created_at: new Date().toISOString() };
+      const reply = { ...asked, id: asked.id + 1, role: 'plant', content: 'Yes, got it.', reply_to: asked.id };
+      app.source.world.chat.push(asked, reply);
+      return reply;
+    });
     await fireEvent.press(within(row).getByRole('button', { name: 'Retry' }));
     await waitFor(() => expect(send).toHaveBeenCalledWith(app.source.world.plant.id, 'Did you get this?'));
     expect(screen.getAllByText('Did you get this?')).toHaveLength(1);
     await waitFor(() => expect(screen.queryByTestId('chat-typing')).toBeNull(), { timeout: 3000 });
+    expect(await screen.findByText('Yes, got it.')).toBeTruthy();
     expect(screen.queryByTestId('chat-unanswered')).toBeNull();
     expect(screen.getAllByText('Did you get this?')).toHaveLength(1);
+  });
+
+  it('shows a failed Retry on the original bubble', async () => {
+    const app = await openChat((app) => storeQuestion(app, 'Did you get this?', 120_000));
+    const row = await screen.findByTestId('chat-unanswered', {}, { timeout: 5000 });
+    jest.spyOn(app.source, 'sendChat').mockRejectedValueOnce(new ChatError('failed', 'network'));
+    await fireEvent.press(within(row).getByRole('button', { name: 'Retry' }));
+    await waitFor(() => expect(screen.getByTestId('chat-unanswered')).toHaveTextContent(/Couldn’t reach Sparks/));
+    expect(screen.queryByTestId('chat-send-error')).toBeNull();
+    expect(screen.getAllByText('Did you get this?')).toHaveLength(1);
+  });
+
+  it('does not resend a question answered while the connection was checked', async () => {
+    const app = await openChat((app) => storeQuestion(app, 'Did you get this?', 120_000));
+    const row = await screen.findByTestId('chat-unanswered', {}, { timeout: 5000 });
+    const question = app.source.world.chat.at(-1)!;
+    let online!: () => void;
+    network.getNetworkStateAsync.mockImplementationOnce(
+      () => new Promise((r) => (online = () => r({ type: 'WIFI', isConnected: true, isInternetReachable: true }))),
+    );
+    const send = jest.spyOn(app.source, 'sendChat');
+    const pressed = fireEvent.press(within(row).getByRole('button', { name: 'Retry' }));
+    await waitFor(() => expect(online).toBeDefined());
+    await act(async () => {
+      addChatMessage(app.queryClient, { ...question, id: question.id + 1, role: 'plant', content: 'Here now.', reply_to: question.id });
+    });
+    expect((await screen.findAllByText('Here now.')).length).toBeGreaterThan(0);
+    await act(async () => online());
+    await pressed;
+    expect(send).not.toHaveBeenCalled();
+    expect(screen.queryByTestId('chat-unanswered')).toBeNull();
+  });
+
+  it('says plainly that a Retry was not sent while offline', async () => {
+    await openChat((app) => storeQuestion(app, 'Did you get this?', 120_000));
+    const row = await screen.findByTestId('chat-unanswered', {}, { timeout: 5000 });
+    network.getNetworkStateAsync.mockResolvedValueOnce({ type: 'NONE', isConnected: false, isInternetReachable: false });
+    await fireEvent.press(within(row).getByRole('button', { name: 'Retry' }));
+    const notice = await screen.findByTestId('chat-offline');
+    expect(notice).toHaveTextContent(/Try again when you’re back online/);
+    expect(notice).not.toHaveTextContent(/in the box/);
   });
 
   it('waits before offering Retry for a question that may still be answered', async () => {

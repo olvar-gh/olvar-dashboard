@@ -46,8 +46,11 @@ export function sendErrorText(error: ChatError): string {
   }
 }
 
-/** A send refused because the device is offline; the message stays in the composer. */
+/** A send from the composer refused because the device is offline; the message stays in the composer. */
 export const OFFLINE_TEXT = 'You’re offline, so your message wasn’t sent. It’s still in the box; send it when you’re back online.';
+
+/** A Retry or suggestion refused because the device is offline (nothing was put in the composer). */
+export const OFFLINE_RETRY_TEXT = 'You’re offline, so your message wasn’t sent. Try again when you’re back online.';
 
 /** Under a reply stored with `error` set: the server answered with its fallback text. */
 export const ERROR_ROW_TEXT = 'Sparks couldn’t think this through, so this is a basic answer.';
@@ -62,32 +65,34 @@ export function canRetry(error: ChatError): boolean {
  * (newer than every row seen at send time) is in the conversation.
  */
 export function optimisticVisible(messages: readonly ChatMessageRow[], text: string, lastIdAtSend: number): boolean {
-  return !messages.some((m) => m.role === 'user' && m.id > lastIdAtSend && m.content === text);
+  return !storedRowOf(messages, text, lastIdAtSend);
 }
 
 /** How long a send may take before a stored question without an answer counts as lost. */
 export const ANSWER_TIMEOUT_MS = 60_000;
 
 /**
- * The newest message when it is the user's and no reply to it is stored: the answer never
- * arrived (the send failed after the question was saved, or the app closed while waiting).
+ * The newest user message when no reply points to it: its answer never arrived (the send failed
+ * after the question was saved, or the app closed while waiting).
  */
 export function unansweredQuestion<T extends ChatMessageRow>(messages: readonly T[]): T | null {
-  const last = messages.at(-1);
-  if (!last || last.role !== 'user') return null;
+  const last = messages.findLast((m) => m.role === 'user');
+  if (!last) return null;
   return messages.some((m) => m.reply_to === last.id) ? null : last;
 }
 
-/**
- * Drops an unanswered question that was asked again right after it, so a Retry of a stored
- * question shows one bubble rather than two identical ones.
- */
-export function withoutRetried<T extends ChatMessageRow>(messages: readonly T[]): T[] {
-  const answered = new Set(messages.map((m) => m.reply_to));
-  return messages.filter((m, i) => {
-    const next = messages[i + 1];
-    return m.role !== 'user' || answered.has(m.id) || !(next?.role === 'user' && next.content === m.content);
-  });
+/** A Retry of the stored question `of`, sent when `lastIdAtSend` was the newest id. */
+export type RetryAttempt = { of: number; text: string; lastIdAtSend: number };
+
+/** The user row a send of `text` stored, if it is in yet: the first one newer than the send. */
+export function storedRowOf<T extends ChatMessageRow>(messages: readonly T[], text: string, lastIdAtSend: number): T | undefined {
+  return messages.find((m) => m.role === 'user' && m.id > lastIdAtSend && m.content === text);
+}
+
+/** Hides a retried question once its Retry stored a new row, so one bubble stands for both. */
+export function withoutRetried<T extends ChatMessageRow>(messages: readonly T[], attempts: readonly RetryAttempt[]): T[] {
+  const replaced = new Set(attempts.filter((a) => storedRowOf(messages, a.text, a.lastIdAtSend)).map((a) => a.of));
+  return replaced.size ? messages.filter((m) => !replaced.has(m.id)) : [...messages];
 }
 
 /** The question a plant reply answers, for Retry on an error row. */

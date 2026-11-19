@@ -55,7 +55,7 @@ function Day({ day, chat, all, timeZone }: { day: ChatDay<ChatRow>; chat: ChatMo
             {chat.unanswered?.id === m.id ? (
               <View style={styles.sendError} testID="chat-unanswered">
                 <Icon name="alert" size={14} color={colors.status.warn} />
-                <Text style={styles.sendErrorText}>No answer arrived for this question.</Text>
+                <Text style={styles.sendErrorText}>{chat.unanswered.error ?? 'No answer arrived for this question.'}</Text>
                 <Button variant="secondary" label="Retry" onPress={() => void chat.retryUnanswered()} />
               </View>
             ) : null}

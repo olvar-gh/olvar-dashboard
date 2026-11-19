@@ -29,15 +29,19 @@ describe('chat model', () => {
     expect(unansweredQuestion([row(1, 'user', 'a'), row(2, 'plant', 'b', 1)])).toBeNull();
     // An overlapping send can store the reply before a later question; only the newest row counts.
     expect(unansweredQuestion([row(1, 'user', 'a'), row(3, 'plant', 'b', 2), row(2, 'user', 'c')])).toBeNull();
+    // The newest user row counts even when an older question's reply is stored after it.
+    expect(unansweredQuestion([row(1, 'user', 'a'), row(2, 'user', 'c'), row(3, 'plant', 'b', 1)])?.id).toBe(2);
     expect(unansweredQuestion([])).toBeNull();
   });
 
-  it('shows a retried unanswered question once', () => {
-    const ids = (rows: ChatMessageRow[]) => withoutRetried(rows).map((m) => m.id);
-    expect(ids([row(1, 'user', 'a'), row(2, 'user', 'a'), row(3, 'plant', 'b', 2)])).toEqual([2, 3]);
-    // An answered question asked again, or a different question, stays.
-    expect(ids([row(1, 'user', 'a'), row(2, 'plant', 'b', 1), row(3, 'user', 'a')])).toEqual([1, 2, 3]);
-    expect(ids([row(1, 'user', 'a'), row(2, 'user', 'c')])).toEqual([1, 2]);
+  it('hides a question only once its known Retry is stored', () => {
+    const rows = [row(1, 'user', 'a'), row(2, 'user', 'a'), row(3, 'plant', 'b', 2)];
+    const ids = (attempts: { of: number; text: string; lastIdAtSend: number }[]) => withoutRetried(rows, attempts).map((m) => m.id);
+    expect(ids([{ of: 1, text: 'a', lastIdAtSend: 1 }])).toEqual([2, 3]);
+    // The same text asked again without Retry stays as asked.
+    expect(ids([])).toEqual([1, 2, 3]);
+    // A Retry whose row is not in yet keeps the original.
+    expect(ids([{ of: 1, text: 'a', lastIdAtSend: 3 }])).toEqual([1, 2, 3]);
   });
 
   it('quotes the current temperature in a suggestion', () => {

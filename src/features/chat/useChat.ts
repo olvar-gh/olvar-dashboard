@@ -1,13 +1,14 @@
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { useChatHistory, useDevice, useGateway, useLatest, useNow, usePlant, usePlantStatus, useSendChat, type ChatError } from '@/data';
 import { groupChatDays } from '@/domain/chat-days';
 import { formatAge, formatTime, secondsSince } from '@/domain/format';
 
-import { ANSWER_TIMEOUT_MS, canRetry, contextRows, isChatRow, MAX_MESSAGE_CHARS, OFFLINE_TEXT, optimisticVisible, rateLimitText, sendErrorText, unansweredQuestion, withoutRetried } from './model';
+import { ANSWER_TIMEOUT_MS, canRetry, contextRows, isChatRow, MAX_MESSAGE_CHARS, OFFLINE_RETRY_TEXT, OFFLINE_TEXT, optimisticVisible, rateLimitText, sendErrorText, storedRowOf, unansweredQuestion, withoutRetried, type RetryAttempt } from './model';
 import { isOffline } from './network';
 
-type FailedSend = { id: number; text: string; lastIdAtSend: number; error: ChatError };
+/** `retryOf` is the stored question a Retry asked again; its failure shows on that bubble. */
+type FailedSend = { id: number; text: string; lastIdAtSend: number; error: ChatError; retryOf?: number };
 
 /** Everything the Chat screen shows, shared by the desktop and iPhone layouts. */
 export function useChat() {
@@ -25,10 +26,17 @@ export function useChat() {
   const [lastIdAtSend, setLastIdAtSend] = useState(0);
   const [failures, setFailures] = useState<FailedSend[]>([]);
   const [notice, setNotice] = useState<string | null>(null);
+  const [attempts, setAttempts] = useState<RetryAttempt[]>([]);
+  const [sendingRetry, setSendingRetry] = useState(false);
   const failureId = useRef(0);
 
   const all = history.messages;
-  const messages = useMemo(() => (all ? withoutRetried(all.filter(isChatRow)) : undefined), [all]);
+  const messages = useMemo(() => (all ? withoutRetried(all.filter(isChatRow), attempts) : undefined), [all, attempts]);
+  // The send checks the newest rows after its await, not the ones from the render that started it.
+  const latestMessages = useRef(messages);
+  useEffect(() => {
+    latestMessages.current = messages;
+  }, [messages]);
   const lastQuestion = messages ? unansweredQuestion(messages) : null;
   // A question with no answer gets Retry once its send could have timed out (sooner for a known failure).
   const answerDueAt = lastQuestion ? new Date(Date.parse(lastQuestion.created_at) + ANSWER_TIMEOUT_MS) : null;
@@ -43,9 +51,12 @@ export function useChat() {
   // Set while the connection is checked, so a second tap cannot slip a duplicate send in.
   const checking = useRef(false);
 
-  /** Sends `text`; only a send from the composer (`fromDraft`) clears it, so a chip or retry keeps the draft. */
+  /**
+   * Sends `text`. Only a send from the composer (`fromDraft`) clears it, so a chip or retry keeps the
+   * draft; `retryOf` is the stored question a Retry asks again.
+   */
   const deliver = useCallback(
-    async (text: string, fromDraft: boolean) => {
+    async (text: string, { fromDraft = false, retryOf }: { fromDraft?: boolean; retryOf?: number } = {}) => {
       const message = text.trim();
       if (!ready || !message || message.length > MAX_MESSAGE_CHARS || send.isPending || rateLimited || checking.current) return false;
       checking.current = true;
@@ -56,19 +67,26 @@ export function useChat() {
         checking.current = false;
       }
       if (offline) {
-        setNotice(OFFLINE_TEXT);
+        setNotice(fromDraft ? OFFLINE_TEXT : OFFLINE_RETRY_TEXT);
         return false;
       }
+      const rows = latestMessages.current ?? [];
+      // The answer may have come in while the connection was checked.
+      if (retryOf != null && rows.some((m) => m.reply_to === retryOf)) return false;
       setNotice(null);
-      const lastId = Math.max(0, ...(messages ?? []).map((m) => m.id));
+      const lastId = Math.max(0, ...rows.map((m) => m.id));
       setLastIdAtSend(lastId);
+      if (retryOf != null) setAttempts((a) => [...a, { of: retryOf, text: message, lastIdAtSend: lastId }]);
+      setSendingRetry(retryOf != null);
       send.mutate(message, {
+        onSuccess: () => setSendingRetry(false),
         onError: (error: ChatError) => {
+          setSendingRetry(false);
           if (error.kind === 'rate_limited') {
             setRetryUntil(Date.now() + (error.retryAfterS ?? 60) * 1000);
-            setDraft((d) => d || message);
+            if (retryOf == null) setDraft((d) => d || message);
           } else {
-            setFailures((f) => [...f, { id: ++failureId.current, text: message, lastIdAtSend: lastId, error }]);
+            setFailures((f) => [...f, { id: ++failureId.current, text: message, lastIdAtSend: lastId, error, retryOf }]);
             // A timeout may come after the question was stored; without Realtime only a re-read shows it.
             if (error.kind === 'failed') void history.refetch();
           }
@@ -79,10 +97,10 @@ export function useChat() {
       if (fromDraft) setDraft((d) => (d === text ? '' : d));
       return true;
     },
-    [history, messages, rateLimited, ready, send],
+    [history, rateLimited, ready, send],
   );
-  const submit = useCallback((text: string) => deliver(text, false), [deliver]);
-  const sendDraft = useCallback(() => deliver(draft, true), [deliver, draft]);
+  const submit = useCallback((text: string) => deliver(text), [deliver]);
+  const sendDraft = useCallback(() => deliver(draft, { fromDraft: true }), [deliver, draft]);
 
   const retryFailed = (id: number) => {
     const failure = failures.find((f) => f.id === id);
@@ -93,26 +111,28 @@ export function useChat() {
   };
   const dismissFailed = (id: number) => setFailures((f) => f.filter((x) => x.id !== id));
 
+  const rows = messages ?? [];
   const pendingText = send.isPending ? send.variables : undefined;
-  // Retrying a stored question: its row already stands for the bubble.
-  const retryingStored = lastQuestion != null && lastQuestion.id <= lastIdAtSend && lastQuestion.content === pendingText;
-  const showPending = pendingText != null && !retryingStored && optimisticVisible(messages ?? [], pendingText, lastIdAtSend);
+  // A Retry in flight is shown by the stored question's own bubble.
+  const showPending = pendingText != null && !sendingRetry && optimisticVisible(rows, pendingText, lastIdAtSend);
   // A send that timed out may still have been stored; its row replaces the failed bubble.
   const failed = failures
-    .filter((f) => optimisticVisible(messages ?? [], f.text, f.lastIdAtSend))
+    .filter((f) => f.retryOf == null && optimisticVisible(rows, f.text, f.lastIdAtSend))
     .map((f) => ({ id: f.id, text: f.text, error: sendErrorText(f.error), retry: canRetry(f.error) }));
-  // The last question was stored but never answered: offer Retry when its own send failed, or once
-  // any send of it (perhaps from another device) could have timed out.
-  const failedHere = lastQuestion != null && failures.some((f) => f.text === lastQuestion.content && lastQuestion.id > f.lastIdAtSend);
+  // The last question was stored but never answered: offer Retry when a send of it is known to have
+  // failed, or once any send of it (perhaps from another device) could have timed out.
+  const failure = lastQuestion
+    ? failures.findLast((f) => f.retryOf === lastQuestion.id || storedRowOf(rows, f.text, f.lastIdAtSend)?.id === lastQuestion.id)
+    : undefined;
   const unanswered =
-    lastQuestion && !send.isPending && (failedHere || now.getTime() >= answerDueAt!.getTime())
-      ? { id: lastQuestion.id, text: lastQuestion.content }
+    lastQuestion && !send.isPending && (failure || now.getTime() >= answerDueAt!.getTime())
+      ? { id: lastQuestion.id, text: lastQuestion.content, error: failure ? sendErrorText(failure.error) : null }
       : null;
   const retryUnanswered = () => {
     if (!unanswered) return Promise.resolve(false);
-    const { text } = unanswered;
-    return submit(text).then((sent) => {
-      if (sent) setFailures((f) => f.filter((x) => x.text !== text));
+    const { id, text } = unanswered;
+    return deliver(text, { retryOf: id }).then((sent) => {
+      if (sent) setFailures((f) => f.filter((x) => x.retryOf !== id && storedRowOf(rows, x.text, x.lastIdAtSend)?.id !== id));
       return sent;
     });
   };
@@ -152,7 +172,7 @@ export function useChat() {
     failed,
     retryFailed,
     dismissFailed,
-    /** The newest question has no stored answer; `retryUnanswered` asks it again. */
+    /** The newest question has no stored answer (`error` when a send of it failed); `retryUnanswered` asks it again. */
     unanswered,
     retryUnanswered,
     /** A send refused before it left (offline); the draft is kept. */

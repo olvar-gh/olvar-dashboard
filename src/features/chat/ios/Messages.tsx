@@ -74,7 +74,7 @@ function retryFor(chat: ChatModel, all: ChatRow[], reply: ChatRow) {
 function Unanswered({ chat }: { chat: ChatModel }) {
   return (
     <View style={styles.unanswered} testID="chat-unanswered">
-      <Text style={[styles.note, styles.noteError]}>No answer arrived.</Text>
+      <Text style={[styles.note, styles.noteError]}>{chat.unanswered?.error ?? 'No answer arrived.'}</Text>
       <Pressable accessibilityRole="button" accessibilityLabel="Retry" onPress={() => void chat.retryUnanswered()} hitSlop={8}>
         <Text style={styles.retry}>Retry</Text>
       </Pressable>
