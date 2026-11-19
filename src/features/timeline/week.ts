@@ -219,3 +219,14 @@ export function weekSummary(rows: readonly DailyRow[], weekStart: LocalDate): Su
 export function weekBounds(weekStart: LocalDate, timeZone: string): { from: Date; to: Date } {
   return { from: localDayBounds(timeZone, weekStart).start, to: localDayBounds(timeZone, addDays(weekStart, 6)).end };
 }
+
+const HOUR_MS = 3_600_000;
+
+/**
+ * The `readings_hourly_v` window for a week. Buckets are UTC hours, so in a :30/:45 time zone
+ * the week starts inside a bucket; the window starts at that bucket so its first hour is kept.
+ */
+export function hourlyWindow(weekStart: LocalDate, timeZone: string): { from: Date; to: Date } {
+  const { from, to } = weekBounds(weekStart, timeZone);
+  return { from: new Date(Math.floor(from.getTime() / HOUR_MS) * HOUR_MS), to };
+}

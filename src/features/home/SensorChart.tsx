@@ -5,6 +5,9 @@ import type { SensorCharts } from './useHome';
 import type { MetricKey } from './model';
 import { metricColor, type Variant } from './palette';
 
+/** The hourly soil line breaks where a bucket is missing (the device was offline that hour). */
+const HOURLY_MAX_GAP_MS = 1.5 * 3_600_000;
+
 const HEIGHT: Record<Variant, { line: number; bars: number }> = {
   desktop: { line: 64, bars: 78 },
   ios: { line: 48, bars: 56 },
@@ -27,6 +30,7 @@ export function SensorChart({ metric, charts, variant }: { metric: MetricKey; ch
           timeZone={charts.timeZone}
           color={color}
           threshold={line}
+          maxGapMs={HOURLY_MAX_GAP_MS}
           height={HEIGHT[variant].line}
           accessibilityLabel="Soil moisture over the last 7 days"
           testID="chart-soil"

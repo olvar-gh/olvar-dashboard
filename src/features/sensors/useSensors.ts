@@ -14,11 +14,11 @@ export type RangeQuery = {
 };
 
 /** Raw readings_v through fetchAll (≈1,440 rows). */
-export function useRange24h(calibrated: boolean): RangeQuery {
+export function useRange24h(calibrated: boolean, timeZone: string): RangeQuery {
   const q = useReadings24h();
   const data = useMemo(
-    () => (q.data ? fromReadings(q.data.rows, q.data.from, q.data.to, calibrated) : undefined),
-    [q.data, calibrated],
+    () => (q.data ? fromReadings(q.data.rows, q.data.from, q.data.to, calibrated, timeZone) : undefined),
+    [q.data, calibrated, timeZone],
   );
   return { data, isPending: q.isPending, error: q.error, refetch: () => void q.refetch() };
 }
@@ -46,7 +46,10 @@ export function useSensorsScreen() {
   const timeZone = plant.data?.timezone ?? 'UTC';
   // isLoading, not isPending: without a device the latest query is disabled and would stay pending forever.
   const pending = plant.isLoading || device.isLoading || latest.isLoading || status.isLoading;
-  const error = plant.error ?? device.error ?? latest.error ?? status.error ?? null;
+  const core = [plant, device, latest, status];
+  // A failed background refetch keeps the cached screen; only a query with nothing cached blocks it.
+  const error = core.find((q) => q.error && q.data === undefined)?.error ?? null;
+  const refreshError = core.find((q) => q.error)?.error ?? null;
 
   const refresh = useCallback(() => queryClient.invalidateQueries(), [queryClient]);
 
@@ -62,6 +65,7 @@ export function useSensorsScreen() {
     timeZone,
     pending,
     error,
+    refreshError,
     refresh,
   };
 }

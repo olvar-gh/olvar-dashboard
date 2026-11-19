@@ -10,6 +10,7 @@ import { colors, interFamily, useBreakpoint, type Breakpoint } from '@/theme';
 import { OfflineSensors } from './OfflineSensors.web';
 import { SensorCard } from './SensorCard.web';
 import { METRICS, hardwareText, latestValue, metricStatus, type Range } from './model';
+import { RefreshError } from './RefreshError';
 import { useRange24h, useRangeHourly, useSensorsScreen, type RangeQuery, type SensorsScreenState } from './useSensors';
 import { useRangeParam } from './useRangeParam';
 
@@ -41,9 +42,18 @@ export function SensorsScreen() {
 }
 
 function Body({ state, bp }: { state: SensorsScreenState; bp: Breakpoint }) {
-  const now = useNow(15_000);
   if (state.error) return <ErrorState title="Sensors" message="Couldn’t load the sensor readings. Check your connection and try again." onRetry={() => void state.refresh()} />;
   if (state.pending) return <LoadingGrid bp={bp} />;
+  return (
+    <>
+      {state.refreshError ? <RefreshError onRetry={() => void state.refresh()} /> : null}
+      <Content state={state} bp={bp} />
+    </>
+  );
+}
+
+function Content({ state, bp }: { state: SensorsScreenState; bp: Breakpoint }) {
+  const now = useNow(15_000);
   if (state.display?.offline) return <OfflineSensors state={state} now={now} />;
   if (!state.latest || state.display?.overall === 'no_data') return <NoReadings />;
   return <LiveSensors state={state} bp={bp} />;
@@ -67,7 +77,7 @@ function LiveSensors({ state, bp }: { state: SensorsScreenState; bp: Breakpoint 
 }
 
 function Range24h({ state, bp }: { state: SensorsScreenState; bp: Breakpoint }) {
-  return <Cards query={useRange24h(state.calibrated)} range="24h" state={state} bp={bp} />;
+  return <Cards query={useRange24h(state.calibrated, state.timeZone)} range="24h" state={state} bp={bp} />;
 }
 
 function RangeHourly({ days, state, bp }: { days: 7 | 30; state: SensorsScreenState; bp: Breakpoint }) {
@@ -76,7 +86,7 @@ function RangeHourly({ days, state, bp }: { days: 7 | 30; state: SensorsScreenSt
 
 function Cards({ query, range, state, bp }: { query: RangeQuery; range: Range; state: SensorsScreenState; bp: Breakpoint }) {
   const { cardMinHeight, chartHeight } = bp.screens.sensors;
-  if (query.error) return <ErrorState title="Charts" message="Couldn’t load the chart data. Check your connection and try again." onRetry={query.refetch} />;
+  if (query.error && !query.data) return <ErrorState title="Charts" message="Couldn’t load the chart data. Check your connection and try again." onRetry={query.refetch} />;
   if (!query.data) return <LoadingGrid bp={bp} />;
   const data = query.data;
   const cards = METRICS.map((spec) => (
@@ -96,7 +106,12 @@ function Cards({ query, range, state, bp }: { query: RangeQuery; range: Range; s
       minHeight={cardMinHeight}
     />
   ));
-  return <Grid bp={bp}>{cards}</Grid>;
+  return (
+    <>
+      {query.error ? <RefreshError onRetry={query.refetch} message="Couldn’t refresh the charts. Showing the last ones loaded." testID="sensors-chart-error" /> : null}
+      <Grid bp={bp}>{cards}</Grid>
+    </>
+  );
 }
 
 function Grid({ bp, children }: { bp: Breakpoint; children: ReactElement[] }) {

@@ -4,15 +4,17 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { WeekChart } from '@/components/charts';
 import { Icon, type IconName } from '@/components/icons';
 import { PageScroll, useAccountButton } from '@/components/shell';
-import { Button, Card, EmptyState, Notice, OfflineBanner, PageHeader, Skeleton } from '@/components/ui';
+import { Button, Card, EmptyState, ErrorState, Notice, OfflineBanner, PageHeader, Skeleton } from '@/components/ui';
 import { useDevice } from '@/data';
 import { oldestSelectableDate, type LocalDate } from '@/domain/time';
 import { colors, typography, useBreakpoint } from '@/theme';
 
 import { CATEGORY_LABEL, eventStyle } from './eventStyle';
 import { JumpToDate } from './JumpToDate';
+import { RevealOnScroll } from './RevealOnScroll';
 import {
   useDayActivity,
+  useLazyDays,
   useOfflineState,
   usePlantTimeZone,
   useWeekChart,
@@ -24,8 +26,21 @@ import { dayHeading, weekLabel, type EventRow, type SummaryMetric } from './week
 const SUBTITLE = 'Everything that happened to your plant this week, from sensor peaks to device status.';
 
 export function TimelineScreen() {
-  const { plant, timeZone } = usePlantTimeZone();
+  const { plant, timeZone, query, failed } = usePlantTimeZone();
   const account = useAccountButton();
+  if (failed) {
+    return (
+      <PageScroll testID="timeline">
+        <PageHeader title="Timeline" subtitle={SUBTITLE} {...account} />
+        <ErrorState
+          title="Timeline"
+          message="Couldn’t load your plant. Check your connection and try again."
+          onRetry={() => void query.refetch()}
+          retrying={query.isFetching}
+        />
+      </PageScroll>
+    );
+  }
   if (!plant || !timeZone) {
     return (
       <PageScroll testID="timeline">
@@ -249,12 +264,19 @@ function ActivityCard({
   const [counts, setCounts] = useState<Record<LocalDate, number>>({});
   const onCount = useCallback((date: LocalDate, n: number) => setCounts((c) => (c[date] === n ? c : { ...c, [date]: n })), []);
   const ordered = [...days].reverse();
+  const lazy = useLazyDays(ordered);
   const known = ordered.every((d) => counts[d] !== undefined);
   const total = ordered.reduce((sum, d) => sum + (counts[d] ?? 0), 0);
+  const events = `${total} ${total === 1 ? 'event' : 'events'}`;
+  const subtitle = known
+    ? `${events} this week`
+    : ordered.some((d) => counts[d] !== undefined)
+      ? `${events} so far · scroll for earlier days`
+      : 'Loading this week…';
   return (
     <Card
       title="Activity"
-      subtitle={known ? `${total} ${total === 1 ? 'event' : 'events'} this week` : 'Loading this week…'}
+      subtitle={subtitle}
       actions={
         <Pressable accessibilityRole="button" onPress={onJump} style={styles.jump} testID="jump-to-date-button">
           <Icon name="calendar" size={14} color={colors.text.secondary} />
@@ -266,9 +288,16 @@ function ActivityCard({
       testID="activity"
     >
       <View style={styles.days}>
-        {ordered.map((date) => (
-          <DayGroup key={date} date={date} today={today} timeZone={timeZone} onCount={onCount} />
-        ))}
+        {ordered.map((date) =>
+          lazy.isActive(date) ? (
+            <DayGroup key={date} date={date} today={today} timeZone={timeZone} onCount={onCount} />
+          ) : (
+            <RevealOnScroll key={date} onReveal={() => lazy.reveal(date)}>
+              <DayHeading date={date} today={today} />
+              <DaySkeleton />
+            </RevealOnScroll>
+          ),
+        )}
       </View>
     </Card>
   );
@@ -292,9 +321,7 @@ function DayGroup({
   }, [date, n, onCount]);
   return (
     <View testID={`day-${date}`}>
-      <Text accessibilityRole="header" aria-level={3} style={styles.dayHeading}>
-        {dayHeading(date, today)}
-      </Text>
+      <DayHeading date={date} today={today} />
       {day.rows ? (
         day.rows.length ? (
           day.rows.map((r) => <EventLine key={r.key} row={r} />)
@@ -306,12 +333,26 @@ function DayGroup({
           Couldn’t load this day.
         </Notice>
       ) : (
-        <View style={styles.eventSkeleton} accessibilityLabel="Loading">
-          <Skeleton width={40} height={12} />
-          <Skeleton width={32} height={32} radius={16} />
-          <Skeleton width="50%" height={14} />
-        </View>
+        <DaySkeleton />
       )}
+    </View>
+  );
+}
+
+function DayHeading({ date, today }: { date: LocalDate; today: LocalDate }) {
+  return (
+    <Text accessibilityRole="header" aria-level={3} style={styles.dayHeading}>
+      {dayHeading(date, today)}
+    </Text>
+  );
+}
+
+function DaySkeleton() {
+  return (
+    <View style={styles.eventSkeleton} accessibilityLabel="Loading">
+      <Skeleton width={40} height={12} />
+      <Skeleton width={32} height={32} radius={16} />
+      <Skeleton width="50%" height={14} />
     </View>
   );
 }

@@ -6,11 +6,12 @@ import { renderRouter } from 'expo-router/testing-library';
 import type { ReactNode } from 'react';
 
 import { renderApp } from '@/components/shell/testing/render-app';
-import { DataProvider } from '@/data';
+import { DataError, DataProvider } from '@/data';
 import type { FixtureScenario } from '@/data/fixtures/generate';
 import { createFixtureSource } from '@/data/source/fixtures';
 
 import { SensorsScreen as DesktopSensorsScreen } from '../SensorsScreen.web';
+import { formatWhen } from '../model';
 
 type Node = { props?: Record<string, unknown>; children?: (Node | string)[] | null };
 
@@ -49,7 +50,7 @@ async function renderDesktop(scenario?: FixtureScenario, url = '/sensors') {
     { _layout: () => <Stack />, sensors: DesktopSensorsScreen, timeline: () => null, calibrate: () => null },
     { initialUrl: url, wrapper },
   );
-  return Object.assign(app, { source });
+  return Object.assign(app, { source, queryClient });
 }
 
 describe('iPhone Sensors tab', () => {
@@ -249,5 +250,108 @@ describe('desktop Sensors page', () => {
       },
     );
     expect(await screen.findByText('Waiting for the first reading')).toBeTruthy();
+  });
+});
+
+describe('Sensors with cached data and the offline view', () => {
+  it('keeps the cached offline guidance with an inline error when a refresh fails', async () => {
+    const app = await renderApp('/sensors', { scenario: 'offline' });
+    await screen.findByTestId('sensors-offline');
+    app.source.getStatus = async () => {
+      throw new DataError('fetch failed');
+    };
+    await act(async () => {
+      await app.queryClient.refetchQueries({ queryKey: ['status'] });
+    });
+    expect(await screen.findByTestId('sensors-refresh-error')).toBeTruthy();
+    expect(screen.getByTestId('sensors-offline')).toBeTruthy();
+  });
+
+  it('keeps the cached cards when the readings refresh fails on desktop', async () => {
+    const app = await renderDesktop();
+    await screen.findByTestId('sensor-card-humidity');
+    app.source.getLatestReadings = async () => {
+      throw new DataError('fetch failed');
+    };
+    await act(async () => {
+      await app.queryClient.refetchQueries({ queryKey: ['latest'] });
+    });
+    expect(await screen.findByTestId('sensors-refresh-error')).toBeTruthy();
+    expect(screen.getByTestId('sensor-card-humidity')).toBeTruthy();
+  });
+
+  it('says the gateway is being checked while its status loads', async () => {
+    const app = await renderApp('/sensors', { scenario: 'offline' });
+    await screen.findByTestId('sensors-offline');
+    app.source.getGateway = () => new Promise(() => {});
+    await act(async () => {
+      void app.queryClient.resetQueries({ queryKey: ['gateway'] });
+    });
+    await waitFor(() => expect(within(screen.getByTestId('gateway-row')).getByText('Checking the Gateway…')).toBeTruthy());
+    expect(screen.queryByText('Gateway Is Offline')).toBeNull();
+  });
+
+  it('keeps the cached charts with a retryable notice when the range query fails', async () => {
+    const app = await renderApp('/sensors');
+    await screen.findByTestId('sensor-card-soil');
+    const getReadings = app.source.getReadings;
+    app.source.getReadings = async () => {
+      throw new DataError('fetch failed');
+    };
+    await act(async () => {
+      await app.queryClient.refetchQueries({ queryKey: ['readings', '24h'] });
+    });
+    const notice = await screen.findByTestId('sensors-chart-error');
+    expect(screen.getByTestId('sensor-card-soil')).toBeTruthy();
+    app.source.getReadings = getReadings;
+    await fireEvent.press(within(notice).getByRole('button', { name: 'Retry' }));
+    await waitFor(() => expect(screen.queryByTestId('sensors-chart-error')).toBeNull());
+  });
+
+  it('treats a gateway lookup with no row as no heartbeat, not as still checking', async () => {
+    const app = await renderApp('/sensors', { scenario: 'offline' });
+    await screen.findByTestId('sensors-offline');
+    app.source.getGateway = async () => null;
+    await act(async () => {
+      await app.queryClient.resetQueries({ queryKey: ['gateway'] });
+    });
+    await waitFor(() => expect(within(screen.getByTestId('gateway-row')).getByText('Gateway Is Offline')).toBeTruthy());
+  });
+
+  it('says the gateway status is unavailable when its request fails', async () => {
+    const app = await renderApp('/sensors', { scenario: 'offline' });
+    await screen.findByTestId('sensors-offline');
+    app.source.getGateway = async () => {
+      throw new DataError('fetch failed');
+    };
+    await act(async () => {
+      await app.queryClient.resetQueries({ queryKey: ['gateway'] });
+    });
+    await waitFor(() => expect(within(screen.getByTestId('gateway-row')).getByText('Gateway Status Unavailable')).toBeTruthy());
+  });
+
+  describe('on a pinned clock', () => {
+    const NOW = new Date('2026-11-17T05:30:00Z');
+    beforeEach(() => {
+      jest.useFakeTimers({ now: NOW, doNotFake: ['nextTick', 'setImmediate'] });
+    });
+    afterEach(() => {
+      jest.useRealTimers();
+    });
+
+    it('says how long since the last reading, not since the device went offline', async () => {
+      await renderApp('/sensors', { scenario: 'offline', now: NOW });
+      await screen.findByTestId('sensors-offline');
+      // The fixture's last reading is 25 min old; the LWT fired 90 s after it.
+      expect(screen.getByText(/hasn’t reported for 25 min$/)).toBeTruthy();
+    });
+
+    it('dates "hasn’t reported since" from the last reading on desktop', async () => {
+      const app = await renderDesktop('offline');
+      await screen.findByTestId('sensors-offline');
+      const latest = (await app.source.getLatestReadings(app.source.world.device.id, 1))[0];
+      const at = formatWhen(latest.recorded_at, app.source.world.plant.timezone);
+      expect(screen.getByText(new RegExp(`hasn’t reported since ${at} \\(25 min ago\\)`))).toBeTruthy();
+    });
   });
 });

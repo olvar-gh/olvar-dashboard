@@ -5,7 +5,7 @@ import { colors } from '@/theme';
 
 import { ChartFrame } from './ChartFrame';
 import { Label, XLabels, YGrid, textWidth } from './parts';
-import { clamp, linear, normalizeSeries, timeTicks, toMs, valueDomain, type SeriesPoint } from './scales';
+import { clamp, linear, localHourStart, normalizeSeries, timeTicks, toMs, valueDomain, type SeriesPoint } from './scales';
 
 const HOUR_MS = 3_600_000;
 
@@ -27,16 +27,22 @@ export type HourBarsProps = {
 
 export type Bucket = { start: number; end: number; v: number | null; current: boolean; future: boolean };
 
-/** Buckets covering `domain`, aligned to `bucketMs`, each with its value (null when missing). */
+/**
+ * Buckets covering `domain`, each with its value (null when missing). Hour buckets follow the
+ * plant-local clock when `timeZone` is given; other sizes are aligned to `bucketMs`.
+ */
 export function toBuckets(
   data: readonly SeriesPoint[],
   domain: readonly [number, number],
   bucketMs: number,
   now: number,
+  timeZone?: string,
 ): Bucket[] {
-  const first = Math.floor(domain[0] / bucketMs) * bucketMs;
+  const align = (t: number) =>
+    timeZone && bucketMs === HOUR_MS ? localHourStart(t, timeZone) : Math.floor(t / bucketMs) * bucketMs;
+  const first = align(domain[0]);
   const byStart = new Map<number, number | null>();
-  for (const p of normalizeSeries(data)) byStart.set(Math.floor(p.t / bucketMs) * bucketMs, p.v);
+  for (const p of normalizeSeries(data)) byStart.set(align(p.t), p.v);
   const out: Bucket[] = [];
   for (let start = first; start < domain[1]; start += bucketMs) {
     out.push({
@@ -108,7 +114,7 @@ export function HourBars({
 }: HourBarsProps) {
   const timeDomain = [toMs(domain[0]), toMs(domain[1])] as const;
   const nowMs = now === undefined ? timeDomain[1] : toMs(now);
-  const buckets = toBuckets(data, timeDomain, bucketMs, nowMs);
+  const buckets = toBuckets(data, timeDomain, bucketMs, nowMs, timeZone);
   const values = buckets.flatMap((b) => (b.v == null || b.future ? [] : [b.v]));
   const mini = variant === 'mini';
 

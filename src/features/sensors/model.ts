@@ -2,7 +2,7 @@
 // Nothing here judges a value: status words come from plant_status_v, bands from thresholds.
 
 import type { IconName } from '@/components/icons';
-import type { SeriesPoint } from '@/components/charts';
+import { localHourStart, type SeriesPoint } from '@/components/charts';
 import type { HourlyRow, PlantStatus, Reading, ThresholdMetric } from '@/data';
 import { formatNumber, formatShortDate, formatTime } from '@/domain/format';
 import { colors, iosColors } from '@/theme';
@@ -116,7 +116,6 @@ export type RangeData = {
   metrics: Record<MetricKey, MetricSeries>;
 };
 
-const HOUR_MS = 3_600_000;
 
 function statsOf(values: readonly number[]): Stats | null {
   if (!values.length) return null;
@@ -131,11 +130,11 @@ function statsOf(values: readonly number[]): Stats | null {
   return { min, max, avg: sum / values.length };
 }
 
-/** Mean of each whole hour of readings (null when every read in it failed). */
-export function hourlyAverages(rows: readonly Reading[], column: ReadingColumn): SeriesPoint[] {
+/** Mean of each plant-local clock hour of readings (null when every read in it failed). */
+export function hourlyAverages(rows: readonly Reading[], column: ReadingColumn, timeZone: string): SeriesPoint[] {
   const sums = new Map<number, { sum: number; n: number }>();
   for (const r of rows) {
-    const bucket = Math.floor(Date.parse(r.recorded_at) / HOUR_MS) * HOUR_MS;
+    const bucket = localHourStart(Date.parse(r.recorded_at), timeZone);
     const acc = sums.get(bucket) ?? { sum: 0, n: 0 };
     const v = r[column];
     if (v != null) {
@@ -150,7 +149,7 @@ export function hourlyAverages(rows: readonly Reading[], column: ReadingColumn):
 }
 
 /** 24 h view from raw readings (oldest first, ≈1,440 rows). */
-export function fromReadings(rows: readonly Reading[], from: Date, to: Date, calibrated: boolean): RangeData {
+export function fromReadings(rows: readonly Reading[], from: Date, to: Date, calibrated: boolean, timeZone: string): RangeData {
   const metrics = {} as Record<MetricKey, MetricSeries>;
   for (const spec of METRICS) {
     const column = readingColumn(spec, calibrated);
@@ -159,7 +158,7 @@ export function fromReadings(rows: readonly Reading[], from: Date, to: Date, cal
     metrics[spec.key] = {
       series,
       stats: statsOf(values),
-      ...(spec.key === 'light' && { bars: hourlyAverages(rows, column) }),
+      ...(spec.key === 'light' && { bars: hourlyAverages(rows, column, timeZone) }),
     };
   }
   return { range: '24h', from, to, metrics };
@@ -293,4 +292,16 @@ export function silentFor(seconds: number): string {
   }
   const d = Math.floor(s / 86_400);
   return `${d} ${d === 1 ? 'day' : 'days'}`;
+}
+
+export type GatewayState = 'checking' | 'unavailable' | 'online' | 'offline';
+
+/**
+ * What the offline view may say about the gateway: nothing definite while its request is loading
+ * or failed. A lookup that finds no gateway row means it never sent a heartbeat.
+ */
+export function gatewayState(gateway: { data?: unknown; error: Error | null; stale: boolean }): GatewayState {
+  if (gateway.error) return 'unavailable';
+  if (gateway.data === undefined) return 'checking';
+  return gateway.data === null || gateway.stale ? 'offline' : 'online';
 }

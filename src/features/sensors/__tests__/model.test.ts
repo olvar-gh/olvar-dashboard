@@ -72,7 +72,7 @@ describe('fromReadings (24 h)', () => {
   const to = new Date(t0 + 1440 * MIN);
 
   it('keeps every row past the 1,000-row page so the last point is the latest reading', () => {
-    const data = fromReadings(rows, from, to, true);
+    const data = fromReadings(rows, from, to, true, 'UTC');
     const series = data.metrics.temperature.series;
     expect(series).toHaveLength(1440);
     expect(series[series.length - 1]).toEqual({ t: rows[1439].recorded_at, v: rows[1439].temperature_c });
@@ -80,28 +80,36 @@ describe('fromReadings (24 h)', () => {
 
   it('computes min, avg and max over the readings, skipping failed reads', () => {
     const withNull = [...rows.slice(0, 3), reading(3, { temperature_c: null })];
-    const stats = fromReadings(withNull, from, to, true).metrics.temperature.stats!;
+    const stats = fromReadings(withNull, from, to, true, 'UTC').metrics.temperature.stats!;
     expect(stats.min).toBe(20);
     expect(stats.max).toBeCloseTo(20.2);
     expect(stats.avg).toBeCloseTo(20.1);
   });
 
   it('charts the raw soil value while uncalibrated', () => {
-    const data = fromReadings(rows.slice(0, 2), from, to, false);
+    const data = fromReadings(rows.slice(0, 2), from, to, false, 'UTC');
     expect(data.metrics.soil.series.map((p) => p.v)).toEqual([2000, 2001]);
   });
 
   it('averages light per hour for the bars', () => {
-    const bars = hourlyAverages(rows.slice(0, 120), 'lux');
+    const bars = hourlyAverages(rows.slice(0, 120), 'lux', 'UTC');
     expect(bars).toEqual([
       { t: t0, v: 100 },
       { t: t0 + 60 * MIN, v: 300 },
     ]);
   });
 
+  it('buckets light by the plant-local hour in a half-hour time zone', () => {
+    const kolkata = [
+      { recorded_at: '2026-11-05T18:40:00Z', lux: 100 },
+      { recorded_at: '2026-11-05T19:20:00Z', lux: 300 },
+    ].map((p) => ({ ...reading(0), ...p }));
+    expect(hourlyAverages(kolkata, 'lux', 'Asia/Kolkata')).toEqual([{ t: Date.parse('2026-11-05T18:30:00Z'), v: 200 }]);
+  });
+
   it('marks an hour whose reads all failed as null', () => {
     const failed = Array.from({ length: 3 }, (_, i) => reading(i, { lux: null }));
-    expect(hourlyAverages(failed, 'lux')).toEqual([{ t: t0, v: null }]);
+    expect(hourlyAverages(failed, 'lux', 'UTC')).toEqual([{ t: t0, v: null }]);
   });
 });
 

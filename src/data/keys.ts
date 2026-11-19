@@ -12,6 +12,7 @@ export const keys = {
   gateway: ['gateway'] as const,
   latest: (deviceId: string, limit: number) => ['latest', deviceId, limit] as const,
   readings24h: (deviceId: string) => ['readings', '24h', deviceId] as const,
+  readingsDay: (deviceId: string, date: string, timeZone: string) => ['readings', 'day', deviceId, date, timeZone] as const,
   hourly: (deviceId: string, window: string) => ['hourly', deviceId, window] as const,
   daily: (deviceId: string, fromDate: string, toDate: string, timeZone: string) =>
     ['daily', deviceId, fromDate, toDate, timeZone] as const,

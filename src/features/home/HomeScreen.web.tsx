@@ -6,6 +6,7 @@ import { colors, typography, useBreakpoint, type Breakpoint } from '@/theme';
 
 import { InsightsCard } from './desktop/InsightsCard';
 import { PlantCard } from './desktop/PlantCard';
+import { RefreshError } from './RefreshError';
 import { SensorCard } from './desktop/SensorCard';
 import { TodayCard } from './desktop/TodayCard';
 import { useHome, type HomeData } from './useHome';
@@ -65,6 +66,7 @@ export function HomeScreen() {
         {...account}
       />
       <View style={[styles.rows, { gap: l.rowGap }]}>
+        {d.refreshError ? <RefreshError onRetry={home.retry} retrying={home.retrying} /> : null}
         {d.status.offline ? <OfflineBanner testID="home-offline" since={d.status.offlineSince} detail={OFFLINE_DETAIL} /> : null}
         <View style={[styles.top, wide(bp) && styles.row, { gap: l.columnGap }]}>
           <PlantCard

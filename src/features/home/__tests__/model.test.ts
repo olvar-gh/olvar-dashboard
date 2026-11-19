@@ -121,9 +121,26 @@ describe('today', () => {
       reading('2026-11-05T17:10:00Z', { lux: null }),
       reading('2026-11-05T18:10:00Z', { lux: 50 }),
     ];
-    expect(hourlyMeans(rows, dayStart, new Date('2026-11-06T15:00:00Z'))).toEqual([
+    expect(hourlyMeans(rows, dayStart, new Date('2026-11-06T15:00:00Z'), 'Asia/Seoul')).toEqual([
       { t: Date.parse('2026-11-05T16:00:00Z'), v: 200 },
       { t: Date.parse('2026-11-05T18:00:00Z'), v: 50 },
+    ]);
+  });
+
+  it('averages lux per local hour in a half-hour time zone', () => {
+    const start = new Date('2026-11-05T18:30:00Z');
+    const rows = [reading('2026-11-05T18:40:00Z', { lux: 100 }), reading('2026-11-05T19:20:00Z', { lux: 300 })];
+    expect(hourlyMeans(rows, start, new Date('2026-11-06T18:30:00Z'), 'Asia/Kolkata')).toEqual([
+      { t: Date.parse('2026-11-05T18:30:00Z'), v: 200 },
+    ]);
+  });
+
+  it('keeps the repeated hour of a fall-back day as two hours', () => {
+    const start = new Date('2026-11-01T04:00:00Z');
+    const rows = [reading('2026-11-01T05:30:00Z', { lux: 100 }), reading('2026-11-01T06:30:00Z', { lux: 300 })];
+    expect(hourlyMeans(rows, start, new Date('2026-11-02T05:00:00Z'), 'America/New_York')).toEqual([
+      { t: Date.parse('2026-11-01T05:00:00Z'), v: 100 },
+      { t: Date.parse('2026-11-01T06:00:00Z'), v: 300 },
     ]);
   });
 

@@ -114,3 +114,80 @@ describe('desktop Home', () => {
     expect(await screen.findByTestId('home-screen')).toBeTruthy();
   });
 });
+
+describe('Home data states', () => {
+  it('keeps the cached Home with an inline error when a background refresh fails', async () => {
+    const app = await renderApp('/');
+    expect(await value('temperature')).toBe('23.4');
+    app.source.getLatestReadings = async () => {
+      throw new DataError('fetch failed');
+    };
+    await act(async () => {
+      await app.queryClient.refetchQueries({ queryKey: ['latest'] });
+    });
+    expect(await screen.findByTestId('home-refresh-error')).toBeTruthy();
+    expect(screen.queryByTestId('home-error')).toBeNull();
+    expect(await value('temperature')).toBe('23.4');
+  });
+
+  it('keeps the offline banner when a refresh fails while offline', async () => {
+    const app = await renderApp('/', { scenario: 'offline' });
+    await screen.findByTestId('home-offline');
+    app.source.getStatus = async () => {
+      throw new DataError('fetch failed');
+    };
+    await act(async () => {
+      await app.queryClient.refetchQueries({ queryKey: ['status'] });
+    });
+    expect(await screen.findByTestId('home-refresh-error')).toBeTruthy();
+    expect(screen.getByTestId('home-offline')).toBeTruthy();
+  });
+
+  it('shows the waiting state, not skeletons, when the plant has no device', async () => {
+    const app = await renderApp('/');
+    app.source.getDevice = async () => null;
+    await app.queryClient.resetQueries();
+    await waitFor(() => expect(screen.getByTestId('sensor-soil-value').props.children).toBe('—'));
+    expect(within(screen.getByTestId('home-screen')).getByText(/^Nothing to report yet today/)).toBeTruthy();
+    expect(screen.queryByTestId('home-loading')).toBeNull();
+  });
+
+  it('keeps the waiting state after pull-to-refresh when the plant has no device', async () => {
+    const app = await renderApp('/');
+    app.source.getDevice = async () => null;
+    await app.queryClient.resetQueries();
+    await waitFor(() => expect(screen.getByTestId('sensor-soil-value').props.children).toBe('—'));
+    const readings = jest.spyOn(app.source, 'getReadings');
+    const periods = jest.spyOn(app.source, 'getOfflinePeriods');
+    await act(async () => {
+      await screen.getByTestId('home-screen').props.refreshControl.props.onRefresh();
+    });
+    expect(readings).not.toHaveBeenCalled();
+    expect(periods).not.toHaveBeenCalled();
+    expect(screen.queryByTestId('today-error')).toBeNull();
+    expect(screen.queryByTestId('home-error')).toBeNull();
+    expect(within(screen.getByTestId('home-screen')).getByText(/^Nothing to report yet today/)).toBeTruthy();
+  });
+});
+
+describe('Home on a 25-hour day', () => {
+  // 23:20 on Sun Nov 1 2026 in New York, the day clocks fall back: the day began 25 h 20 min ago.
+  const NOW = new Date('2026-11-02T04:20:00Z');
+
+  beforeEach(() => {
+    jest.useFakeTimers({ now: NOW, doNotFake: ['nextTick', 'setImmediate'] });
+  });
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
+  it('includes the first hour of the day in today’s low and high', async () => {
+    const source = createFixtureSource({ days: 2, now: NOW, timeZone: 'America/New_York' });
+    const first = source.world.readings.find((r) => r.recorded_at >= '2026-11-01T04:00:00Z')!;
+    expect(first.recorded_at < '2026-11-01T04:20:00Z').toBe(true);
+    first.temperature_c = 3;
+    await renderDesktop(source);
+    const card = within(await screen.findByTestId('sensor-temperature'));
+    expect(await card.findByText(/^Low 3\.0/)).toBeTruthy();
+  });
+});
