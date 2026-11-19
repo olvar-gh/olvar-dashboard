@@ -1,7 +1,7 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { useRouter, type Href } from 'expo-router';
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { Pressable, RefreshControl, StyleSheet, Text, View, type ScrollViewInstance } from 'react-native';
+import { useCallback, useEffect, useState } from 'react';
+import { Pressable, RefreshControl, StyleSheet, Text, View } from 'react-native';
 
 import { WeekChart } from '@/components/charts';
 import { Icon } from '@/components/icons';
@@ -33,6 +33,7 @@ import {
   useWeekSelection,
   useWeekSummary,
 } from './useTimeline';
+import { useTimelineScroll } from './useTimelineScroll';
 import { daySectionTitle, stripDay, weekDates, weekLabel, type EventCategory, type EventRow } from './week';
 
 const CHART_HEIGHT = 132;
@@ -79,9 +80,9 @@ function Timeline({ timeZone, plantName }: { timeZone: string; plantName: string
   const [jumpOpen, setJumpOpen] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [categories, setCategories] = useState<Record<LocalDate, EventCategory[]>>({});
-  const scrollRef = useRef<ScrollViewInstance>(null);
+  const scroll = useTimelineScroll(nav.weekStart);
+  const { reach } = scroll;
   const [sectionY, setSectionY] = useState<Record<LocalDate, number>>({});
-  const [reach, setReach] = useState(0);
   const ordered = [...nav.days].reverse();
   const lazy = useLazyDays(ordered);
   const { reveal } = lazy;
@@ -113,20 +114,15 @@ function Timeline({ timeZone, plantName }: { timeZone: string; plantName: string
   const scrollTo = (date: LocalDate) => {
     reveal(date);
     const y = sectionY[date];
-    if (y !== undefined) scrollRef.current?.scrollTo({ y: Math.max(0, y - 120), animated: true });
+    if (y !== undefined) scroll.scrollToContent(y);
   };
 
   return (
     <PageScroll
       testID="timeline"
-      {...({ ref: scrollRef } as object)}
+      {...({ ref: scroll.ref } as object)}
+      {...scroll.props}
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} />}
-      onLayout={(e) => setReach((r) => Math.max(r, e.nativeEvent.layout.height))}
-      onScroll={(e) => {
-        const bottom = e.nativeEvent.contentOffset.y + e.nativeEvent.layoutMeasurement.height;
-        setReach((r) => Math.max(r, bottom));
-      }}
-      scrollEventThrottle={100}
     >
       <NavBar
         title="Timeline"

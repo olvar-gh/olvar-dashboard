@@ -5,7 +5,7 @@ import { colors } from '@/theme';
 
 import { ChartFrame } from './ChartFrame';
 import { Label, XLabels, YGrid, textWidth } from './parts';
-import { clamp, linear, localHourStart, normalizeSeries, timeTicks, toMs, valueDomain, type SeriesPoint } from './scales';
+import { clamp, linear, localHourStart, nextLocalHourStart, normalizeSeries, timeTicks, toMs, valueDomain, type SeriesPoint } from './scales';
 
 const HOUR_MS = 3_600_000;
 
@@ -38,20 +38,23 @@ export function toBuckets(
   now: number,
   timeZone?: string,
 ): Bucket[] {
-  const align = (t: number) =>
-    timeZone && bucketMs === HOUR_MS ? localHourStart(t, timeZone) : Math.floor(t / bucketMs) * bucketMs;
-  const first = align(domain[0]);
+  const local = timeZone && bucketMs === HOUR_MS ? timeZone : undefined;
+  const align = (t: number) => (local ? localHourStart(t, local) : Math.floor(t / bucketMs) * bucketMs);
+  // Local hours can be 30 or 90 minutes long on a DST day in a :30 zone, so step by the clock.
+  const next = (start: number) => (local ? nextLocalHourStart(start, local) : start + bucketMs);
   const byStart = new Map<number, number | null>();
   for (const p of normalizeSeries(data)) byStart.set(align(p.t), p.v);
   const out: Bucket[] = [];
-  for (let start = first; start < domain[1]; start += bucketMs) {
+  for (let start = align(domain[0]); start < domain[1]; ) {
+    const end = next(start);
     out.push({
       start,
-      end: start + bucketMs,
+      end,
       v: byStart.get(start) ?? null,
-      current: now >= start && now < start + bucketMs,
+      current: now >= start && now < end,
       future: start > now,
     });
+    start = end;
   }
   return out;
 }
