@@ -181,19 +181,19 @@ describe('edits typed while a save is in flight', () => {
     const { result } = await renderHook(() => useCareTargets(), { wrapper });
     await waitFor(() => expect(result.current.thresholds.data).toBeTruthy());
     await act(() => result.current.startEditing());
-    await act(() => result.current.setRange('soil_pct', 'low', '30'));
+    await act(() => result.current.setRange('soil_pct', 'low', '40'));
     let saving!: Promise<boolean>;
     await act(async () => {
       saving = result.current.save();
     });
-    await act(() => result.current.setRange('soil_pct', 'low', '32'));
+    await act(() => result.current.setRange('soil_pct', 'low', '42'));
     await act(async () => {
       release();
       await saving;
     });
-    expect(source.world.plant.threshold_overrides).toEqual({ soil_pct: { ok_low: 30 } });
+    expect(source.world.plant.threshold_overrides).toEqual({ soil_pct: { ok_low: 40 } });
     expect(result.current.open).toBe(true);
-    expect(result.current.draft.soil_pct.low).toBe('32');
+    expect(result.current.draft.soil_pct.low).toBe('42');
   });
 
   it('keeps a name typed while the previous one was saving', async () => {

@@ -23,6 +23,8 @@ export function useSignOut() {
   const source = useDataSource();
   const qc = useQueryClient();
   return useMutation({
+    // Signing out of this device only clears the local session, so it must not wait for the network.
+    networkMode: 'always',
     mutationFn: () => source.auth.signOut(),
     onSuccess: () => {
       qc.removeQueries({ predicate: (q) => q.queryKey[0] !== 'session' });

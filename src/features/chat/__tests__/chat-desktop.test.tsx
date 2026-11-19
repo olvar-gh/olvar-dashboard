@@ -1,6 +1,7 @@
 // Jest resolves the iOS files, so the desktop parts are rendered directly around the shared model.
-import { fireEvent, screen, waitFor } from '@testing-library/react-native';
+import { act, fireEvent, screen, waitFor } from '@testing-library/react-native';
 
+import { onlineManager } from '@tanstack/react-query';
 import { StyleSheet } from 'react-native';
 
 import { BOTTOM_BAR_CLEARANCE } from '@/components/shell';
@@ -8,6 +9,7 @@ import { renderWithFixtures } from '@/components/shell/testing/render-app';
 import { ChatError } from '@/data';
 
 import { ChatCard } from '../desktop/ChatCard';
+import { fitInputHeight } from '../desktop/Composer';
 import { ContextCard } from '../desktop/ContextCard';
 import { Conversations } from '../desktop/Conversations';
 import { useChat } from '../useChat';
@@ -147,5 +149,83 @@ describe('desktop chat', () => {
     expect(input.props.value).toBe('오늘 물 줘야 해');
     await fireEvent(input, 'keyPress', key({ isComposing: false, keyCode: 13 }));
     expect(send).toHaveBeenCalledWith(source.world.plant.id, '오늘 물 줘야 해');
+  });
+
+  it('keeps the draft and says so when sending while offline', async () => {
+    const { source } = await renderWithFixtures(<DesktopChat />);
+    await screen.findByTestId('chat-messages');
+    const send = jest.spyOn(source, 'sendChat');
+    onlineManager.setOnline(false);
+    try {
+      await fireEvent.changeText(screen.getByTestId('chat-input'), 'Are you there?');
+      await fireEvent.press(screen.getByTestId('chat-send'));
+      expect(send).not.toHaveBeenCalled();
+      expect(screen.getByTestId('chat-input').props.value).toBe('Are you there?');
+      expect(screen.getByTestId('chat-offline')).toBeTruthy();
+      expect(screen.queryByTestId('chat-typing')).toBeNull();
+    } finally {
+      onlineManager.setOnline(true);
+    }
+  });
+
+  it('keeps a failed message available to retry while another send is in flight', async () => {
+    const { source } = await renderWithFixtures(<DesktopChat />);
+    await screen.findByTestId('chat-messages');
+    const send = jest
+      .spyOn(source, 'sendChat')
+      .mockRejectedValueOnce(new ChatError('failed', '500'))
+      .mockImplementationOnce(() => new Promise(() => {}));
+    await fireEvent.changeText(screen.getByTestId('chat-input'), 'Still there?');
+    await fireEvent.press(screen.getByTestId('chat-send'));
+    await screen.findByTestId('chat-send-error');
+    await fireEvent.changeText(screen.getByTestId('chat-input'), 'And tomorrow?');
+    await fireEvent.press(screen.getByTestId('chat-send'));
+    expect(send).toHaveBeenLastCalledWith(source.world.plant.id, 'And tomorrow?');
+    expect(await screen.findByTestId('chat-typing')).toBeTruthy();
+    expect(screen.getByText('Still there?')).toBeTruthy();
+    expect(screen.getByTestId('chat-send-error')).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Retry' })).toBeTruthy();
+  });
+
+  it('does not accept a send before the history has loaded', async () => {
+    const { source, queryClient } = await renderWithFixtures(<DesktopChat />);
+    jest.spyOn(source, 'getChatPage').mockReturnValue(new Promise(() => {}));
+    await act(() => queryClient.resetQueries({ queryKey: ['chat'] }));
+    await screen.findByTestId('chat-loading');
+    const send = jest.spyOn(source, 'sendChat');
+    await fireEvent.changeText(screen.getByTestId('chat-input'), 'Hello?');
+    expect(screen.getByTestId('chat-send').props.accessibilityState).toMatchObject({ disabled: true });
+    await fireEvent.press(screen.getByTestId('chat-send'));
+    await fireEvent.press(screen.getByRole('button', { name: 'How am I doing this week?' }));
+    expect(send).not.toHaveBeenCalled();
+    expect(screen.getByTestId('chat-input').props.value).toBe('Hello?');
+  });
+});
+
+describe('web composer height', () => {
+  // A textarea's scrollHeight is never less than its own height, like a browser's.
+  function textarea(contentHeight: () => number) {
+    const style = { height: '36px' };
+    return {
+      style,
+      get scrollHeight() {
+        return Math.max(contentHeight(), parseFloat(style.height));
+      },
+    };
+  }
+
+  it('shrinks again when a multiline draft gets shorter', () => {
+    let content = 120;
+    const node = textarea(() => content);
+    node.style.height = `${fitInputHeight(node)}px`;
+    expect(node.style.height).toBe('120px');
+    content = 38;
+    expect(fitInputHeight(node)).toBe(38);
+    expect(node.style.height).toBe('120px');
+  });
+
+  it('stays between one line and the cap', () => {
+    expect(fitInputHeight(textarea(() => 10))).toBe(36);
+    expect(fitInputHeight(textarea(() => 900))).toBe(160);
   });
 });

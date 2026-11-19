@@ -6,6 +6,7 @@ import {
   checkDraft,
   deviceRows,
   draftFrom,
+  editedMetrics,
   filterZones,
   formatNow,
   formatRange,
@@ -75,34 +76,98 @@ describe('care targets', () => {
   });
 
   it('reads a decimal comma as a decimal point, never as a dropped separator', () => {
-    expect(parseNumber('18,5', ',')).toBe(18.5);
-    expect(parseNumber('2,1', ',')).toBe(2.1);
-    expect(parseNumber('1.500,5', ',')).toBe(1500.5);
-    expect(parseNumber('2,1', '.')).toBe(2.1);
-    expect(parseNumber('18,5', '.')).toBe(18.5);
-    expect(parseNumber('1,500', '.')).toBe(1500);
-    expect(parseNumber('18.5', ',')).toBe(18.5);
-    expect(parseNumber('1,2,3', '.')).toBeNull();
+    expect(parseNumber('18,5', 'de-DE')).toBe(18.5);
+    expect(parseNumber('2,1', 'de-DE')).toBe(2.1);
+    expect(parseNumber('1.500,5', 'de-DE')).toBe(1500.5);
+    expect(parseNumber('2,1', 'en-US')).toBe(2.1);
+    expect(parseNumber('18,5', 'en-US')).toBe(18.5);
+    expect(parseNumber('1,500', 'en-US')).toBe(1500);
+    expect(parseNumber('18.5', 'de-DE')).toBe(18.5);
+    expect(parseNumber('1,2,3', 'en-US')).toBeNull();
+  });
+
+  it('reads grouped thousands by the locale instead of as a decimal', () => {
+    expect(parseNumber('1.500', 'de-DE')).toBe(1500);
+    expect(parseNumber('12.000', 'de-DE')).toBe(12000);
+    expect(parseNumber('1.500', 'en-US')).toBe(1.5);
+    expect(parseNumber('1\u202f500', 'fr-FR')).toBe(1500);
+    expect(parseNumber('1 500,5', 'fr-FR')).toBe(1500.5);
+  });
+
+  it('fills and reads Latin digits in every locale, and accepts typed native digits', () => {
+    const draft = draftFrom(SPATHIPHYLLUM_THRESHOLDS, 'ar-EG');
+    expect(draft.temperature_c).toEqual({ low: '18', high: '29' });
+    draft.temperature_c = { low: '18.5', high: draft.temperature_c.high };
+    expect(checkDraft(draft, ['temperature_c'], SPATHIPHYLLUM_THRESHOLDS, 'ar-EG').ranges.temperature_c).toEqual({ low: 18.5, high: 29 });
+    expect(parseNumber('٢٩٫٥', 'ar-EG')).toBe(29.5);
+    expect(parseNumber('२९', 'hi-IN')).toBe(29);
+  });
+
+  it('rejects malformed space grouping instead of reading it as a decimal', () => {
+    expect(parseNumber('18 50', 'fr-FR')).toBeNull();
+    expect(parseNumber('1 50', 'fr-FR')).toBeNull();
+    expect(parseNumber('1 500', 'fr-FR')).toBe(1500);
+  });
+
+  it('rejects ambiguous or mixed separators', () => {
+    expect(parseNumber('1.500', 'fr-FR')).toBeNull();
+    expect(parseNumber('1.500,5', 'en-US')).toBeNull();
+    expect(parseNumber('1,5.5', 'de-DE')).toBeNull();
+    expect(parseNumber('12a', 'en-US')).toBeNull();
+    const draft = draftFrom(SPATHIPHYLLUM_THRESHOLDS, 'fr-FR');
+    draft.lux = { low: '1.500', high: '5400' };
+    expect(checkDraft(draft, ['lux'], SPATHIPHYLLUM_THRESHOLDS, 'fr-FR').errors.lux).toMatch(/plain numbers, like 18,5/);
+  });
+
+  it('fills the editor in the locale’s format, so untouched ends parse back', () => {
+    const draft = draftFrom(SPATHIPHYLLUM_THRESHOLDS, 'de-DE');
+    expect(draft.lux).toEqual({ low: '800', high: '5400' });
+    draft.temperature_c = { low: '18,5', high: draft.temperature_c.high };
+    expect(checkDraft(draft, ['temperature_c'], SPATHIPHYLLUM_THRESHOLDS, 'de-DE').ranges.temperature_c).toEqual({ low: 18.5, high: 29 });
   });
 
   it('saves a comma-decimal temperature as typed', () => {
-    const draft = draftFrom(SPATHIPHYLLUM_THRESHOLDS);
+    const draft = draftFrom(SPATHIPHYLLUM_THRESHOLDS, 'de-DE');
     draft.temperature_c = { low: '2,1', high: '18,5' };
-    const { errors, ranges } = checkDraft(draft);
+    const { errors, ranges } = checkDraft(draft, ['temperature_c'], {}, 'de-DE');
     expect(errors.temperature_c).toBeUndefined();
     expect(ranges.temperature_c).toEqual({ low: 2.1, high: 18.5 });
   });
 
-  it('rejects a range whose low end is not below its high end', () => {
-    const draft = draftFrom(SPATHIPHYLLUM_THRESHOLDS);
+  it('rejects a range whose low end is above its high end', () => {
+    const draft = draftFrom(SPATHIPHYLLUM_THRESHOLDS, 'en-US');
     draft.soil_pct = { low: '60', high: '40' };
     draft.lux = { low: '', high: '900' };
     draft.humidity_pct = { low: '-5', high: '70' };
-    const { errors, ranges } = checkDraft(draft);
-    expect(errors.soil_pct).toBe('The low end must be below the high end.');
+    const { errors } = checkDraft(draft, ['soil_pct', 'lux', 'humidity_pct'], {}, 'en-US');
+    expect(errors.soil_pct).toBe('The low end can’t be above the high end.');
     expect(errors.lux).toMatch(/both ends/);
     expect(errors.humidity_pct).toMatch(/between 0 and 100/);
-    expect(ranges.temperature_c).toEqual({ low: 18, high: 29 });
+  });
+
+  it('accepts equal range endpoints', () => {
+    const draft = draftFrom(SPATHIPHYLLUM_THRESHOLDS, 'en-US');
+    draft.soil_pct = { low: '50', high: '50' };
+    expect(checkDraft(draft, ['soil_pct'], SPATHIPHYLLUM_THRESHOLDS, 'en-US')).toEqual({ ranges: { soil_pct: { low: 50, high: 50 } }, errors: {} });
+  });
+
+  it('checks only edited metrics, so an untouched metric without a range does not block the save', () => {
+    const thresholds = { ...SPATHIPHYLLUM_THRESHOLDS, lux: {} };
+    const draft = draftFrom(thresholds, 'en-US');
+    expect(draft.lux).toEqual({ low: '', high: '' });
+    draft.soil_pct = { low: '40', high: '80' };
+    const base = draftFrom(thresholds, 'en-US');
+    expect(editedMetrics(draft, base)).toEqual(['soil_pct']);
+    expect(checkDraft(draft, editedMetrics(draft, base), thresholds, 'en-US')).toEqual({ ranges: { soil_pct: { low: 40, high: 80 } }, errors: {} });
+  });
+
+  it('keeps an edited range inside the effective warning bounds', () => {
+    const draft = draftFrom(SPATHIPHYLLUM_THRESHOLDS, 'en-US');
+    draft.temperature_c = { low: '15', high: '29' };
+    draft.lux = { low: '800', high: '12000' };
+    const { errors } = checkDraft(draft, ['temperature_c', 'lux'], SPATHIPHYLLUM_THRESHOLDS, 'en-US');
+    expect(errors.temperature_c).toBe('Keep it within the warning bounds, 16 and 30 °C.');
+    expect(errors.lux).toBe('Keep it within the warning bounds, 800 and 10,800 lux.');
   });
 
   it('saves only the ends that differ from the profile and keeps other override keys', () => {
@@ -115,8 +180,14 @@ describe('care targets', () => {
     expect(overrides).toEqual({ soil_pct: { ok_low: 30 }, lux: { high: 9000 } });
   });
 
+  it('keeps the saved ranges of metrics that were not edited', () => {
+    const overrides = buildOverrides(SPATHIPHYLLUM_THRESHOLDS, { lux: { ok_low: 1000 }, soil_pct: { ok_low: 30 } }, { soil_pct: { low: 40, high: 85 } });
+    expect(overrides).toEqual({ lux: { ok_low: 1000 }, soil_pct: { ok_low: 40 } });
+  });
+
   it('collapses to {} when every range matches the preset', () => {
-    const ranges = checkDraft(draftFrom(SPATHIPHYLLUM_THRESHOLDS)).ranges;
+    const draft = draftFrom(SPATHIPHYLLUM_THRESHOLDS, 'en-US');
+    const ranges = checkDraft(draft, ['soil_pct', 'lux', 'temperature_c', 'humidity_pct'], SPATHIPHYLLUM_THRESHOLDS, 'en-US').ranges;
     expect(buildOverrides(SPATHIPHYLLUM_THRESHOLDS, {}, ranges)).toEqual({});
   });
 
@@ -161,6 +232,37 @@ describe('time zones', () => {
     expect(zones[0]).toBe('Mars/Olympus_Mons');
     expect(zones).toContain('Asia/Seoul');
     expect(filterZones(zones, 'new york')).toEqual(['America/New_York']);
+  });
+
+  it('offers only zones this device can format', () => {
+    const Real = Intl.DateTimeFormat;
+    const spy = jest.spyOn(Intl, 'DateTimeFormat').mockImplementation(((locale?: string, options?: Intl.DateTimeFormatOptions) => {
+      if (options?.timeZone === 'America/Coyhaique') throw new RangeError('Invalid time zone');
+      return new Real(locale, options);
+    }) as typeof Intl.DateTimeFormat);
+    const intl = Intl as unknown as { supportedValuesOf?: unknown };
+    const original = intl.supportedValuesOf;
+    intl.supportedValuesOf = () => ['Asia/Seoul', 'America/Coyhaique', 'Europe/Berlin'];
+    try {
+      expect(timeZones('Asia/Seoul')).toEqual(['UTC', 'Asia/Seoul', 'Europe/Berlin']);
+    } finally {
+      intl.supportedValuesOf = original;
+      spy.mockRestore();
+    }
+  });
+
+  it('offers the full IANA list where Intl.supportedValuesOf is missing (Hermes)', () => {
+    const intl = Intl as unknown as { supportedValuesOf?: unknown };
+    const original = intl.supportedValuesOf;
+    delete intl.supportedValuesOf;
+    try {
+      const zones = timeZones('Asia/Seoul');
+      expect(zones.length).toBeGreaterThan(400);
+      expect(zones).toEqual(expect.arrayContaining(['UTC', 'America/Argentina/Buenos_Aires', 'Asia/Kathmandu', 'Europe/Kyiv', 'Pacific/Chatham']));
+      expect(new Set(zones).size).toBe(zones.length);
+    } finally {
+      intl.supportedValuesOf = original;
+    }
   });
 });
 

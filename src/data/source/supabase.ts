@@ -86,7 +86,8 @@ export function createSupabaseSource(client: Client): DataSource {
         claimAuth('signOut');
         try {
           const { error } = await client.auth.signOut({ scope: 'local' });
-          if (error) throw new DataError(error.message, error.code);
+          // Offline, revoking the token fails after the local session is already gone: signed out here.
+          if (error && (await client.auth.getSession()).data.session) throw new DataError(error.message, error.code);
         } finally {
           authBusy = null;
         }

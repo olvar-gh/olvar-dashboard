@@ -9,10 +9,16 @@ import { ERROR_ROW_TEXT, questionFor, type ChatRow } from '../model';
 import { PlantAvatar } from '../PlantAvatar';
 import type { ChatModel } from '../useChat';
 
-type Props = { chat: ChatModel; onDayLayout: (date: string, y: number) => void; onLayout?: (e: LayoutChangeEvent) => void };
+type Props = {
+  chat: ChatModel;
+  onDayLayout: (date: string, y: number) => void;
+  onLayout?: (e: LayoutChangeEvent) => void;
+  /** Fetches the older page with a fresh scroll anchor. */
+  onLoadOlder: () => void;
+};
 
 /** Day-grouped bubbles; a failed send or a fallback answer offers a native action sheet. */
-export function IosMessages({ chat, onDayLayout, onLayout }: Props) {
+export function IosMessages({ chat, onDayLayout, onLayout, onLoadOlder }: Props) {
   const { days = [], messages = [], timeZone } = chat;
   return (
     <View style={styles.list} onLayout={onLayout}>
@@ -25,10 +31,18 @@ export function IosMessages({ chat, onDayLayout, onLayout }: Props) {
           Loading earlier messages…
         </Text>
       ) : null}
+      {chat.history.isFetchNextPageError && !chat.history.isFetchingNextPage ? (
+        <View style={styles.olderError} testID="chat-older-error">
+          <Text style={[styles.note, styles.noteError]}>Couldn’t load earlier messages.</Text>
+          <Pressable accessibilityRole="button" onPress={onLoadOlder} hitSlop={8}>
+            <Text style={styles.retry}>Retry</Text>
+          </Pressable>
+        </View>
+      ) : null}
       {days.map((day) => (
         <Day key={day.date} day={day} chat={chat} all={messages} timeZone={timeZone} onDayLayout={onDayLayout} />
       ))}
-      {chat.pending || chat.sending || chat.sendError ? <Pending chat={chat} /> : null}
+      {chat.pending || chat.sending || chat.failed.length ? <Pending chat={chat} /> : null}
     </View>
   );
 }
@@ -101,28 +115,21 @@ function PlantBubble({ message, timeZone, onRetry }: { message: ChatRow; timeZon
 }
 
 function Pending({ chat }: { chat: ChatModel }) {
-  const { pending, sendError } = chat;
-  const options = async () => {
-    if (!sendError) return;
-    const choices = sendError.retry ? ['Try Again', 'Delete'] : ['Delete'];
-    const i = await showActionSheet({ title: sendError.text, options: choices, destructiveIndex: choices.length - 1 });
+  const options = async (failure: ChatModel['failed'][number]) => {
+    const choices = failure.retry ? ['Try Again', 'Delete'] : ['Delete'];
+    const i = await showActionSheet({ title: failure.error, options: choices, destructiveIndex: choices.length - 1 });
     if (i == null) return;
-    if (choices[i] === 'Try Again') chat.retrySend();
-    else chat.dismissSendError();
+    if (choices[i] === 'Try Again') chat.retryFailed(failure.id);
+    else chat.dismissFailed(failure.id);
   };
   return (
-    <View style={styles.day} testID={sendError ? 'chat-send-error' : undefined}>
-      {pending ? (
-        sendError ? (
-          <UserBubble text={pending.text} note={`Not sent. ${sendError.text}`} onPress={options} />
-        ) : (
-          <UserBubble text={pending.text} faded />
-        )
-      ) : sendError ? (
-        <Pressable accessibilityRole="button" onPress={options} style={styles.user}>
-          <Text style={[styles.note, styles.noteError]}>{`${sendError.text} Tap for options.`}</Text>
-        </Pressable>
-      ) : null}
+    <View style={styles.day}>
+      {chat.failed.map((f) => (
+        <View key={f.id} testID="chat-send-error">
+          <UserBubble text={f.text} note={`Not sent. ${f.error}`} onPress={() => void options(f)} />
+        </View>
+      ))}
+      {chat.pending ? <UserBubble text={chat.pending.text} faded /> : null}
       {chat.sending ? (
         <View style={styles.plant} testID="chat-typing">
           <PlantAvatar size={26} />
@@ -140,6 +147,8 @@ const styles = StyleSheet.create({
   day: { gap: 14, paddingBottom: 14 },
   older: { paddingBottom: 14 },
   idle: { opacity: 0 },
+  olderError: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 8, paddingBottom: 14 },
+  retry: { ...typography.iosCaption1, color: colors.brand.olive, fontWeight: '600' },
   divider: { ...typography.iosCaption1, color: iosColors.labelTertiary, textAlign: 'center', paddingTop: 4 },
   user: { alignItems: 'flex-end', gap: 4, paddingLeft: 48 },
   userBubble: { backgroundColor: colors.brand.olive, borderRadius: 20, paddingHorizontal: 14, paddingVertical: 9 },

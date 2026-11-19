@@ -13,6 +13,7 @@ import {
   useThresholds,
   useUpdateName,
   useUpdatePlant,
+  type PlantPatch,
 } from '@/data';
 
 import {
@@ -20,6 +21,7 @@ import {
   checkDraft,
   deviceRows,
   draftFrom,
+  editedMetrics,
   locationError,
   nameError,
   nicknameError,
@@ -60,7 +62,10 @@ export function usePlantForm({ keep = false }: FormOptions = {}) {
     setSubmitted(true);
     if (!p || errors.nickname || errors.location || isSaving('plant')) return false;
     try {
-      await track(() => update.mutateAsync({ plantId: p.id, patch: { nickname: nickname.trim(), location: location.trim() || null } }));
+      const patch: PlantPatch = {};
+      if (nickname.trim() !== p.nickname) patch.nickname = nickname.trim();
+      if ((location.trim() || null) !== (p.location ?? null)) patch.location = location.trim() || null;
+      if (Object.keys(patch).length) await track(() => update.mutateAsync({ plantId: p.id, patch }));
       // Edits typed while the request was in flight stay as the next draft.
       if (getNickname() === nicknameDraft) setNickname(null);
       if (getLocation() === locationDraft) setLocation(null);
@@ -103,9 +108,10 @@ export function useCareTargets({ keep = false }: FormOptions = {}) {
   const [edits, setEdits, getEdits] = useDraft<RangeDraft | null>('care.edits', keep, null);
   const [busy, track] = useSaving('care');
   const [submitted, setSubmitted] = useState(false);
-  const draft = useMemo(() => edits ?? draftFrom(thresholds.data), [edits, thresholds.data]);
-
-  const check = useMemo(() => checkDraft(draft), [draft]);
+  const base = useMemo(() => draftFrom(thresholds.data), [thresholds.data]);
+  const draft = edits ?? base;
+  const edited = useMemo(() => editedMetrics(draft, base), [draft, base]);
+  const check = useMemo(() => checkDraft(draft, edited, thresholds.data), [draft, edited, thresholds.data]);
 
   const startEditing = () => {
     update.reset();
@@ -126,8 +132,10 @@ export function useCareTargets({ keep = false }: FormOptions = {}) {
     setSubmitted(true);
     if (!p || Object.keys(check.errors).length || isSaving('care')) return false;
     try {
-      const overrides = buildOverrides(p.profile.thresholds, p.threshold_overrides, check.ranges);
-      await track(() => update.mutateAsync({ plantId: p.id, patch: { threshold_overrides: overrides } }));
+      if (edited.length) {
+        const overrides = buildOverrides(p.profile.thresholds, p.threshold_overrides, check.ranges);
+        await track(() => update.mutateAsync({ plantId: p.id, patch: { threshold_overrides: overrides } }));
+      }
       if (getEdits() === edits) {
         setEdits(null);
         setEditing(false);
@@ -194,7 +202,9 @@ export function useDeviceRows() {
   });
   // The device query stays disabled (and pending) until the plant has loaded.
   const isPending = plant.isPending || (!!plant.data && device.isPending) || gateway.isPending;
-  const error = plant.error ?? device.error ?? gateway.error ?? null;
+  // Without the latest reading or the status the rows would read "No reading yet" or "Connected".
+  const missing = (q: { error: Error | null; data: unknown }) => (q.data === undefined ? q.error : null);
+  const error = plant.error ?? device.error ?? gateway.error ?? missing(latest) ?? missing(status) ?? null;
   const refetch = () => {
     if (plant.error || !plant.data) {
       void plant.refetch();
@@ -242,9 +252,10 @@ export function useAccountForm({ keep = false }: FormOptions = {}) {
     updatePlant.reset();
   };
 
-  const errors = { name: nameError(name) };
+  const nameDirty = name.trim() !== storedName;
+  const errors = { name: nameDirty ? nameError(name) : null };
   const zoneDirty = zoneDraft !== null && zoneDraft !== storedZone;
-  const dirty = name !== storedName || zoneDirty;
+  const dirty = nameDirty || zoneDirty;
 
   const save = async () => {
     setSubmitted(true);
@@ -258,7 +269,7 @@ export function useAccountForm({ keep = false }: FormOptions = {}) {
     const plantId = plant.data?.id;
     try {
       await track(async () => {
-        if (name.trim() !== storedName) {
+        if (nameDirty) {
           await updateName.mutateAsync(name.trim());
         }
         if (getName() === nameDraft) setName(null);

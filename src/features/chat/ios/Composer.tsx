@@ -16,9 +16,15 @@ export function Suggestions({ chat }: { chat: ChatModel }) {
       </Text>
     );
   }
-  const blocked = chat.sending;
+  const blocked = chat.sending || !chat.ready;
   return (
-    <ScrollView
+    <>
+      {chat.notice ? (
+        <Pressable accessibilityRole="button" accessibilityHint="Dismisses this message" onPress={chat.dismissNotice} testID="chat-offline">
+          <Text style={[styles.limit, styles.notice]}>{chat.notice}</Text>
+        </Pressable>
+      ) : null}
+      <ScrollView
       horizontal
       showsHorizontalScrollIndicator={false}
       style={styles.chipsScroll}
@@ -31,7 +37,8 @@ export function Suggestions({ chat }: { chat: ChatModel }) {
           <Text style={styles.chipText}>{s}</Text>
         </Pressable>
       ))}
-    </ScrollView>
+      </ScrollView>
+    </>
   );
 }
 
@@ -83,6 +90,7 @@ const styles = StyleSheet.create({
   },
   chipText: { ...typography.iosFootnoteEmphasized, color: colors.text.primary },
   limit: { ...typography.iosFootnote, color: iosColors.labelSecondary, textAlign: 'center' },
+  notice: { color: colors.status.alert, paddingBottom: 10 },
   fieldWrap: {
     marginHorizontal: 16,
     minHeight: 48,

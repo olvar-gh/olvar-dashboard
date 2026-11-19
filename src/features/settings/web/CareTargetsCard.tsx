@@ -30,14 +30,10 @@ export function CareTargetsCard() {
     if (ok) await c.applyPreset();
   };
 
+  // Save and Cancel sit under the rows, so the header keeps room for the switch at 320 px.
   const actions = (
     <>
-      {c.open ? (
-        <>
-          <Button variant="secondary" label="Cancel" onPress={c.cancel} disabled={c.saving} />
-          <Button label="Save ranges" onPress={() => void c.save()} loading={c.saving} testID="care-save" />
-        </>
-      ) : !c.presetOn ? (
+      {!c.open && !c.presetOn ? (
         <Button variant="secondary" label="Edit ranges" onPress={c.startEditing} testID="care-edit" />
       ) : null}
       <View style={styles.preset}>
@@ -88,6 +84,12 @@ export function CareTargetsCard() {
           <Notice tone="warn" testID="care-save-error">
             {c.saveError}
           </Notice>
+        ) : null}
+        {c.open ? (
+          <View style={styles.editActions} testID="care-edit-actions">
+            <Button variant="secondary" label="Cancel" onPress={c.cancel} disabled={c.saving} />
+            <Button label="Save ranges" onPress={() => void c.save()} loading={c.saving} testID="care-save" />
+          </View>
         ) : null}
         <Text style={styles.footer}>Ranges set the target bands on the Sensors and Timeline charts. Readings arrive every 60 s.</Text>
       </View>
@@ -158,6 +160,7 @@ function RangeInput({ label, value, onChangeText, error }: { label: string; valu
 
 const styles = StyleSheet.create({
   content: { gap: 12 },
+  editActions: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'flex-end', gap: 8 },
   preset: { flexDirection: 'row', alignItems: 'center', gap: 10, marginLeft: 8 },
   presetLabel: { ...typography.label, color: colors.text.secondary },
   row: { paddingVertical: 7, gap: 4 },

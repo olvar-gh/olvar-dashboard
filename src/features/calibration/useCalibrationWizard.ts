@@ -1,5 +1,5 @@
 import { router } from 'expo-router';
-import { useEffect, useReducer, useRef } from 'react';
+import { useCallback, useEffect, useReducer, useRef } from 'react';
 
 import { hrefs } from '@/components/shell';
 import { useCalibrationReadings, useDevice, useNow, usePlant, useSaveCalibration } from '@/data';
@@ -73,19 +73,6 @@ export function useCalibrationWizard() {
   // taken while the sheet was closed, so every session pins its baseline from its own fetch.
   const deviceId = device.data?.id;
   const { refetch: refetchReadings } = readings;
-  useEffect(() => {
-    if (!deviceId) return;
-    let active = true;
-    void refetchReadings().then((result) => {
-      if (!active || result.isError) return;
-      latestIdRef.current = result.data?.[0]?.id ?? 0;
-      dispatch({ type: 'pin', baseline: baselineNow() });
-    });
-    return () => {
-      active = false;
-    };
-  }, [deviceId, refetchReadings]);
-
   const mounted = useRef(true);
   useEffect(() => {
     mounted.current = true;
@@ -93,6 +80,18 @@ export function useCalibrationWizard() {
       mounted.current = false;
     };
   }, []);
+
+  /** Fetches the readings and pins the baseline from them, unless one is already pinned. */
+  const fetchAndPin = useCallback(async () => {
+    const result = await refetchReadings();
+    if (!mounted.current || result.isError) return;
+    latestIdRef.current = result.data?.[0]?.id ?? 0;
+    dispatch({ type: 'pin', baseline: { id: latestIdRef.current, at: Date.now() } });
+  }, [refetchReadings]);
+
+  useEffect(() => {
+    if (deviceId) void fetchAndPin();
+  }, [deviceId, fetchAndPin]);
 
   const live = rows ? deriveLive(rows, state.baseline, now, device.data?.status === 'offline') : null;
   const step = wizardStep(state);
@@ -111,7 +110,8 @@ export function useCalibrationWizard() {
   const retry = () => {
     void plant.refetch();
     void device.refetch();
-    void readings.refetch();
+    // The first fetch may have failed before a baseline was pinned.
+    if (deviceId) void fetchAndPin();
   };
 
   const capture = () => {
