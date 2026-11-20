@@ -58,7 +58,7 @@ describe('care targets', () => {
     expect(formatRange(temp, { low: 18, high: 27 })).toBe('18 – 27 °C');
     expect(formatRange(soil, { low: 35, high: 60 }, true)).toBe('35–60%');
     expect(formatRange(light, { low: 500, high: 1500 }, true)).toBe('500–1,500 lux');
-    expect(formatRange(temp, null)).toBe('—');
+    expect(formatRange(temp, null)).toBe('-');
   });
 
   it('says when a reading failed instead of showing a number', () => {

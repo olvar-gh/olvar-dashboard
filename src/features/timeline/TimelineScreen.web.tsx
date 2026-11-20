@@ -106,7 +106,7 @@ function Timeline({ timeZone, plantName }: { timeZone: string; plantName: string
               <EmptyState
                 comingSoon
                 title="Care reminders"
-                body={`Watering and care reminders are coming soon — ${plantName} will suggest what to do next here.`}
+                body={`Watering and care reminders are coming soon: ${plantName} will suggest what to do next here.`}
               />
             </View>
           </Card>
@@ -361,7 +361,7 @@ function EventLine({ row }: { row: EventRow }) {
   const look = eventStyle(row.kind);
   return (
     <View style={styles.event} testID={`event-${row.kind}`}>
-      <Text style={styles.time}>{row.time ?? '—'}</Text>
+      <Text style={styles.time}>{row.time ?? '-'}</Text>
       <View style={[styles.eventIcon, { backgroundColor: look.tint }]}>
         <Icon name={look.icon} size={16} color={look.ink} />
       </View>

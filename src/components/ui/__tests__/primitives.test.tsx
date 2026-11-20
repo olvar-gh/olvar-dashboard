@@ -249,7 +249,7 @@ describe('RangeCard', () => {
   });
 
   it('clamps out-of-scale values and hides the marker for a failed read', async () => {
-    await render(<RangeCard testID="rc" caption="Light" value="—" min={0} max={100} low={-10} high={150} current={null} color="#ffcc00" />);
+    await render(<RangeCard testID="rc" caption="Light" value="-" min={0} max={100} low={-10} high={150} current={null} color="#ffcc00" />);
     expect(flat(screen.getByTestId('rc-range').props.style)).toMatchObject({ left: '0%', width: '100%' });
     expect(screen.queryByTestId('rc-now')).toBeNull();
   });

@@ -5,8 +5,8 @@ serves it with `e2e/web/serve-spa.mjs` on `WEB_PORT` (default 8099), and runs th
 
 | Project | Viewport | Used for |
 |---|---|---|
-| `fhd-1920` | 1920×1080, DPR 1 | Figma comparison, full-page baselines |
-| `mbp-1512` | 1512×982, DPR 2 (captured at `scale: 'css'`, so 1512×982) | Figma comparison, full-page baselines |
+| `fhd-1920` | 1920×1080, DPR 1 | desktop layout checks, full-page baselines |
+| `mbp-1512` | 1512×982, DPR 2 (captured at `scale: 'css'`, so 1512×982) | desktop layout checks, full-page baselines |
 | `layout-1000`, `layout-2560` | | layout checks only |
 | `web-narrow` | 402×874 | phone layout on the web |
 
@@ -30,35 +30,18 @@ PLAYWRIGHT_BASE_URL=http://localhost:8171 npm run test:visual
 ## Visual suite (`e2e/web/visual.spec.ts`)
 
 Each of the 8 v1 screens (Sign in, Home, Sensors, Timeline, Chat, Soil calibration, Settings, Account)
-is opened on the fixtures with the clock fixed to the Figma frames' time (Home Fri Nov 6 14:32 Seoul,
-the rest Sat Nov 7 14:30). Two tests run per screen and size:
-
-- **Figma comparison.** The first screenful (Chat is scrolled to the top first, since it follows the
-  latest message) is diffed against `design/figma/<Screen>-<width>.png`, the
-  1× export of the frame `<Screen> / Desktop <width>`. Regions that v1 removes or changes on purpose
-  (PLAN §2.1.1) are masked from `e2e/web/figma-masks.json`, in CSS px, rounded out to whole pixels. The share of differing pixels is
-  printed (`figma-diff <Screen>-<width>: x %`), added as a test annotation, and must stay at or under the
-  screen's `budget`. The budget is the current value plus a small margin, so a drift away from Figma
-  fails, and a fix toward Figma lets you lower it. The capture and diff images are written to
-  `test-results/<test>/figma/`.
-- **Full-page baseline.** `toHaveScreenshot` against
-  `e2e/web/__screenshots__/visual.spec.ts/<Screen>-<project>-<platform>.png`. The viewport grows to the
-  document height before the capture, because Playwright's `fullPage` resize can catch the charts
-  while they re-measure. Baselines exist for macOS only, so run the visual suite locally on a Mac. It does
-  not run in CI.
-
-### Refreshing the Figma exports
-
-The PNGs in `design/figma/` come from file `ZMGAYBFUZjGsECpL54uEJg` (node ids in PLAN §2.1). Export
-each frame at 1× (a 1512 frame may be taller than 982; only the first 982 px are compared). With the
-Figma MCP, call `get_screenshot` with `maxDimension` equal to the frame width, then download the URL.
-Keep the names `<Screen>-1920.png`, `<Screen>-1512.png` and `<Screen>-iphone.png`, with
-`Screen` ∈ SignIn, Home, Sensors, Timeline, Chat, Calibration, Settings, Account.
+is opened on the fixtures with the clock fixed to the design frames' time (Home Fri Nov 6 14:32 Seoul,
+the rest Sat Nov 7 14:30) and compared with a **full-page baseline**: `toHaveScreenshot` against
+`e2e/web/__screenshots__/visual.spec.ts/<Screen>-<project>-<platform>.png`. The viewport grows to the
+document height before the capture, because Playwright's `fullPage` resize can catch the charts
+while they re-measure. Baselines exist for macOS only, so run the visual suite locally on a Mac. It does
+not run in CI.
 
 ## Live checks (`e2e/web/live.spec.ts`)
 
-These run against the gateway's local stack (`supabase start` plus the seed in olvar-gateway). Take
-the keys from `supabase status -o env` in the gateway checkout:
+These run against the local Supabase stack of [olvar-gateway](https://github.com/olvar-gh/olvar-gateway),
+the public backend repo: clone it, then run `supabase start` and its seed there. Take the keys from
+`supabase status -o env` in that checkout:
 
 ```bash
 EXPO_PUBLIC_SUPABASE_URL=http://127.0.0.1:54321 \

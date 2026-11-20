@@ -201,7 +201,7 @@ export function latestValue(latest: Reading | null | undefined, spec: MetricSpec
 }
 
 export function valueText(spec: MetricSpec, v: number | null | undefined, calibrated: boolean): string {
-  if (v == null) return '—';
+  if (v == null) return '-';
   return formatNumber(v, spec.key === 'soil' && !calibrated ? 0 : spec.decimals);
 }
 

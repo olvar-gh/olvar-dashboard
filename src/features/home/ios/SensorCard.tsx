@@ -20,7 +20,7 @@ export function SensorCard({ card, charts }: { card: SensorCardModel; charts: Se
     <Pressable
       testID={`sensor-${card.metric}`}
       accessibilityRole="button"
-      accessibilityLabel={`${look.desktopTitle}, ${card.value === '—' ? 'no value' : `${card.value} ${card.unit}`}, ${card.statusLabel}`}
+      accessibilityLabel={`${look.desktopTitle}, ${card.value === '-' ? 'no value' : `${card.value} ${card.unit}`}, ${card.statusLabel}`}
       onPress={() => router.push('/sensors')}
       style={({ pressed }) => [styles.card, pressed && styles.pressed]}
     >
@@ -35,7 +35,7 @@ export function SensorCard({ card, charts }: { card: SensorCardModel; charts: Se
         <Text testID={`sensor-${card.metric}-value`} style={styles.value}>
           {card.value}
         </Text>
-        {card.value !== '—' ? <Text style={styles.unit}>{card.unit}</Text> : null}
+        {card.value !== '-' ? <Text style={styles.unit}>{card.unit}</Text> : null}
       </View>
       <View style={[styles.chart, card.metric === 'humidity' && styles.center]}>
         {card.notCalibrated ? (

@@ -54,7 +54,7 @@ export function SensorCard({ card, charts, minHeight }: Props) {
           <Text testID={`sensor-${card.metric}-value`} style={styles.value}>
             {card.value}
           </Text>
-          {card.value !== '—' ? <Text style={styles.unit}>{card.unit}</Text> : null}
+          {card.value !== '-' ? <Text style={styles.unit}>{card.unit}</Text> : null}
         </View>
         <View style={side ? styles.gauge : styles.chart}>{chart}</View>
       </View>

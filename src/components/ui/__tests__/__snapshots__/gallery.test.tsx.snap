@@ -3741,7 +3741,7 @@ exports[`gallery (iOS) matches the snapshot 1`] = `
                             }
                           }
                         >
-                          —
+                          -
                         </Text>
                         <Text
                           style={
@@ -4375,7 +4375,7 @@ exports[`gallery (iOS) matches the snapshot 1`] = `
                       }
                     >
                       Last choice: 
-                      —
+                      -
                     </Text>
                     <View
                       style={

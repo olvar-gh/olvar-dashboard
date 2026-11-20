@@ -22,7 +22,7 @@ describe('iPhone Home', () => {
     expect(await value('temperature')).toBe('23.4');
     expect(await value('humidity')).toBe('58');
     expect(within(screen.getByTestId('plant-mood')).getByText('Feeling great')).toBeTruthy();
-    expect(screen.getByTestId('plant-summary').props.children).toBe("All good — I'm feeling great");
+    expect(screen.getByTestId('plant-summary').props.children).toBe("All good, I'm feeling great");
     expect(screen.getByText('Insights are coming soon')).toBeTruthy();
     expect(screen.queryByText('Log care')).toBeNull();
   });
@@ -54,8 +54,8 @@ describe('iPhone Home', () => {
   it('shows failed reads without a recalibration prompt', async () => {
     await renderApp('/', { scenario: 'null-reads' });
     const home = within(await screen.findByTestId('home-screen'));
-    expect(await value('soil')).toBe('—');
-    expect(await value('temperature')).toBe('—');
+    expect(await value('soil')).toBe('-');
+    expect(await value('temperature')).toBe('-');
     expect(home.getAllByText(/^Read failed at \d\d:\d\d$/)).toHaveLength(2);
     expect(home.queryByRole('button', { name: 'Calibrate' })).toBeNull();
   });
@@ -147,7 +147,7 @@ describe('Home data states', () => {
     const app = await renderApp('/');
     app.source.getDevice = async () => null;
     await app.queryClient.resetQueries();
-    await waitFor(() => expect(screen.getByTestId('sensor-soil-value').props.children).toBe('—'));
+    await waitFor(() => expect(screen.getByTestId('sensor-soil-value').props.children).toBe('-'));
     expect(within(screen.getByTestId('home-screen')).getByText(/^Nothing to report yet today/)).toBeTruthy();
     expect(screen.queryByTestId('home-loading')).toBeNull();
   });
@@ -156,7 +156,7 @@ describe('Home data states', () => {
     const app = await renderApp('/');
     app.source.getDevice = async () => null;
     await app.queryClient.resetQueries();
-    await waitFor(() => expect(screen.getByTestId('sensor-soil-value').props.children).toBe('—'));
+    await waitFor(() => expect(screen.getByTestId('sensor-soil-value').props.children).toBe('-'));
     const readings = jest.spyOn(app.source, 'getReadings');
     const periods = jest.spyOn(app.source, 'getOfflinePeriods');
     await act(async () => {

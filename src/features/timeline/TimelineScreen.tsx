@@ -163,7 +163,7 @@ function Timeline({ timeZone, plantName }: { timeZone: string; plantName: string
         </View>
       ))}
       <WeekSummarySection weekStart={nav.weekStart} />
-      <ListSection header="Upcoming care" footer={`Care reminders are coming soon — ${plantName} will suggest what to do next here.`}>
+      <ListSection header="Upcoming care" footer={`Care reminders are coming soon: ${plantName} will suggest what to do next here.`}>
         <IosListRow icon="sparkle" iconTint={colors.brand.sage} label="Coming soon" subtitle="Watering and care reminders" testID="upcoming-care" />
       </ListSection>
       <JumpToDate
@@ -231,7 +231,7 @@ function SoilChartCard({ weekStart, timeZone, today, isCurrent }: { weekStart: L
   const latest = useLatest().data;
   const summary = useWeekSummary(weekStart).stats?.find((s) => s.metric === 'soil');
   const now = isCurrent ? latest?.soil_pct : null;
-  const value = now != null ? formatNumber(now) : summary?.average != null ? formatNumber(summary.average) : '—';
+  const value = now != null ? formatNumber(now) : summary?.average != null ? formatNumber(summary.average) : '-';
   const unit = now != null ? '% now' : '% avg';
   if (query.error && !series) {
     return <ErrorState title="Soil moisture" message="Couldn’t load this week’s readings." onRetry={() => void query.refetch()} />;

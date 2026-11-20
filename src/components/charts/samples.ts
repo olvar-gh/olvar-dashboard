@@ -6,7 +6,7 @@ const MIN = 60_000;
 const HOUR = 60 * MIN;
 
 export const SAMPLE_TZ = 'Europe/Berlin';
-/** Fri, Nov 6, 2026 14:32 in Berlin — the Home frame's "now". */
+/** Fri, Nov 6, 2026 14:32 in Berlin, the Home frame's "now". */
 export const SAMPLE_NOW = Date.parse('2026-11-06T13:32:00Z');
 export const SAMPLE_DAY: readonly [number, number] = [SAMPLE_NOW - 24 * HOUR, SAMPLE_NOW];
 

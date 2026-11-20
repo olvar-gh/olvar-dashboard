@@ -106,7 +106,7 @@ describe('iPhone Sensors tab', () => {
     await renderApp('/sensors', { scenario: 'null-reads' });
     const sensors = within(await screen.findByTestId('sensors-screen'));
     await sensors.findByTestId('sensor-card-soil');
-    expect(screen.getByTestId('sensor-value-soil').props.children).toBe('—');
+    expect(screen.getByTestId('sensor-value-soil').props.children).toBe('-');
     expect(sensors.getAllByText(/^Read failed at \d\d:\d\d$/)).toHaveLength(2);
     expect(screen.queryByTestId('soil-not-calibrated')).toBeNull();
   });

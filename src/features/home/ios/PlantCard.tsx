@@ -48,7 +48,7 @@ export function PlantCard({ plant, status, message, lastReading }: Props) {
         </View>
         <View style={styles.reading}>
           <Text style={styles.footnote}>Last reading</Text>
-          <Text style={styles.readingTime}>{lastReading?.time ?? '—'}</Text>
+          <Text style={styles.readingTime}>{lastReading?.time ?? '-'}</Text>
         </View>
       </View>
     </Pressable>

@@ -136,7 +136,7 @@ describe('card text', () => {
   it('formats values and stats per metric', () => {
     expect(valueText(spec('temperature'), 23.44, true)).toBe('23.4');
     expect(valueText(spec('light'), 1240, true)).toBe('1,240');
-    expect(valueText(spec('soil'), null, true)).toBe('—');
+    expect(valueText(spec('soil'), null, true)).toBe('-');
     expect(statText(spec('soil'), 34, true)).toBe('34%');
     expect(statText(spec('soil'), 2214, false)).toBe('2,214');
     expect(statText(spec('temperature'), 19.8, true)).toBe('19.8 °C');

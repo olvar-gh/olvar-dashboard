@@ -249,9 +249,9 @@ const QUESTIONS = [
 ];
 
 const ANSWERS = [
-  "I'm feeling great — the soil is just right and the light is soft.",
+  "I'm feeling great. The soil is just right and the light is soft.",
   'Not yet! My soil is still nicely moist. Check again in a couple of days.',
-  'The light is just right for me — bright but not direct.',
+  'The light is just right for me: bright but not direct.',
   'Slept well, thanks. The night was a little cool but comfortable.',
   "I'm fine where I am. The temperature has stayed in my comfort zone.",
   'Lovely and bright, without any harsh sun on my leaves.',
@@ -289,7 +289,7 @@ function chatRow(id: number, role: 'user' | 'plant', content: string, t: number,
     reply_to: replyTo,
     error: null,
     based_on_reading_at: null,
-    model: role === 'plant' ? 'deepseek-flash' : null,
+    model: role === 'plant' ? 'claude-haiku-5-5' : null,
     tokens_in: null,
     tokens_out: null,
   };

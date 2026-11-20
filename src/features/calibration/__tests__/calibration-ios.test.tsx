@@ -94,7 +94,7 @@ describe('iOS calibration sheet', () => {
   it('shows a failed read without treating the sensor as uncalibrated', async () => {
     await renderWithFixtures(<CalibrationSheet />, { scenario: 'null-reads' });
     expect(await screen.findByText(/^Read failed at \d\d:\d\d$/)).toBeTruthy();
-    expect(screen.getAllByText('—').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('-').length).toBeGreaterThan(0);
     expect(screen.queryByText('Not calibrated')).toBeNull();
   });
 

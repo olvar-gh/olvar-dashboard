@@ -55,7 +55,7 @@ const input = (patch: Partial<SensorInput> = {}): SensorInput => ({
 
 describe('header text', () => {
   it('greets by local hour with the first name', () => {
-    expect(greeting(14, 'Dongmin Lee')).toBe('Good afternoon, Dongmin');
+    expect(greeting(14, 'Mina Park')).toBe('Good afternoon, Mina');
     expect(greeting(8, null)).toBe('Good morning');
     expect(greeting(21, '')).toBe('Good evening');
     expect(greeting(3, 'D')).toBe('Good evening, D');
@@ -78,23 +78,23 @@ describe('sensor cards', () => {
     const failed = reading('2026-11-06T05:32:00Z', { soil_raw: null, soil_pct: null });
     expect(sensorCard('soil', input({ calibrated: false }))).toMatchObject({ value: '2,100', unit: 'raw', notCalibrated: true, readFailed: false, range: null });
     expect(sensorCard('soil', input({ calibrated: false, latest: failed }))).toMatchObject({
-      value: '—',
+      value: '-',
       notCalibrated: true,
       readFailed: true,
       meta: 'Read failed at 14:32',
     });
-    expect(sensorCard('soil', input({ latest: failed }))).toMatchObject({ value: '—', notCalibrated: false, readFailed: true });
+    expect(sensorCard('soil', input({ latest: failed }))).toMatchObject({ value: '-', notCalibrated: false, readFailed: true });
   });
 
   it('marks a failed read on other metrics and the last reading when offline', () => {
     const latest = reading('2026-11-06T05:32:00Z', { temperature_c: null });
-    expect(sensorCard('temperature', input({ latest }))).toMatchObject({ value: '—', readFailed: true, meta: 'Read failed at 14:32' });
+    expect(sensorCard('temperature', input({ latest }))).toMatchObject({ value: '-', readFailed: true, meta: 'Read failed at 14:32' });
     expect(sensorCard('light', input({ offline: true }))).toMatchObject({ value: '1,240', meta: 'Last reading 14:32' });
   });
 
   it('waits for the first reading', () => {
     expect(sensorCard('humidity', input({ latest: null, status: null }))).toMatchObject({
-      value: '—',
+      value: '-',
       statusLabel: 'No data yet',
       meta: 'Waiting for the first reading',
     });
