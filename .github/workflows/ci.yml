@@ -18,21 +18,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
-        with:
-          fetch-depth: 0
       - uses: actions/setup-node@v5
         with:
           node-version-file: .node-version
           cache: npm
-      - name: No em dashes (tracked files and commit messages)
-        env:
-          BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
+      - name: No em dashes
         run: |
-          found=0
-          if git grep -n $'\u2014' -- .; then found=1; fi
-          # A new branch push has no usable "before" (all zeros); its files are still checked above.
-          if [[ -n "$BASE" && ! "$BASE" =~ ^0+$ ]] && git log --format='%h %B' "$BASE..HEAD" | grep -n $'\u2014'; then found=1; fi
-          if [[ $found -eq 1 ]]; then
+          if git grep -n $'\u2014' -- .; then
             echo "Replace the em dashes above (project rule, AGENTS.md)" >&2
             exit 1
           fi

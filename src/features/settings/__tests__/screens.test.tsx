@@ -104,7 +104,7 @@ describe('Settings (iPhone)', () => {
     await screen.findByText('SHT31 + GY-302');
     app.source.updateDevice({ climate_sensor });
     await app.queryClient.invalidateQueries({ queryKey: ['device'] });
-    expect(await screen.findByText(title)).toBeTruthy();
+    expect((await screen.findByText(title)).props.numberOfLines).toBe(2);
     expect(screen.getByText(subtitle)).toBeTruthy();
   });
 

@@ -8,6 +8,8 @@ export type IosListAccessory = 'chevron' | 'toggle' | 'check' | 'none';
 
 export type IosListRowProps = {
   label: string;
+  /** Lines the label may wrap to before it is truncated. */
+  labelLines?: number;
   subtitle?: string;
   value?: string;
   icon?: IconName;
@@ -30,6 +32,7 @@ export type IosListRowProps = {
 /** Inset grouped row, Body 17 (Figma iPhone/List row). */
 export function IosListRow({
   label,
+  labelLines = 1,
   subtitle,
   value,
   icon,
@@ -53,7 +56,7 @@ export function IosListRow({
       ) : null}
       <View style={[styles.iosContent, separator && styles.iosSeparator]}>
         <View style={styles.iosText}>
-          <Text numberOfLines={1} style={styles.iosLabel}>
+          <Text numberOfLines={labelLines} style={styles.iosLabel}>
             {label}
           </Text>
           {subtitle ? <Text style={styles.iosSubtitle}>{subtitle}</Text> : null}

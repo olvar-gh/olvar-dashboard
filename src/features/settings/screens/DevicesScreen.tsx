@@ -23,6 +23,8 @@ export function DevicesScreen() {
     <IosListRow
       key={r.key}
       label={r.short.title}
+      // The climate part name wraps beside a long status ("Read failed 14:00") on a 375 pt screen.
+      labelLines={r.key === 'climate' ? 2 : 1}
       subtitle={r.short.subtitle}
       icon={r.icon}
       iconTint={TINTS[r.key]}
