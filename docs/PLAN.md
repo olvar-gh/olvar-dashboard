@@ -16,7 +16,7 @@ Scope of this repo: the Expo app that serves **desktop web** and **native iOS** 
   - Screens, data hooks, charts and tokens are shared.
 - **"Avatar" means chat with your plant** (decision A):
   - The Chat screen calls the gateway's Edge Function `chat`.
-  - Replies come from Claude Haiku 5.5 (`claude-haiku-5-5`, Anthropic API), in first person as the plant and in the user's language.
+  - Replies are written in first person as the plant and in the user's language. The model is configured in the gateway (currently Claude via the Anthropic API).
   - Messages are stored in `chat_messages`.
 - **Status pill:** the pill text (`overall_label`), the per-metric labels (`<metric>_label`) and the one-line `summary` are **display-only**, read from the gateway view `plant_status_v`.
   - The dashboard contains no threshold logic.
@@ -162,12 +162,10 @@ Even the new frames still contain deferred features. Each one is handled consist
   - https://supabase.com/docs/reference/javascript/range
   - A full day of raw readings (about 1,440 rows) is over this limit, so it must be paginated.
 
-### 2.5 Claude Haiku 5.5 (used only by the gateway's `chat` function)
+### 2.5 Chat model (used only by the gateway's `chat` function)
 
-- The function calls the Anthropic Messages API with the model `claude-haiku-5-5`. The `chat` contract the dashboard uses (§4) is the same whichever model answers.
-  - https://platform.claude.com/docs/en/api/messages
-- Thinking is on by default on this model. Short chat replies do not need it, so the function can send `thinking: {type: "disabled"}`, which the model accepts at effort `high` or below.
-- **Cost:** $0.10 input / $0.50 output per 1M tokens (prompts up to 100K tokens), so well under $0.001 per chat turn. Source: https://platform.claude.com/docs/en/about-claude/pricing
+- The model is configured in the gateway, currently Claude via the Anthropic API. The `chat` contract the dashboard uses (§4) is the same whichever model answers.
+- Model choice, API key and cost are the gateway's concern; see its deployment docs: https://github.com/olvar-gh/olvar-gateway/blob/main/docs/DEPLOY.md
 
 ### 2.6 Hosting, distribution, testing
 
@@ -249,7 +247,7 @@ Notes (not contract changes):
 ```
  ESP32 ─MQTT(60 s)→ Pi 3B gateway ─secret key→ Supabase Postgres (readings, rollups, devices, plants, chat_messages,
                                                 views readings_v / readings_hourly_v / plant_status_v) ── olvar-gateway
-                                              Edge Function chat ──→ Anthropic API, Claude Haiku 5.5
+                                              Edge Function chat ──→ Anthropic API (Claude)
                      publishable key + owner JWT ▲          ▲ Realtime: readings INSERT (signal), devices UPDATE, chat_messages INSERT
               ┌──────────────────────── olvar-dashboard ───────────────────────────────────────┐
               │ Expo Router app: web SPA (Cloudflare Pages)  /  iOS (Xcode → TestFlight)          │

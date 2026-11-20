@@ -5,8 +5,9 @@
 #   scripts/sync-types.sh --check <ref>  exit 1 if the pinned copy differs from <ref> (CI)
 #
 # Reads from a local checkout when GATEWAY_DIR (default ../olvar-gateway) has <ref>, otherwise
-# downloads the file from the public GitHub repo (GATEWAY_REPO, default olvar-gh/olvar-gateway,
-# https://github.com/olvar-gh/olvar-gateway). No GitHub login or token is needed.
+# downloads the file from GitHub (GATEWAY_REPO, default olvar-gh/olvar-gateway,
+# https://github.com/olvar-gh/olvar-gateway). The anonymous download needs no login; if it fails
+# (for example while the repo is still private), it falls back to an authenticated `gh api` request.
 set -euo pipefail
 
 check=0
@@ -26,7 +27,8 @@ fetch() {
   if git -C "$gateway_dir" rev-parse --verify --quiet "$ref^{commit}" >/dev/null 2>&1; then
     git -C "$gateway_dir" show "$ref:$src_path"
   else
-    curl -fsSL "https://raw.githubusercontent.com/$gateway_repo/$ref/$src_path"
+    curl -fsSL "https://raw.githubusercontent.com/$gateway_repo/$ref/$src_path" 2>/dev/null ||
+      gh api -H "Accept: application/vnd.github.raw" "repos/$gateway_repo/contents/$src_path?ref=$ref"
   fi
 }
 
