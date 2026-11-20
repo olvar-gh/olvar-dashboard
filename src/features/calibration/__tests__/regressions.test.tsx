@@ -1,5 +1,5 @@
 import { QueryClient } from '@tanstack/react-query';
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import { useState } from 'react';
 import { Alert, Pressable, Text } from 'react-native';
 
@@ -37,6 +37,18 @@ function Reopenable({ children }: { children: React.ReactNode }) {
 
 beforeEach(() => jest.clearAllMocks());
 
+// A query client's cache holds a gcTime timer (5 min by default) per query and mutation, which
+// would keep Jest running long after the tests. Unmount first, then empty every client made here.
+const clients: QueryClient[] = [];
+function track(client: QueryClient): QueryClient {
+  clients.push(client);
+  return client;
+}
+afterEach(async () => {
+  await cleanup();
+  for (const client of clients.splice(0)) client.clear();
+});
+
 describe('reopening', () => {
   it('does not count readings that arrived while the sheet was closed', async () => {
     const { source } = await renderWithFixtures(
@@ -61,7 +73,7 @@ describe('initial load errors', () => {
     source.getPlant = async () => {
       throw new Error('network');
     };
-    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const queryClient = track(new QueryClient({ defaultOptions: { queries: { retry: false } } }));
     await render(
       <DataProvider source={source} queryClient={queryClient}>
         <IosSheet />
@@ -81,7 +93,7 @@ describe('retry after the first readings request failed', () => {
       if (fail) throw new Error('network');
       return real(...args);
     });
-    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const queryClient = track(new QueryClient({ defaultOptions: { queries: { retry: false } } }));
     await render(
       <DataProvider source={source} queryClient={queryClient}>
         <IosSheet />
@@ -100,7 +112,7 @@ describe('reopening with the production query client', () => {
   it('fetches on open and shows the live reading although the cache is still fresh', async () => {
     const source = createFixtureSource({ days: 1 });
     await render(
-      <DataProvider source={source} queryClient={createQueryClient()}>
+      <DataProvider source={source} queryClient={track(createQueryClient())}>
         <Reopenable>
           <IosSheet />
         </Reopenable>

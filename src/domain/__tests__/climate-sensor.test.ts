@@ -23,8 +23,17 @@ describe('climate sensor', () => {
     });
     for (const value of [null, undefined, 'bme280']) {
       const labels = climateLabels(value);
-      expect(labels).toMatchObject({ title: 'Climate sensor + GY-302', hardware: 'Climate sensor' });
+      expect(labels).toMatchObject({ title: 'Climate sensor + GY-302', shortTitle: 'Climate + GY-302', hardware: 'Climate sensor' });
       expect(Object.values(labels).join(' ')).not.toMatch(/0x|GPIO/);
+    }
+  });
+
+  it('keeps the iPhone titles about as short as the SHT31 one, so a 375 pt row does not clip them', () => {
+    const longest = 'SHT31 + GY-302'.length + 2;
+    for (const value of ['sht31', 'dht11', null]) {
+      const { shortTitle } = climateLabels(value);
+      expect(shortTitle).toContain('GY-302');
+      expect(shortTitle.length).toBeLessThanOrEqual(longest);
     }
   });
 });

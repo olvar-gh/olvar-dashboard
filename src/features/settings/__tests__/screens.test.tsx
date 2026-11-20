@@ -98,7 +98,7 @@ describe('Settings (iPhone)', () => {
 
   it.each([
     ['dht11', 'DHT11 + GY-302', 'Temp, humidity, light · GPIO4, I²C'],
-    [null, 'Climate sensor + GY-302', 'Temp, humidity, light'],
+    [null, 'Climate + GY-302', 'Temp, humidity, light'],
   ] as const)('labels the climate sensor row for %s', async (climate_sensor, title, subtitle) => {
     const app = await open('/settings/devices');
     await screen.findByText('SHT31 + GY-302');

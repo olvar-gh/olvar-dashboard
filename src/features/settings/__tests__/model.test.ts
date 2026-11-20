@@ -310,7 +310,7 @@ describe('device rows', () => {
       expect(climate(unknown)).toMatchObject({
         title: 'Climate sensor + GY-302',
         subtitle: 'Temperature, humidity and light',
-        short: { title: 'Climate sensor + GY-302', subtitle: 'Temp, humidity, light' },
+        short: { title: 'Climate + GY-302', subtitle: 'Temp, humidity, light' },
       });
     }
     expect(deviceRows({ ...base, device: null }).find((r) => r.key === 'climate')!.title).toBe('Climate sensor + GY-302');

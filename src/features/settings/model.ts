@@ -487,7 +487,7 @@ export function deviceRows(i: DeviceInputs): DeviceRowModel[] {
       subtitle: climate.subtitle,
       icon: 'sliders',
       status: climateStatus,
-      short: { title: climate.title, subtitle: climate.shortSubtitle, value: climateStatus.label },
+      short: { title: climate.shortTitle, subtitle: climate.shortSubtitle, value: climateStatus.label },
     },
   ];
 }

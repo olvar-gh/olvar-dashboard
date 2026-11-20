@@ -27,7 +27,7 @@ describe('app config', () => {
 describe('release version', () => {
   it('is the same in package.json, app.json and package-lock.json, with a CHANGELOG entry', () => {
     const { version } = readJson('package.json');
-    expect(version).toBe('0.1.0');
+    expect(version).toMatch(/^\d+\.\d+\.\d+$/);
     expect(readJson('app.json').expo.version).toBe(version);
     const lock = readJson('package-lock.json');
     expect([lock.version, lock.packages[''].version]).toEqual([version, version]);
