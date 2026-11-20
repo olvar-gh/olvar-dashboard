@@ -5,7 +5,7 @@ The dashboard ships two ways:
 - **Web:** a static Expo web export (`web.output: "single"`) hosted on **Cloudflare Pages**.
 - **iOS:** built **locally on the Mac mini** with Xcode (`npm run ios:release`), installed straight onto a connected iPhone, and optionally archived and uploaded to **TestFlight** from Xcode.
 
-No EAS service is used: no EAS Build, Submit, Hosting or Workflows, and there is no `eas.json`. The `eas` steps in `docs/PLAN.md` T14 no longer apply.
+No EAS service is used: no EAS Build, Submit, Hosting or Workflows, and there is no `eas.json`.
 
 Every step below runs under your own accounts. The repository holds no credentials. CI only builds and checks the web export; it deploys nothing.
 

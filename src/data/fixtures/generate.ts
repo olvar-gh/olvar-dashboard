@@ -197,6 +197,7 @@ export function generateFixtures(options: FixtureOptions = {}): FixtureWorld {
     soil_dry_raw: calibrated ? FIXTURE_DRY_RAW : null,
     soil_wet_raw: calibrated ? FIXTURE_WET_RAW : null,
     soil_calibrated_at: calibrated ? new Date(calibratedAt).toISOString() : null,
+    climate_sensor: 'sht31',
   };
 
   const plant: PlantWithProfile = {

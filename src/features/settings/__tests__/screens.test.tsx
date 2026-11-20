@@ -90,9 +90,22 @@ describe('Settings (iPhone)', () => {
     expect(await screen.findByText('Raspberry Pi 3B · Wi-Fi · MQTT')).toBeTruthy();
     expect(screen.getByText('olvar-a1b2c3 · every 60 s')).toBeTruthy();
     expect(screen.getByText('SHT31 + GY-302')).toBeTruthy();
+    expect(screen.getByText('Temp, humidity, light · I²C')).toBeTruthy();
     expect(screen.getByText('Read OK')).toBeTruthy();
     await fireEvent.press(screen.getByTestId('device-soil'));
     await waitFor(() => expect(app.getPathname()).toBe('/calibrate'));
+  });
+
+  it.each([
+    ['dht11', 'DHT11 + GY-302', 'Temp, humidity, light · GPIO4, I²C'],
+    [null, 'Climate sensor + GY-302', 'Temp, humidity, light'],
+  ] as const)('labels the climate sensor row for %s', async (climate_sensor, title, subtitle) => {
+    const app = await open('/settings/devices');
+    await screen.findByText('SHT31 + GY-302');
+    app.source.updateDevice({ climate_sensor });
+    await app.queryClient.invalidateQueries({ queryKey: ['device'] });
+    expect(await screen.findByText(title)).toBeTruthy();
+    expect(screen.getByText(subtitle)).toBeTruthy();
   });
 
   it('shows "Read failed" when the latest climate reading is null', async () => {

@@ -7,7 +7,7 @@ import { useBreakpoint } from '@/theme';
 
 import { useDeviceRows } from '../hooks';
 
-/** Desktop "Devices & calibration" card: gateway, sensor node, soil probe (Recalibrate), SHT31 + GY-302. */
+/** Desktop "Devices & calibration" card: gateway, sensor node, soil probe (Recalibrate), climate sensor + GY-302. */
 export function DevicesCard() {
   const d = useDeviceRows();
   const router = useRouter();

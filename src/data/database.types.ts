@@ -1,6 +1,7 @@
 // PROVISIONAL: generated with `supabase gen types typescript --local --schema public` from the migrations at
-// olvar-gateway 98cf8dc8598c7fc0c553274565f467dbafa3d3ac, because the gateway has not published
-// supabase/types/database.types.ts yet. Replace with `scripts/sync-types.sh <ref>` once it does. Do not edit.
+// olvar-gateway 98cf8dc8598c7fc0c553274565f467dbafa3d3ac, before the gateway published
+// supabase/types/database.types.ts. devices.climate_sensor (text, NULL or 'sht31' | 'dht11') is added by hand
+// from the climate sensor contract. Replace with `scripts/sync-types.sh <ref>` once the gateway ships that column.
 
 export type Json = string | number | boolean | null | { [key: string]: Json | undefined } | Json[];
 
@@ -74,6 +75,7 @@ export type Database = {
       };
       devices: {
         Row: {
+          climate_sensor: string | null;
           created_at: string;
           fw: string | null;
           id: string;
@@ -88,6 +90,7 @@ export type Database = {
         };
         ComputedFields: never;
         Insert: {
+          climate_sensor?: string | null;
           created_at?: string;
           fw?: string | null;
           id: string;
@@ -101,6 +104,7 @@ export type Database = {
           status_changed_at?: string | null;
         };
         Update: {
+          climate_sensor?: string | null;
           created_at?: string;
           fw?: string | null;
           id?: string;

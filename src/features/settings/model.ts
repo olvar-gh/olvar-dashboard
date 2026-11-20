@@ -3,6 +3,7 @@
 
 import type { IconName } from '@/components/icons';
 import { DataError, type Json, type Reading, type ThresholdKey, type ThresholdMetric, type Thresholds } from '@/data';
+import { climateLabels } from '@/domain/climate-sensor';
 import { formatAge, formatLocalDate, formatNumber, formatTime } from '@/domain/format';
 import { localDate, tzOffsetMs } from '@/domain/time';
 import { colors, iosColors } from '@/theme';
@@ -396,7 +397,15 @@ export type DeviceInputs = {
   gatewayAgeS: number | null;
   gatewayStale: boolean;
   device:
-    | { id: string; fw: string | null; soil_dry_raw: number | null; soil_wet_raw: number | null; soil_calibrated_at: string | null }
+    | {
+        id: string;
+        fw: string | null;
+        soil_dry_raw: number | null;
+        soil_wet_raw: number | null;
+        soil_calibrated_at: string | null;
+        /** `devices.climate_sensor`; absent or NULL names no part. */
+        climate_sensor?: string | null;
+      }
     | null
     | undefined;
   /** Display status says the node is offline (180 s rule or LWT). */
@@ -408,7 +417,7 @@ export type DeviceInputs = {
   timeZone: string;
 };
 
-/** Gateway, sensor node, soil probe and SHT31 + GY-302 rows with their live status. */
+/** Gateway, sensor node, soil probe and climate sensor + GY-302 rows with their live status. */
 export function deviceRows(i: DeviceInputs): DeviceRowModel[] {
   const gwVersion = i.gateway?.version ? ` · v${i.gateway.version}` : '';
   const gatewayStatus = !i.gateway
@@ -444,6 +453,7 @@ export function deviceRows(i: DeviceInputs): DeviceRowModel[] {
     : climateFailed
       ? { label: `Read failed ${formatTime(l.recorded_at, i.timeZone)}`, live: false }
       : { label: 'Read OK', live: !i.nodeOffline };
+  const climate = climateLabels(d?.climate_sensor);
 
   return [
     {
@@ -473,11 +483,11 @@ export function deviceRows(i: DeviceInputs): DeviceRowModel[] {
     },
     {
       key: 'climate',
-      title: 'SHT31 + GY-302',
-      subtitle: 'Temperature, humidity and light · I²C 0x44, 0x23',
+      title: climate.title,
+      subtitle: climate.subtitle,
       icon: 'sliders',
       status: climateStatus,
-      short: { title: 'SHT31 + GY-302', subtitle: 'Temp, humidity, light · I²C', value: climateStatus.label },
+      short: { title: climate.title, subtitle: climate.shortSubtitle, value: climateStatus.label },
     },
   ];
 }

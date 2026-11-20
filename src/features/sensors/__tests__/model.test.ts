@@ -162,7 +162,10 @@ describe('card text', () => {
       'Capacitive v1.2 · GPIO34 · Read failed at 14:00 · calibrated Nov 5',
     );
     expect(hardwareText(spec('soil'), reading(0), null, false, tz)).toBe('Capacitive v1.2 · GPIO34 · raw 2,000 · not calibrated');
-    expect(hardwareText(spec('temperature'), reading(0), null, true, tz)).toBe('SHT31 · I²C 0x44 · Read OK');
+    expect(hardwareText(spec('temperature'), reading(0), { climate_sensor: 'sht31' }, true, tz)).toBe('SHT31 · I²C 0x44 · Read OK');
+    expect(hardwareText(spec('humidity'), reading(0), { climate_sensor: 'dht11' }, true, tz)).toBe('DHT11 · GPIO4 · Read OK');
+    expect(hardwareText(spec('temperature'), reading(0), { climate_sensor: null }, true, tz)).toBe('Climate sensor · Read OK');
+    expect(hardwareText(spec('humidity'), reading(0), null, true, tz)).toBe('Climate sensor · Read OK');
     expect(hardwareText(spec('light'), reading(0, { lux: null }), null, true, tz)).toBe(
       'GY-302 (BH1750) · I²C 0x23 · Read failed at 14:00',
     );
