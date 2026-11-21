@@ -4,6 +4,7 @@
 import type { IconName } from '@/components/icons';
 import { localHourStart, type SeriesPoint } from '@/components/charts';
 import type { HourlyRow, PlantStatus, Reading, ThresholdMetric } from '@/data';
+import { climateLabels } from '@/domain/climate-sensor';
 import { formatNumber, formatShortDate, formatTime } from '@/domain/format';
 import { colors, iosColors } from '@/theme';
 
@@ -29,7 +30,8 @@ export type MetricSpec = {
   /** `plant_status_v` columns holding this metric's status key and label. */
   statusColumn: 'soil_status' | 'light_status' | 'temperature_status' | 'humidity_status';
   labelColumn: 'soil_label' | 'light_label' | 'temperature_label' | 'humidity_label';
-  hardware: string;
+  /** Fixed part and bus; temperature and humidity name theirs from `devices.climate_sensor`. */
+  hardware?: string;
 };
 
 export const METRICS: readonly MetricSpec[] = [
@@ -76,7 +78,6 @@ export const METRICS: readonly MetricSpec[] = [
     column: 'temperature_c',
     statusColumn: 'temperature_status',
     labelColumn: 'temperature_label',
-    hardware: 'SHT31 · I²C 0x44',
   },
   {
     key: 'humidity',
@@ -91,7 +92,6 @@ export const METRICS: readonly MetricSpec[] = [
     column: 'humidity_pct',
     statusColumn: 'humidity_status',
     labelColumn: 'humidity_label',
-    hardware: 'SHT31 · I²C 0x44',
   },
 ];
 
@@ -239,6 +239,7 @@ export type DeviceInfo = {
   soil_dry_raw?: number | null;
   soil_wet_raw?: number | null;
   soil_calibrated_at?: string | null;
+  climate_sensor?: string | null;
 };
 
 /** Desktop card footer: the part, its bus or pin, and how the latest read went. */
@@ -249,7 +250,7 @@ export function hardwareText(
   calibrated: boolean,
   timeZone: string,
 ): string {
-  const parts = [spec.hardware];
+  const parts = [spec.hardware ?? climateLabels(device?.climate_sensor).hardware];
   const failedAt = latest ? `Read failed at ${formatTime(latest.recorded_at, timeZone)}` : null;
   if (spec.key === 'soil') {
     if (latest?.soil_raw == null) {

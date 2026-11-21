@@ -9,7 +9,7 @@ Scope of this repo: the Expo app that serves **desktop web** and **native iOS** 
 ## 1. Summary
 
 - **Stack:** Expo **SDK 58** (React Native **0.88**, React **19.3**, react-native-web 0.21), Expo Router, TypeScript (strict).
-  - Xcode ≥ 26.4 is required; release builds use Xcode 27.1.
+  - Xcode 27 or later is required (`scripts/ios-release.js` checks it); release builds use Xcode 27.1.
 - **One codebase, two layouts:**
   - **Desktop web** uses a sidebar shell built to the Figma **Desktop 1920** and **Desktop 1512** frames.
   - **iOS** uses system **native tabs** (Home · Sensors · Timeline · Chat) with Liquid Glass, built to the Figma 402×874 frames.
@@ -42,7 +42,7 @@ Scope of this repo: the Expo app that serves **desktop web** and **native iOS** 
 
 ### 2.1 Figma (design file, page `0:1`)
 
-**v1 frames.** Node IDs refer to frames in the design file. The **Desktop 1920 and Desktop 1512 frames are the primary web references.** The older 1440×1024 frames are kept only for component details.
+**v1 frames.** The Figma design file is private and is not part of this repository. Node IDs here and in code comments refer to its frames and are kept as provenance; the values the code uses are exported to `design/tokens.json` and `design/layout.json`. The **Desktop 1920 and Desktop 1512 frames are the primary web references.** The older 1440×1024 frames are kept only for component details.
 
 | Screen | Desktop 1920×1080 | Desktop 1512×982 | Desktop 1440 (older) | iPhone 402×874 |
 |---|---|---|---|---|
@@ -111,7 +111,7 @@ Even the new frames still contain deferred features. Each one is handled consist
 | Chat "Past conversations" (1920 left column; 1512 side column) | **Kept as day groups.** The single conversation is grouped by local date. Each entry shows the first user message of that day, and clicking it scrolls to that day. The "New chat" button and mic icon are not rendered, because there are no threads. The **"Based on readings from HH:mm"** footer is kept, using `chat_messages.based_on_reading_at`. |
 | Settings Plant profile: Species, Location, Added, photo | Nickname and **Location** (free text, ≤ 60 characters) are editable. Time zone is edited in Account. Species comes from the plant profile (read-only) and Added is `created_at` (read-only). Photo is not rendered (no column). |
 | Settings Care targets: "Use preset" toggle, sliders, per-row alert switches | **Editable** through `plants.threshold_overrides`. "Use preset" **on** sets overrides `{}` (profile values, locked). **Off** enables per-metric range editing of `ok_low`/`ok_high`. The per-row alert switches are not rendered (notifications deferred). |
-| Settings Devices: "Add device" button | Not rendered. The rows (gateway, ESP32, soil probe, SHT31 + GY-302) show live status, and the soil probe row keeps its **Recalibrate** button. |
+| Settings Devices: "Add device" button | Not rendered. The rows (gateway, ESP32, soil probe, climate sensor + GY-302) show live status. The climate row names the part from `devices.climate_sensor`: "SHT31 + GY-302" (I²C 0x44, 0x23), "DHT11 + GY-302" (GPIO4, I²C 0x23), or "Climate sensor + GY-302" without addresses when the column is NULL or unknown, and the soil probe row keeps its **Recalibrate** button. |
 | Settings nav items Chat, Notifications | Not rendered. The nav keeps Plant profile, Care targets, Devices & calibration and Account. |
 | Account: photo, username, delete account | Not rendered. The pane keeps name, email (read-only), time zone, a password change, and an added **Sign out** button. |
 | Loading, error, offline and empty states | Built from existing components and tokens (§5.5, decision H). |
@@ -172,7 +172,7 @@ Even the new frames still contain deferred features. Each one is handled consist
 - **Web hosting:** the `single` web export is static files, served from Cloudflare Pages (see `docs/DEPLOY.md`).
 - **iOS builds:** Release builds are made locally with Xcode; a free Personal Team can install on your own iPhone, but those builds expire after 7 days.
 - **TestFlight:** requires the Apple Developer Program at $99/yr. Source: https://developer.apple.com/programs
-- **Testing:** `jest-expo` with React Native Testing Library for unit tests; Maestro on the iOS Simulator for end-to-end tests.
+- **Testing:** `jest-expo` with React Native Testing Library for unit tests; Playwright for web end-to-end tests. Maestro flows on the iOS Simulator are planned but not in the repository yet.
   - https://docs.expo.dev/develop/unit-testing
 - **Playwright screenshots:**
   - `toHaveScreenshot` supports `mask` for regions to ignore. Source: https://playwright.dev/docs/test-snapshots
@@ -302,7 +302,7 @@ olvar-dashboard/
 │  │              timeline-events.ts, calibration.ts, chat-days.ts, status-freshness.ts
 │  └─ theme/      tokens.ts, layout.ts (tiers, §5.4), typography.ts, fonts.ts, useBreakpoint.ts
 ├─ e2e/web/       *.spec.ts, playwright.config.ts, serve-spa.mjs, __screenshots__/ (full-page baselines)
-├─ .maestro/      sign-in.yaml, home.yaml, chat.yaml, calibrate.yaml
+├─ .maestro/      (planned, not in the repository yet) sign-in.yaml, home.yaml, chat.yaml, calibrate.yaml
 ├─ .github/workflows/ ci.yml
 └─ scripts/       sync-types.sh, check-web-export.js, ios-release.js, smoke-pages.sh
 ```
@@ -608,7 +608,7 @@ The app is built in the steps T0 to T14 below. Each step lists its scope, the wo
 **Work:**
 - 24 h / 7 d / 30 d segmented control: 24 h reads `readings_v` through `fetchAll()` (about 1,440 rows); 7 d and 30 d read `readings_hourly_v` (≤ 720 rows).
 - 4 detail cards with min / avg / max.
-- Hardware footers, for example "Capacitive · GPIO34 · raw 1,980 · calibrated Nov 5" or "SHT31 · I²C 0x44 · Read OK / Read failed".
+- Hardware footers, for example "Capacitive · GPIO34 · raw 1,980 · calibrated Nov 5" or "SHT31 · I²C 0x44 · Read OK / Read failed" (temperature and humidity name the part from `devices.climate_sensor`: SHT31, DHT11 · GPIO4, or a neutral "Climate sensor").
 - The offline state.
 - No Export button.
 
@@ -724,7 +724,7 @@ The app is built in the steps T0 to T14 below. Each step lists its scope, the wo
 ### T14: iOS pipeline and web deploy
 
 **Work:**
-- Maestro flows on the iPhone 17 Pro simulator (iOS 27).
+- Maestro flows on the iPhone 17 Pro simulator (iOS 27). Not done in v0.1.0: the repository has no `.maestro/` flows yet.
 - Local iOS Release builds: `npm run ios:release` installs on a connected iPhone and `npm run ios:archive` archives for TestFlight (`docs/DEPLOY.md`).
 - Web deploys on Cloudflare Pages, with a check of the export (`scripts/check-web-export.js`).
 - Icon, splash and launch screen.

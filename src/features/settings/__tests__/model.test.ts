@@ -271,7 +271,14 @@ describe('device rows', () => {
     gateway: { version: '0.1.0', last_seen_at: '2026-11-06T05:00:00Z' },
     gatewayAgeS: 12,
     gatewayStale: false,
-    device: { id: 'olvar-a1b2c3', fw: '0.1.0', soil_dry_raw: 2910, soil_wet_raw: 1350, soil_calibrated_at: '2026-11-05T01:00:00Z' },
+    device: {
+      id: 'olvar-a1b2c3',
+      fw: '0.1.0',
+      soil_dry_raw: 2910,
+      soil_wet_raw: 1350,
+      soil_calibrated_at: '2026-11-05T01:00:00Z',
+      climate_sensor: 'sht31',
+    },
     nodeOffline: false,
     nodeOfflineSince: null,
     latest: { recorded_at: '2026-11-06T05:00:00Z', temperature_c: 23.4, humidity_pct: 58, lux: 1240 } as Reading,
@@ -287,6 +294,26 @@ describe('device rows', () => {
     expect(rows[2]).toMatchObject({ subtitle: 'Capacitive · GPIO34 · dry 2,910 · wet 1,350', status: { label: 'Calibrated Nov 5' }, recalibrate: true });
     expect(rows[3].status).toEqual({ label: 'Read OK', live: true });
     expect(rows[2].short).toEqual({ title: 'Soil Moisture Sensor', subtitle: 'Capacitive · GPIO34', value: 'Nov 5' });
+    expect(rows[3]).toMatchObject({ title: 'SHT31 + GY-302', subtitle: 'Temperature, humidity and light · I²C 0x44, 0x23' });
+    expect(rows[3].short).toEqual({ title: 'SHT31 + GY-302', subtitle: 'Temp, humidity, light · I²C', value: 'Read OK' });
+  });
+
+  it('names the climate sensor the firmware reports', () => {
+    const climate = (climate_sensor: string | null | undefined, device = base.device) =>
+      deviceRows({ ...base, device: device && { ...device, climate_sensor } }).find((r) => r.key === 'climate')!;
+    expect(climate('dht11')).toMatchObject({
+      title: 'DHT11 + GY-302',
+      subtitle: 'Temperature, humidity and light · GPIO4, I²C 0x23',
+      short: { title: 'DHT11 + GY-302', subtitle: 'Temp, humidity, light · GPIO4, I²C' },
+    });
+    for (const unknown of [null, undefined, 'bme280']) {
+      expect(climate(unknown)).toMatchObject({
+        title: 'Climate sensor + GY-302',
+        subtitle: 'Temperature, humidity and light',
+        short: { title: 'Climate + GY-302', subtitle: 'Temp, humidity, light' },
+      });
+    }
+    expect(deviceRows({ ...base, device: null }).find((r) => r.key === 'climate')!.title).toBe('Climate sensor + GY-302');
   });
 
   it('shows a node the gateway has not reported on yet as waiting, not connected', () => {

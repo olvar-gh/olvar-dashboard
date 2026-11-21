@@ -9,6 +9,8 @@ const path = require('node:path');
 const { parseEnv } = require('../src/env.ts');
 
 const SECRET_KEY = /sb_secret_[A-Za-z0-9_-]+/;
+// The chat model is called only by the gateway's `chat` Edge Function.
+const ANTHROPIC = /sk-ant-[A-Za-z0-9_-]+|api\.anthropic\.com/;
 const SCANNED = new Set(['.html', '.js', '.json', '.map']);
 
 function* files(dir) {
@@ -49,9 +51,9 @@ function checkWebExport(dir) {
   if (fs.existsSync(dir)) {
     for (const file of files(dir)) {
       if (!SCANNED.has(path.extname(file))) continue;
-      if (SECRET_KEY.test(fs.readFileSync(file, 'utf8'))) {
-        problems.push(`${path.relative(dir, file)} contains a Supabase secret key`);
-      }
+      const text = fs.readFileSync(file, 'utf8');
+      if (SECRET_KEY.test(text)) problems.push(`${path.relative(dir, file)} contains a Supabase secret key`);
+      if (ANTHROPIC.test(text)) problems.push(`${path.relative(dir, file)} contains an Anthropic API key or host`);
     }
   }
   return problems;

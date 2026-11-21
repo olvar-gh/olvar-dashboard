@@ -1,4 +1,4 @@
-// Serves the `expo export -p web` output with the SPA fallback EAS Hosting applies: unknown paths
+// Serves the `expo export -p web` output with the SPA fallback Cloudflare Pages applies: unknown paths
 // get index.html, so deep links load the app. `expo serve` answers them with 404.
 import { createReadStream, statSync } from 'node:fs';
 import { createServer } from 'node:http';

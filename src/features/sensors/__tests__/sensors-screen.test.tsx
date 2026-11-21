@@ -166,6 +166,18 @@ describe('desktop Sensors page', () => {
     );
   });
 
+  it.each([
+    ['dht11', 'DHT11 · GPIO4 · Read OK'],
+    [null, 'Climate sensor · Read OK'],
+  ] as const)('names the climate sensor %s in the footers', async (climate_sensor, text) => {
+    const app = await renderDesktop();
+    await screen.findByTestId('sensor-hardware-temperature');
+    app.source.updateDevice({ climate_sensor });
+    await app.queryClient.invalidateQueries({ queryKey: ['device'] });
+    await waitFor(() => expect(screen.getByTestId('sensor-hardware-temperature').props.children).toBe(text));
+    expect(screen.getByTestId('sensor-hardware-humidity').props.children).toBe(text);
+  });
+
   it('keeps the range in the URL', async () => {
     const app = await renderDesktop(undefined, '/sensors?range=30d');
     await screen.findByTestId('sensor-card-soil');

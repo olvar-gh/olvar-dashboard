@@ -24,6 +24,17 @@ describe('app config', () => {
   });
 });
 
+describe('release version', () => {
+  it('is the same in package.json, app.json and package-lock.json, with a CHANGELOG entry', () => {
+    const { version } = readJson('package.json');
+    expect(version).toMatch(/^\d+\.\d+\.\d+$/);
+    expect(readJson('app.json').expo.version).toBe(version);
+    const lock = readJson('package-lock.json');
+    expect([lock.version, lock.packages[''].version]).toEqual([version, version]);
+    expect(fs.readFileSync(path.join(root, 'CHANGELOG.md'), 'utf8')).toContain(`## [${version}]`);
+  });
+});
+
 describe('iOS builds', () => {
   it('use no cloud build service', () => {
     expect(fs.existsSync(path.join(root, 'eas.json'))).toBe(false);
@@ -140,6 +151,13 @@ describe('checkWebExport', () => {
     fs.writeFileSync(path.join(dir, '_expo/static/js/web/index-abc.js'), 'const k="sb_secret_abc123";');
     expect(checkWebExport(dir)).toEqual([
       `${path.join('_expo/static/js/web/index-abc.js')} contains a Supabase secret key`,
+    ]);
+  });
+
+  it.each(['sk-ant-api03-abc', 'https://api.anthropic.com/v1/messages'])('rejects a bundle that contains %s', (text) => {
+    fs.writeFileSync(path.join(dir, '_expo/static/js/web/index-abc.js'), `const k="${text}";`);
+    expect(checkWebExport(dir)).toEqual([
+      `${path.join('_expo/static/js/web/index-abc.js')} contains an Anthropic API key or host`,
     ]);
   });
 
